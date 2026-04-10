@@ -1,0 +1,226 @@
+*wplus.txt*  All-in-one Vim plugin (dependency-free)       vim-wplus
+
+==============================================================================
+CONTENTS                                                      *wplus-contents*
+
+  1. Introduction .............. |wplus-intro|
+  2. Modules ................... |wplus-modules|
+  3. Commentary ................ |wplus-commentary|
+  4. Auto Pairs ................ |wplus-pairs|
+  5. Repeat .................... |wplus-repeat|
+  6. Alternate File ............ |wplus-altfile|
+  7. Indent Guide .............. |wplus-indent|
+  8. Statusline ................ |wplus-statusline|
+  9. Tabline ................... |wplus-tabline|
+ 10. Git Gutter ................ |wplus-gitgutter|
+ 11. Git Blame ................. |wplus-blame|
+ 12. Illuminate ................ |wplus-illuminate|
+ 13. Which Key ................. |wplus-whichkey|
+ 14. Undo Tree ................. |wplus-undotree|
+ 15. Surround .................. |wplus-surround|
+
+==============================================================================
+1. INTRODUCTION                                                 *wplus-intro*
+
+vim-wplus is a single Vim plugin that replaces 13 commonly-used plugins with
+pure VimScript implementations. Requires Vim 9.1+ with +job +channel
++popupwin +signs.
+
+To disable individual modules before the plugin loads: >
+    let g:wplus_commentary_enabled = 0
+    let g:wplus_pairs_enabled      = 0
+    " etc.
+<
+
+==============================================================================
+2. MODULES                                                    *wplus-modules*
+
+  Module          Replaces
+  ─────────────────────────────────────────────────
+  commentary      vim-commentary
+  pairs           auto-pairs
+  repeat          vim-repeat
+  altfile         a.vim
+  indent          indentLine
+  statusline      vim-airline + vim-airline-themes
+  tabline         vim-airline tabline
+  gitgutter       vim-gitgutter
+  blame           blamer.nvim
+  illuminate      vim-illuminate
+  whichkey        vim-which-key
+  undotree        undotree
+  surround        vim-surround
+
+==============================================================================
+3. COMMENTARY                                             *wplus-commentary*
+
+Replaces: vim-commentary
+
+Mappings: >
+    gcc        Toggle comment on current line
+    gc{motion} Toggle comment on motion
+    gc         Toggle comment on visual selection
+<
+The comment tokens are determined from &commentstring for the current filetype.
+
+==============================================================================
+4. AUTO PAIRS                                                  *wplus-pairs*
+
+Replaces: auto-pairs
+
+Automatically closes brackets and quotes as you type. Features:
+- Auto-close ( [ { " ' `
+- Skip over existing closing character with <Right>
+- Delete matching pair on <BS>
+
+Configuration: >
+    " Custom pair map (before plugin loads)
+    let g:wplus_pairs_map = { '(': ')', '[': ']', '{': '}' }
+<
+
+==============================================================================
+5. REPEAT                                                      *wplus-repeat*
+
+Replaces: vim-repeat
+
+Allows plugin operations (surround, commentary, etc.) to be repeated with the
+. command. Also compatible with tpope/vim-repeat if installed.
+
+API for plugin authors: >
+    call wplus#repeat#set("\<Plug>MyPlugMapping", v:count1)
+<
+
+==============================================================================
+6. ALTERNATE FILE                                            *wplus-altfile*
+
+Replaces: a.vim
+
+Commands: >
+    :A    Open alternate file (.h <-> .c/.cpp) in current window
+    :AV   Open alternate file in vertical split
+    :AS   Open alternate file in horizontal split
+<
+
+==============================================================================
+7. INDENT GUIDE                                               *wplus-indent*
+
+Replaces: indentLine
+
+Draws a guide character (▏) at each indent level using Vim's conceal feature.
+
+Configuration: >
+    let g:wplus_indent_char       = '▏'   " guide character
+    let g:wplus_indent_ft_exclude = ['json', 'markdown', 'help']
+<
+
+==============================================================================
+8. STATUSLINE                                             *wplus-statusline*
+
+Replaces: vim-airline + vim-airline-themes
+
+Shows (left to right):
+  Mode | Git branch | Filename [flags] | → | Diagnostics | Filetype | Pos
+
+Integrates with coc.nvim diagnostic counts automatically.
+
+==============================================================================
+9. TABLINE                                                 *wplus-tabline*
+
+Replaces: vim-airline tabline extension
+
+Shows all listed buffers. Active buffer is highlighted. Modified buffers show
+a ● indicator. Mouse-click on a buffer label switches to that buffer.
+
+==============================================================================
+10. GIT GUTTER                                            *wplus-gitgutter*
+
+Replaces: vim-gitgutter
+
+Shows +/~/▁ signs in the sign column for added/changed/deleted lines.
+Uses async job_start() so it never blocks the UI.
+
+Signs: >
+    ┃  Added    (WplusGGAdd    highlight)
+    ┃  Changed  (WplusGGChange highlight)
+    ▁  Deleted  (WplusGGDelete highlight)
+<
+Refreshes on: BufReadPost, BufWritePost, InsertLeave.
+
+==============================================================================
+11. GIT BLAME                                               *wplus-blame*
+
+Replaces: blamer.nvim / APZelos/blamer.nvim
+
+Shows inline git blame for the current line as virtual text after a delay.
+
+Configuration: >
+    let g:wplus_blame_delay       = 500           " ms
+    let g:wplus_blame_prefix      = '   '
+    let g:wplus_blame_template    = '<author>, <date> • <summary>'
+    let g:wplus_blame_date_format = '%y/%m/%d'
+<
+Mappings: >
+    <leader>bl   Toggle blame on/off
+    :BlamerToggle Toggle blame on/off
+<
+
+==============================================================================
+12. ILLUMINATE                                            *wplus-illuminate*
+
+Replaces: vim-illuminate
+
+Highlights all occurrences of the word under the cursor using matchadd().
+Updates after |g:wplus_illuminate_delay| ms of cursor inactivity.
+
+Configuration: >
+    let g:wplus_illuminate_delay    = 200   " ms
+    let g:wplus_illuminate_ft_block = ['NERDTree', 'tagbar']
+<
+
+==============================================================================
+13. WHICH KEY                                             *wplus-whichkey*
+
+Replaces: vim-which-key
+
+After pressing <leader> and waiting for |timeoutlen| ms, a popup window
+appears listing registered key bindings.
+
+Register additional hints: >
+    call wplus#whichkey#register('<leader>x', 'My custom command')
+<
+
+==============================================================================
+14. UNDO TREE                                             *wplus-undotree*
+
+Replaces: mbbill/undotree
+
+Opens a sidebar showing the full undo history tree using Vim's built-in
+undotree() function.
+
+Commands: >
+    :UndotreeToggle   Open/close the undo tree sidebar
+    <leader>u         Same (defined in vimrc)
+<
+Configuration: >
+    let g:wplus_undotree_width = 30   " sidebar width
+<
+
+==============================================================================
+15. SURROUND                                              *wplus-surround*
+
+Replaces: vim-surround
+
+Mappings: >
+    ys{motion}{char}   Surround motion with char
+    yss{char}          Surround current line
+    cs{old}{new}       Change surrounding char
+    ds{char}           Delete surrounding char
+    S{char}  (visual)  Surround visual selection
+<
+Example pairs: ( ) [ ] { } < > " ' `
+  - ys2w"   → surround next 2 words with double quotes
+  - cs({    → change ( to { with spaces: { text }
+  - ds"     → delete surrounding double quotes
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:
