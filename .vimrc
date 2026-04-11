@@ -1,14 +1,21 @@
 " ============================================================
-" vim-plug 플러그인 관리자
+" 사전 설정 (플러그인 로드 전에 선언해야 함)
 " ============================================================
+set nocompatible
+set encoding=utf-8
+let mapleader = " "
+
 " vim-polyglot이 개별 언어 플러그인(vim-go, rust.vim, python-syntax)과
-" 충돌하지 않도록 해당 언어 비활성화 (plug#begin() 전에 선언해야 함)
+" 충돌하지 않도록 해당 언어 비활성화
 let g:polyglot_disabled = ['go', 'rust', 'python']
 
+" ============================================================
+" vim-plug 플러그인 관리자
+" ============================================================
 call plug#begin('~/.vim/plugged')
 
 " --- UI / 편의기능 ---
-Plug '/home/wkqco/Workspace/utils/vim-wplus'  " 올인원 플러그인 (airline·commentary·surround·gitgutter·blame·illuminate·whichkey·undotree·pairs·repeat·altfile·indent 대체)
+Plug '/home/wkqco/Workspace/utils/vim-wplus'
 Plug 'preservim/nerdtree'               " 파일 탐색기
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'                 " 퍼지 파인더
@@ -45,12 +52,10 @@ call plug#end()
 " ============================================================
 " 기본 설정
 " ============================================================
-set nocompatible
-filetype plugin indent on
 syntax on
 
-set encoding=utf-8
 set fileencoding=utf-8
+set fileencodings=utf-8,cp949,euc-kr,latin1
 set number                  " 줄 번호
 set relativenumber          " 상대 줄 번호
 set cursorline              " 현재 줄 강조
@@ -118,7 +123,6 @@ colorscheme gruvbox
 " ============================================================
 " 키 매핑
 " ============================================================
-let mapleader = " "
 
 " 파일 탐색기
 nnoremap <leader>e :NERDTreeToggle<CR>
@@ -181,9 +185,23 @@ nnoremap <leader>xc :CocList commands<CR>
 " ============================================================
 let NERDTreeShowHidden = 1
 let NERDTreeMinimalUI  = 1
-" vim만 남으면 자동 닫기
+
+function! s:OpenIDELayout() abort
+    if exists('s:std_in') | return | endif
+    if argc() > 0 && isdirectory(argv(0))
+        execute 'NERDTree ' . argv(0)
+    else
+        NERDTree
+        wincmd p
+    endif
+    TagbarOpen
+endfunction
+
 augroup nerdtree_settings
     autocmd!
+    autocmd StdinReadPre * let s:std_in = 1
+    autocmd VimEnter * call s:OpenIDELayout()
+    " vim만 남으면 자동 닫기
     autocmd BufEnter * if tabpagenr('$') == 1 && winnr('$') == 1 &&
         \ exists('b:NERDTree') && b:NERDTree.isTabTree() | quit | endif
 augroup END
@@ -235,7 +253,7 @@ nmap <silent> gr <Plug>(coc-references)
 
 " 호버로 문서 보기
 nnoremap <silent> K :call ShowDocumentation()<CR>
-function! ShowDocumentation()
+function! ShowDocumentation() abort
     if CocAction('hasProvider', 'hover')
         call CocActionAsync('doHover')
     else
@@ -318,7 +336,7 @@ augroup END
 augroup c_cpp_settings
     autocmd!
     autocmd FileType c,cpp setlocal tabstop=4 shiftwidth=4 expandtab
-    autocmd FileType c,cpp nmap <buffer> <leader>h :A<CR>
+    autocmd FileType c,cpp nmap <buffer> <leader>ah :A<CR>  " 헤더/소스 전환 (<leader>h는 전역 noh)
 augroup END
 
 " ============================================================
