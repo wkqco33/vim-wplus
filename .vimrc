@@ -201,7 +201,10 @@ augroup nerdtree_settings
     autocmd!
     autocmd StdinReadPre * let s:std_in = 1
     autocmd VimEnter * call s:OpenIDELayout()
-    " vim만 남으면 자동 닫기
+    " NERDTree 내부 WinEnter auto-close 비활성화 (Vim 9.1+ E1312 방지)
+    " WinEnter 안에서 창 레이아웃 변경이 금지됐으므로 BufEnter로 대체
+    autocmd VimEnter * silent! autocmd! NERDTree WinEnter
+    " vim만 남으면 자동 닫기 (BufEnter는 E1312 제약 없음)
     autocmd BufEnter * if tabpagenr('$') == 1 && winnr('$') == 1 &&
         \ exists('b:NERDTree') && b:NERDTree.isTabTree() | quit | endif
 augroup END
