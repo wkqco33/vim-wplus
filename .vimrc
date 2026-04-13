@@ -194,7 +194,6 @@ function! s:OpenIDELayout() abort
         NERDTree
         wincmd p
     endif
-    TagbarOpen
 endfunction
 
 augroup nerdtree_settings
