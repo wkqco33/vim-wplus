@@ -46,8 +46,10 @@ endfunction
 
 function! wplus#format#setup() abort
     nnoremap <silent> <M-F> :call wplus#format#run()<CR>
+    nnoremap <silent> <leader>i :call wplus#format#run()<CR>
     inoremap <silent> <M-F> <Esc>:call wplus#format#run()<CR>
     vnoremap <silent> <M-F> :<C-u>call wplus#format#range()<CR>
+    vnoremap <silent> <leader>i :<C-u>call wplus#format#range()<CR>
 endfunction
 
 " ── internals ────────────────────────────────────────────────────────────
