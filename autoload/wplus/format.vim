@@ -29,6 +29,10 @@ let s:fmts = {
 " ── public API ───────────────────────────────────────────────────────────
 
 function! wplus#format#run() abort
+    if &buftype !=# '' || !&modifiable
+        echohl WarningMsg | echomsg '[wplus] current buffer is not formattable' | echohl None
+        return
+    endif
     if s:try_lsp()      | return | endif
     if s:try_external() | return | endif
     if s:try_ale()      | return | endif
@@ -125,6 +129,13 @@ function! s:run_stdin_fmt(cmd, bin) abort
         echohl None
         call winrestview(l:view)
         return 0
+    endif
+
+    if getline(1, '$') ==# l:orig
+        call winrestview(l:view)
+        redraw!
+        echo '[wplus] already formatted (' . a:bin . ')'
+        return 1
     endif
 
     call winrestview(l:view)

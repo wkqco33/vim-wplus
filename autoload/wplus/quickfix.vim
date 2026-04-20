@@ -34,6 +34,55 @@ function! wplus#quickfix#setup() abort
     augroup END
 endfunction
 
+function! s:escape_sub_pattern(text) abort
+    return escape(a:text, '\/')
+endfunction
+
+function! s:escape_sub_replacement(text) abort
+    return escape(a:text, '\/&~')
+endfunction
+
+function! s:collect_quickfix_files(qflist) abort
+    let l:files = {}
+    for l:item in a:qflist
+        let l:name = get(l:item, 'filename', '')
+        if empty(l:name) && get(l:item, 'bufnr', 0) > 0
+            let l:name = bufname(l:item.bufnr)
+        endif
+        if !empty(l:name)
+            let l:files[fnamemodify(l:name, ':p')] = 1
+        endif
+    endfor
+    return sort(keys(l:files))
+endfunction
+
+function! s:replace_mode() abort
+    let l:choice = confirm('Replace mode?', '&Apply\n&Confirm\n&Preview\n&Cancel', 1)
+    return l:choice == 1 ? 'apply' : (l:choice == 2 ? 'confirm' : (l:choice == 3 ? 'preview' : 'cancel'))
+endfunction
+
+function! s:preview_replace(files, from, to) abort
+    echomsg printf('[wplus] preview: %d files, %s -> %s', len(a:files), a:from, a:to)
+    if !empty(a:files)
+        echo join(a:files[: min([len(a:files), 5]) - 1], "\n")
+    endif
+endfunction
+
+function! wplus#quickfix#run_replace(mode, from, to) abort
+    let l:qflist = getqflist()
+    let l:files = s:collect_quickfix_files(l:qflist)
+    if a:mode ==# 'preview'
+        call s:preview_replace(l:files, a:from, a:to)
+        return
+    endif
+
+    let l:pattern = s:escape_sub_pattern(a:from)
+    let l:replacement = s:escape_sub_replacement(a:to)
+    let l:flags = a:mode ==# 'confirm' ? 'gce' : 'ge'
+    execute 'cfdo keepjumps keeppatterns silent %s/' . l:pattern . '/' . l:replacement . '/' . l:flags . ' | update'
+    echomsg '[wplus] project replace done: ' . a:from . ' → ' . a:to . ' (' . a:mode . ')'
+endfunction
+
 " ── quickfix toggle ───────────────────────────────────────────────────────
 
 function! wplus#quickfix#toggle_qf() abort
@@ -100,27 +149,7 @@ function! wplus#quickfix#project_replace() abort
     let l:from = input('Search pattern  : ')
     if empty(l:from) | return | endif
     let l:to   = input('Replace with    : ')
-
-    " Build unique file list from quickfix
-    let l:files = {}
-    for l:item in l:qflist
-        if l:item.bufnr > 0
-            let l:files[l:item.bufnr] = 1
-        endif
-    endfor
-
-    let l:count = 0
-    for l:bufnr in keys(l:files)
-        let l:fname = bufname(str2nr(l:bufnr))
-        if empty(l:fname) | continue | endif
-        execute 'keepjumps keeppatterns bufdo if bufnr("%") == ' . l:bufnr
-            \ . ' | silent! %s/' . escape(l:from, '/') . '/'
-            \ . escape(l:to, '/') . '/g | let g:_wplus_rc = v:count | endif'
-        let l:count += get(g:, '_wplus_rc', 0)
-        unlet! g:_wplus_rc
-    endfor
-
-    " Simpler approach: use cdo
-    execute 'cdo keepjumps s/' . escape(l:from, '/') . '/' . escape(l:to, '/') . '/ge | update'
-    echomsg '[wplus] project replace done: ' . l:from . ' → ' . l:to
+    let l:mode = s:replace_mode()
+    if l:mode ==# 'cancel' | return | endif
+    call wplus#quickfix#run_replace(l:mode, l:from, l:to)
 endfunction

@@ -15,6 +15,25 @@ let s:prop_type = 'WplusBlameProp'
 let s:timer     = -1
 let s:job       = v:null
 
+function! s:git_root(path) abort
+    let l:dir = fnamemodify(a:path, ':p:h')
+    while !empty(l:dir) && l:dir !=# '/'
+        if isdirectory(l:dir . '/.git')
+            return l:dir
+        endif
+        let l:parent = fnamemodify(l:dir, ':h')
+        if l:parent ==# l:dir
+            break
+        endif
+        let l:dir = l:parent
+    endwhile
+    return ''
+endfunction
+
+function! s:git_relpath(root, file) abort
+    return a:file[: len(a:root)] ==# a:root . '/' ? a:file[len(a:root) + 1 :] : a:file
+endfunction
+
 " ── highlight & prop type ─────────────────────────────────────────────────
 
 function! s:init() abort
@@ -86,6 +105,11 @@ function! s:trigger() abort
     let lnum  = line('.')
     let file  = expand('%:p')
     if empty(file) | return | endif
+    let root = s:git_root(file)
+    if empty(root)
+        call s:clear_all(bufnr)
+        return
+    endif
 
     if s:timer != -1
         call timer_stop(s:timer)
@@ -98,14 +122,14 @@ function! s:trigger() abort
 
     let lines = []
     let s:timer = timer_start(g:wplus_blame_delay, {_ ->
-        \ s:start_job(bufnr, lnum, file, lines)})
+        \ s:start_job(bufnr, lnum, root, file, lines)})
 endfunction
 
-function! s:start_job(bufnr, lnum, file, lines) abort
+function! s:start_job(bufnr, lnum, root, file, lines) abort
     let s:timer = -1
     let s:job = job_start(
-        \ ['git', 'blame', '--porcelain', '-L',
-        \   a:lnum . ',' . a:lnum, a:file], {
+        \ ['git', '-C', a:root, 'blame', '--porcelain', '-L',
+        \   a:lnum . ',' . a:lnum, s:git_relpath(a:root, a:file)], {
         \ 'out_cb':  {_, l -> add(a:lines, l)},
         \ 'close_cb': function('s:on_blame', [a:bufnr, a:lnum, a:lines]),
         \ 'err_cb':  {_ch, _msg -> 0},

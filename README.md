@@ -350,6 +350,8 @@ call wplus#whichkey#register('q', 'quit')
 2. <leader>xr          — 치환 패턴 입력 → 모든 파일에 자동 적용
 ```
 
+치환 실행 전 `Apply`, `Confirm`, `Preview` 모드를 선택할 수 있습니다.
+
 ---
 
 ### finder — 고속 퍼지 파인더
@@ -385,6 +387,8 @@ Vim 9의 `matchfuzzy()`와 팝업 윈도우를 사용하여 파일, 버퍼, 최�
 - `r`: 이름 변경
 - `R`: 새로고침
 - `q`: 닫기
+
+대용량 디렉토리 보호를 위해 최대 항목 수와 최대 재귀 깊이를 제한합니다.
 
 ---
 
@@ -430,6 +434,10 @@ Vim 9의 `matchfuzzy()`와 팝업 윈도우를 사용하여 파일, 버퍼, 최�
 | `gd` | 정의 이동 (Go to Definition) |
 | `gr` | 참조 찾기 (References) |
 | `K` | 심볼 정보 요약 (Hover) |
+
+진단이 들어오면 sign 컬럼에 `E`, `W`, `I`, `H`를 표시하고, 현재 버퍼의 오류/경고 수를 상태줄의 `E:n W:n` 형식으로 보여줍니다.
+
+기본 `signcolumn`은 호환성을 위해 `yes`를 사용합니다. 이미 사용자가 `signcolumn`을 직접 설정했다면 그 값을 유지합니다.
 
 Go(`gopls`)를 우선 지원하며, 다른 언어는 `ctags` 및 `keywordprg`로 폴백됩니다.
 
@@ -523,6 +531,19 @@ let g:wplus_indent_ft_exclude = ['help', 'nerdtree', 'undotree', 'tagbar']
 " ── yankhighlight ────────────────────────────────────────────────────────
 let g:wplus_yank_duration     = 250          " 강조 지속 시간 (ms)
 
+" ── lsp ─────────────────────────────────────────────────────────────────
+let g:wplus_lsp_log_enabled   = 1
+let g:wplus_lsp_signcolumn    = 'yes'        " signcolumn 기본값, 빈 문자열이면 건드리지 않음
+
+" ── explorer ────────────────────────────────────────────────────────────
+let g:wplus_explorer_max_entries = 1000      " 최대 표시 항목 수
+let g:wplus_explorer_max_depth   = 8         " 최대 재귀 깊이
+
+" ── session ─────────────────────────────────────────────────────────────
+let g:wplus_session_autoload  = 1
+let g:wplus_session_autosave  = 1
+let g:wplus_session_max_files = 50          " 보관할 세션 파일 최대 개수
+
 " ── undotree ─────────────────────────────────────────────────────────────
 let g:wplus_undotree_width    = 30           " 사이드바 너비 (컬럼)
 ```
@@ -534,4 +555,3 @@ let g:wplus_undotree_width    = 30           " 사이드바 너비 (컬럼)
 ```vim
 :help wplus
 ```
-

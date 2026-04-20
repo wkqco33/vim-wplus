@@ -37,7 +37,7 @@ function! wplus#root#change_dir() abort
     let l:root = wplus#root#find_root()
     if !empty(l:root) && l:root != getcwd()
         " Use silent to avoid messages on every buffer switch
-        silent! execute 'lcd' l:root
+        silent! execute 'lcd ' . fnameescape(l:root)
     endif
 endfunction
 

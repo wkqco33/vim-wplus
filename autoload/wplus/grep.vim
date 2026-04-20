@@ -3,7 +3,38 @@
 if exists('g:autoloaded_wplus_grep') | finish | endif
 let g:autoloaded_wplus_grep = 1
 
+function! s:configure_grep() abort
+    if executable('rg')
+        let &grepprg = 'rg --vimgrep --smart-case'
+        let &grepformat = '%f:%l:%c:%m'
+    elseif executable('git') && isdirectory('.git')
+        let &grepprg = 'git grep -n --column'
+        let &grepformat = '%f:%l:%c:%m'
+    else
+        let &grepprg = 'grep -RIn $* .'
+        let &grepformat = '%f:%l:%m'
+    endif
+endfunction
+
+function! s:escape_regex(text) abort
+    return substitute(a:text, '[\\.^$*+?(){}|\[\]]', '\\&', 'g')
+endfunction
+
+function! s:get_visual_text() abort
+    let [l:line_start, l:col_start] = getpos("'<")[1:2]
+    let [l:line_end, l:col_end] = getpos("'>")[1:2]
+    let l:lines = getline(l:line_start, l:line_end)
+    if empty(l:lines)
+        return ''
+    endif
+
+    let l:lines[-1] = l:lines[-1][: l:col_end - (&selection ==# 'inclusive' ? 1 : 2)]
+    let l:lines[0] = l:lines[0][l:col_start - 1 :]
+    return trim(substitute(join(l:lines, "\n"), '\_s\+', ' ', 'g'))
+endfunction
+
 function! wplus#grep#search(args) abort
+    call s:configure_grep()
     let grep_cmd = &grepprg
     if empty(grep_cmd) | let grep_cmd = 'grep -n $* /dev/null' | endif
 
@@ -20,25 +51,13 @@ function! wplus#grep#search(args) abort
 endfunction
 
 function! wplus#grep#search_visual() abort
-    let [line_start, col_start] = getpos("'<")[1:2]
-    let [line_end, col_end] = getpos("'>")[1:2]
-    let lines = getline(line_start, line_end)
-    if empty(lines) | return | endif
-    let lines[-1] = lines[-1][:col_end - (&selection == 'inclusive' ? 1 : 2)]
-    let lines[0] = lines[0][col_start - 1:]
-    let pattern = join(lines, "\n")
-    call wplus#grep#search(shellescape(pattern))
+    let l:text = s:get_visual_text()
+    if empty(l:text) | return | endif
+    call wplus#grep#search(shellescape(s:escape_regex(l:text)))
 endfunction
 
 function! wplus#grep#setup() abort
-    " Configure grepprg
-    if executable('rg')
-        let &grepprg = 'rg --vimgrep --smart-case'
-        let &grepformat = '%f:%l:%c:%m'
-    elseif executable('git') && isdirectory('.git')
-        let &grepprg = 'git grep -n --column'
-        let &grepformat = '%f:%l:%c:%m'
-    endif
+    call s:configure_grep()
 
     " Commands
     command! -nargs=+ -complete=file Wgrep call wplus#grep#search(<q-args>)

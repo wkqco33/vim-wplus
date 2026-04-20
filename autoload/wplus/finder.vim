@@ -11,8 +11,23 @@ let s:state = {
     \ 'filtered': [],
     \ 'query': '',
     \ 'callback': '',
-    \ 'selected': 0
+    \ 'selected': 0,
+    \ 'width': 0,
+    \ 'height': 0
     \ }
+
+function! s:run_callback(item) abort
+    if empty(a:item)
+        return
+    endif
+
+    if type(s:state.callback) == v:t_func
+        call call(s:state.callback, [a:item])
+        return
+    endif
+
+    execute s:state.callback . ' ' . fnameescape(a:item)
+endfunction
 
 function! wplus#finder#open(items, callback, title) abort
     let s:state.items = a:items
@@ -23,6 +38,8 @@ function! wplus#finder#open(items, callback, title) abort
 
     let l:width = float2nr(&columns * 0.7)
     let l:height = float2nr(&lines * 0.4)
+    let s:state.width = l:width
+    let s:state.height = l:height
     
     let s:state.winid = popup_create([], {
         \ 'title': ' ' . a:title . ' ',
@@ -39,6 +56,7 @@ function! wplus#finder#open(items, callback, title) abort
         \ 'cursorline': 1,
         \ })
     let s:state.bufnr = winbufnr(s:state.winid)
+    call win_execute(s:state.winid, 'syntax match Title /^' . s:prompt . '.*/')
     call s:update_display()
 endfunction
 
@@ -49,17 +67,17 @@ function! wplus#finder#filter(winid, key) abort
     elseif a:key == "\<CR>"
         let l:res = get(s:state.filtered, s:state.selected, '')
         call popup_close(a:winid)
-        if !empty(l:res)
-            execute s:state.callback . ' ' . fnameescape(l:res)
-        endif
+        call s:run_callback(l:res)
         return 1
     elseif a:key == "\<C-n>" || a:key == "\<Down>"
         let s:state.selected = min([s:state.selected + 1, len(s:state.filtered) - 1])
     elseif a:key == "\<C-p>" || a:key == "\<Up>"
         let s:state.selected = max([s:state.selected - 1, 0])
     elseif a:key == "\<BS>" || a:key == "\<C-h>"
-        let s:state.query = s:state.query[:-2]
-        call s:filter_items()
+        if !empty(s:state.query)
+            let s:state.query = s:state.query[:-2]
+            call s:filter_items()
+        endif
     elseif a:key =~ '^\p$'
         let s:state.query .= a:key
         call s:filter_items()
@@ -78,18 +96,27 @@ function! s:filter_items() abort
     let s:state.selected = 0
 endfunction
 
+function! s:get_visible_items() abort
+    let l:max_items = max([s:state.height - 2, 1])
+    let l:count = len(s:state.filtered)
+    if l:count <= l:max_items
+        return {'items': copy(s:state.filtered), 'offset': 0}
+    endif
+
+    let l:offset = min([
+        \ max([s:state.selected - float2nr(l:max_items / 2), 0]),
+        \ l:count - l:max_items,
+        \ ])
+    return {'items': s:state.filtered[l:offset : l:offset + l:max_items - 1], 'offset': l:offset}
+endfunction
+
 function! s:update_display() abort
-    let l:display = [s:prompt . s:state.query, repeat('─', &columns)]
-    let l:display += s:state.filtered
+    let l:visible = s:get_visible_items()
+    let l:display = [s:prompt . s:state.query, repeat('─', max([s:state.width - 2, 1]))]
+    let l:display += l:visible.items
     call popup_settext(s:state.winid, l:display)
-    " Highlight input line and selection
-    call win_execute(s:state.winid, 'syntax clear')
-    call win_execute(s:state.winid, 'syntax match Title /^' . s:prompt . '.*/')
-    call win_execute(s:state.winid, 'call clearmatches()')
-    " Popup cursorline handles the selection highlight, but we need to account for prompt lines
-    call win_execute(s:state.winid, 'call setwinvar(' . s:state.winid . ', "&cursorline", 1)')
-    " Move 'cursor' to selected line (3 is start of items)
-    call win_execute(s:state.winid, 'execute ' . (s:state.selected + 3))
+    let l:cursor = len(l:visible.items) > 0 ? (s:state.selected - l:visible.offset + 3) : 1
+    call win_execute(s:state.winid, 'execute ' . l:cursor)
     redraw
 endfunction
 

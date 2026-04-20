@@ -6,6 +6,45 @@ let g:autoloaded_wplus_explorer = 1
 let s:explorer_buf = -1
 let s:expanded = {} " path -> 1 (expanded)
 let s:tree_data = [] " List of {path, level, is_dir, name}
+let g:wplus_explorer_max_entries = get(g:, 'wplus_explorer_max_entries', 1000)
+let g:wplus_explorer_max_depth = get(g:, 'wplus_explorer_max_depth', 8)
+let s:truncated = 0
+let s:entry_count = 0
+let s:dir_cache = {}
+
+function! s:normalize_dir(path) abort
+    let l:path = simplify(fnamemodify(a:path, ':p'))
+    if l:path !=# '/'
+        let l:path = substitute(l:path, '/\+$', '', '')
+    endif
+    return l:path
+endfunction
+
+function! s:get_dir_entries(path) abort
+    if has_key(s:dir_cache, a:path)
+        return copy(s:dir_cache[a:path])
+    endif
+
+    try
+        let l:files = readdir(a:path)
+    catch
+        return []
+    endtry
+
+    let l:p = a:path
+    call sort(l:files, {a, b -> isdirectory(l:p . '/' . a) == isdirectory(l:p . '/' . b) ? (a ==# b ? 0 : (a ># b ? 1 : -1)) : (isdirectory(l:p . '/' . a) ? -1 : 1)})
+    let s:dir_cache[a:path] = copy(l:files)
+    return l:files
+endfunction
+
+function! s:invalidate_cache(path) abort
+    let l:prefix = s:normalize_dir(a:path)
+    for l:key in keys(copy(s:dir_cache))
+        if l:key ==# l:prefix || l:key[: len(l:prefix)] ==# l:prefix . '/'
+            unlet s:dir_cache[l:key]
+        endif
+    endfor
+endfunction
 
 function! wplus#explorer#toggle() abort
     let l:winid = bufwinid(s:explorer_buf)
@@ -48,8 +87,10 @@ function! s:open_explorer() abort
 endfunction
 
 function! s:render(root) abort
-    let s:current_root = fnamemodify(a:root, ':p:h')
+    let s:current_root = s:normalize_dir(a:root)
     let s:tree_data = []
+    let s:truncated = 0
+    let s:entry_count = 0
     call s:build_tree(s:current_root, 0)
     
     let l:lines = [s:current_root]
@@ -58,6 +99,9 @@ function! s:render(root) abort
         let l:prefix = l:item.is_dir ? (get(s:expanded, l:item.path, 0) ? '▾ ' : '▸ ') : '  '
         call add(l:lines, l:indent . l:prefix . l:item.name)
     endfor
+    if s:truncated
+        call add(l:lines, '  ... truncated ...')
+    endif
     
     setlocal modifiable
     silent %delete _
@@ -66,16 +110,23 @@ function! s:render(root) abort
 endfunction
 
 function! s:build_tree(path, level) abort
-    let l:files = readdir(a:path)
-    let l:p = a:path
-    " Sort: directories first, then files
-    call sort(l:files, {a, b -> isdirectory(l:p . '/' . a) == isdirectory(l:p . '/' . b) ? (a > b ? 1 : -1) : (isdirectory(l:p . '/' . a) ? -1 : 1)})
+    if s:entry_count >= g:wplus_explorer_max_entries || a:level >= g:wplus_explorer_max_depth
+        let s:truncated = 1
+        return
+    endif
+
+    let l:files = s:get_dir_entries(a:path)
     
     for l:f in l:files
         if l:f ==# '.git' | continue | endif
+        if s:entry_count >= g:wplus_explorer_max_entries
+            let s:truncated = 1
+            return
+        endif
         let l:full = a:path . '/' . l:f
         let l:is_dir = isdirectory(l:full)
         call add(s:tree_data, {'path': l:full, 'level': a:level, 'is_dir': l:is_dir, 'name': l:f})
+        let s:entry_count += 1
         
         if l:is_dir && get(s:expanded, l:full, 0)
             call s:build_tree(l:full, a:level + 1)
@@ -115,6 +166,7 @@ function! s:on_add() abort
     else
         call writefile([], l:full_path)
     endif
+    call s:invalidate_cache(l:parent)
     call s:refresh()
 endfunction
 
@@ -124,6 +176,7 @@ function! s:on_delete() abort
     let l:item = s:tree_data[l:lnum - 2]
     if confirm("Delete " . l:item.name . "?", "&Yes\n&No") == 1
         call delete(l:item.path, 'rf')
+        call s:invalidate_cache(fnamemodify(l:item.path, ':h'))
         call s:refresh()
     endif
 endfunction
@@ -135,10 +188,12 @@ function! s:on_rename() abort
     let l:new_name = input('Rename to: ', l:item.name)
     if empty(l:new_name) || l:new_name == l:item.name | return | endif
     call rename(l:item.path, fnamemodify(l:item.path, ':h') . '/' . l:new_name)
+    call s:invalidate_cache(fnamemodify(l:item.path, ':h'))
     call s:refresh()
 endfunction
 
 function! s:refresh() abort
+    call s:invalidate_cache(s:current_root)
     call s:render(s:current_root)
 endfunction
 
