@@ -6,6 +6,7 @@
 "   cmd      : shell command (reads stdin, writes stdout)
 "   filepath : if 1, append shellescape(expand('%')) to cmd (for prettier etc.)
 "   check    : binary name to check with executable() [defaults to first word of cmd]
+"   tmpfile  : if 1, write buffer to temp file, run cmd on it, read back result
 let s:fmts = {
     \ 'go':         { 'cmd': 'goimports' },
     \ 'rust':       { 'cmd': 'rustfmt' },
@@ -24,6 +25,7 @@ let s:fmts = {
     \ 'sh':         { 'cmd': 'shfmt' },
     \ 'bash':       { 'cmd': 'shfmt' },
     \ 'lua':        { 'cmd': 'stylua -' },
+    \ 'dart':       { 'cmd': 'dart format --line-length 120', 'check': 'dart', 'tmpfile': 1 },
     \ }
 
 " ── public API ───────────────────────────────────────────────────────────
@@ -91,7 +93,7 @@ function! s:try_external() abort
     endif
 
     " Check binary availability
-    let l:bin = split(l:cmd)[0]
+    let l:bin = get(l:spec, 'check', split(l:cmd)[0])
     if !executable(l:bin)
         " Try gofmt as fallback for Go
         if l:ft ==# 'go' && executable('gofmt')
@@ -102,6 +104,9 @@ function! s:try_external() abort
         endif
     endif
 
+    if get(l:spec, 'tmpfile', 0)
+        return s:run_tmpfile_fmt(l:cmd, l:bin)
+    endif
     return s:run_stdin_fmt(l:cmd, l:bin)
 endfunction
 
@@ -140,6 +145,41 @@ function! s:run_stdin_fmt(cmd, bin) abort
 
     call winrestview(l:view)
     redraw!
+    echo '[wplus] formatted (' . a:bin . ')'
+    return 1
+endfunction
+
+function! s:run_tmpfile_fmt(cmd, bin) abort
+    let l:view = winsaveview()
+    let l:orig = getline(1, '$')
+    let l:ext = expand('%:e')
+    let l:tmp = tempname() . (empty(l:ext) ? '' : '.' . l:ext)
+
+    call writefile(l:orig, l:tmp)
+    call system(a:cmd . ' ' . shellescape(l:tmp))
+
+    if v:shell_error != 0
+        call delete(l:tmp)
+        echohl WarningMsg
+        echomsg '[wplus] formatter failed: ' . a:bin . ' (exit ' . v:shell_error . ')'
+        echohl None
+        return 0
+    endif
+
+    let l:result = readfile(l:tmp)
+    call delete(l:tmp)
+
+    if l:result ==# l:orig
+        call winrestview(l:view)
+        redraw
+        echo '[wplus] already formatted (' . a:bin . ')'
+        return 1
+    endif
+
+    silent execute '%delete _'
+    call setline(1, l:result)
+    call winrestview(l:view)
+    redraw
     echo '[wplus] formatted (' . a:bin . ')'
     return 1
 endfunction

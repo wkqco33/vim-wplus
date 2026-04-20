@@ -75,7 +75,7 @@ endfunction
 function! s:init_buffer() abort
     setlocal buftype=nofile bufhidden=hide noswapfile
     setlocal nobuflisted nomodifiable nonumber norelativenumber
-    setlocal cursorline winfixwidth
+    setlocal cursorline winfixwidth nowrap
 
     " Syntax highlighting
     syntax clear
@@ -125,11 +125,14 @@ function! s:render(root) abort
     let s:entry_count = 0
     call s:build_tree(s:current_root, 0)
     
+    let l:winw = winwidth(bufwinid(s:explorer_buf))
     let l:lines = [s:current_root]
     for l:item in s:tree_data
         let l:indent = repeat('  ', l:item.level + 1)
         let l:prefix = l:item.is_dir ? (get(s:expanded, l:item.path, 0) ? '▾ ' : '▸ ') : '  '
-        call add(l:lines, l:indent . l:prefix . l:item.name)
+        let l:avail = l:winw - len(l:indent) - len(l:prefix)
+        let l:name = len(l:item.name) > l:avail ? l:item.name[: l:avail - 2] . '…' : l:item.name
+        call add(l:lines, l:indent . l:prefix . l:name)
     endfor
     if s:truncated
         call add(l:lines, '  ... truncated ...')

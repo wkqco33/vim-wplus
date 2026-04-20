@@ -4,7 +4,8 @@ if exists('g:autoloaded_wplus_lsp') | finish | endif
 let g:autoloaded_wplus_lsp = 1
 
 let s:servers = {} " ft -> {job, channel, last_id, requests, buffer}
-let g:wplus_lsp_log_enabled = get(g:, 'wplus_lsp_log_enabled', 1)
+let s:diag_timers = {} " uri -> timer_id
+let g:wplus_lsp_log_enabled = get(g:, 'wplus_lsp_log_enabled', 0)
 let g:wplus_lsp_signcolumn = get(g:, 'wplus_lsp_signcolumn', 'yes')
 
 function! s:log(ft, type, msg) abort
@@ -20,7 +21,7 @@ function! wplus#lsp#setup() abort
     call s:define_diag_signs()
     augroup WplusLSP
         autocmd!
-        autocmd FileType go,c,cpp,python call s:on_filetype_changed()
+        autocmd FileType go,c,cpp,python,dart,rust call s:on_filetype_changed()
     augroup END
     nnoremap <silent> <Plug>WplusLspDefinition :call wplus#lsp#request('textDocument/definition')<CR>
     nnoremap <silent> <Plug>WplusLspHover      :call wplus#lsp#request('textDocument/hover')<CR>
@@ -35,7 +36,7 @@ function! s:on_filetype_changed() abort
         autocmd! * <buffer>
         autocmd BufWritePost <buffer> call s:did_save(&filetype)
         autocmd TextChanged,TextChangedI <buffer> call s:on_change(&filetype)
-        autocmd CursorMoved,CursorHold <buffer> call s:echo_diag()
+        autocmd CursorHold <buffer> call s:echo_diag()
     augroup END
     nmap <buffer><silent> gd <Plug>WplusLspDefinition
     nmap <buffer><silent> K  <Plug>WplusLspHover
@@ -115,7 +116,7 @@ function! s:on_change(ft) abort
     if !has_key(s:servers, a:ft) | return | endif
     let l:buf = bufnr('%')
     silent! timer_stop(getbufvar(l:buf, 'wplus_lsp_timer', -1))
-    let l:timer = timer_start(500, {-> s:send_change(l:buf, a:ft)})
+    let l:timer = timer_start(800, {-> s:send_change(l:buf, a:ft)})
     call setbufvar(l:buf, 'wplus_lsp_timer', l:timer)
 endfunction
 
@@ -138,7 +139,7 @@ endfunction
 
 function! s:start_server(ft) abort
     if has_key(s:servers, a:ft) && job_status(s:servers[a:ft].job) ==# 'run' | call s:did_open(a:ft) | return | endif
-    let l:cmds = {'go': ['gopls'], 'c': ['clangd'], 'cpp': ['clangd'], 'python': ['pyright-langserver', '--stdio']}
+    let l:cmds = {'go': ['gopls'], 'c': ['clangd'], 'cpp': ['clangd'], 'python': ['pyright-langserver', '--stdio'], 'dart': ['dart', 'language-server', '--protocol=lsp'], 'rust': ['rust-analyzer']}
     if !has_key(l:cmds, a:ft) || !executable(l:cmds[a:ft][0]) | return | endif
     let l:job = job_start(l:cmds[a:ft], {'in_mode': 'raw', 'out_mode': 'raw', 'out_cb': {c, m -> s:on_stdout(a:ft, c, m)}, 'err_cb': {c, m -> s:log(a:ft, 'STDERR', m)}})
     let s:servers[a:ft] = {'job': l:job, 'channel': job_getchannel(l:job), 'last_id': 0, 'requests': {}, 'buffer': ''}
@@ -262,7 +263,14 @@ function! s:define_diag_signs() abort
 endfunction
 
 function! s:update_diagnostics(ft, params) abort
-    call timer_start(0, {-> s:do_update_diagnostics(a:ft, a:params)})
+    let l:uri = get(a:params, 'uri', '')
+    silent! call timer_stop(get(s:diag_timers, l:uri, -1))
+    let s:diag_timers[l:uri] = timer_start(300, {-> s:diag_timer_fire(l:uri, a:ft, a:params)})
+endfunction
+
+function! s:diag_timer_fire(uri, ft, params) abort
+    unlet! s:diag_timers[a:uri]
+    call s:do_update_diagnostics(a:ft, a:params)
 endfunction
 
 function! s:clear_diagnostics(bufnr, last_line) abort
@@ -286,6 +294,8 @@ function! s:do_update_diagnostics(ft, params) abort
 
     let l:diags = {}
     let l:counts = {'error': 0, 'warning': 0, 'info': 0, 'hint': 0}
+    let l:signs = []
+    let l:has_textprop = has('textprop')
     for l:diag in a:params.diagnostics
         let l:lnum = l:diag.range.start.line + 1
         if l:lnum <= 0 || l:lnum > l:last_line | continue | endif
@@ -294,8 +304,8 @@ function! s:do_update_diagnostics(ft, params) abort
         let l:style = s:diag_style(l:sev)
         let l:counts[l:style.key] += 1
 
-        call sign_place(0, 'WplusLspGroup', l:style.sign, l:bufnr, {'lnum': l:lnum, 'priority': 20})
-        if has('textprop')
+        call add(l:signs, {'id': 0, 'group': 'WplusLspGroup', 'name': l:style.sign, 'buffer': l:bufnr, 'lnum': l:lnum, 'priority': 20})
+        if l:has_textprop
             let l:msg = '  // ' . split(l:diag.message, "\n")[0]
             silent! call prop_add(l:lnum, 0, {'bufnr': l:bufnr, 'type': l:style.type, 'text': l:msg, 'text_align': 'after'})
         endif
@@ -304,10 +314,11 @@ function! s:do_update_diagnostics(ft, params) abort
         endif
     endfor
 
+    if !empty(l:signs) | call sign_placelist(l:signs) | endif
     call setbufvar(l:bufnr, 'wplus_lsp_diags', l:diags)
     call setbufvar(l:bufnr, 'wplus_lsp_diag_counts', l:counts)
     redrawstatus
-    if bufnr('%') == l:bufnr | redraw! | call s:echo_diag() | endif
+    if bufnr('%') == l:bufnr | redraw | call s:echo_diag() | endif
 endfunction
 
 function! s:echo_diag() abort
