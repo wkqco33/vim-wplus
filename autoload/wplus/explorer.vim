@@ -57,14 +57,25 @@ endfunction
 
 function! s:open_explorer() abort
     let l:path = getcwd()
-    execute 'topleft 30vsplit'
-    enew
+    let l:buf = bufnr('^WplusExplorer$')
+    if l:buf != -1 && bufexists(l:buf)
+        execute 'topleft 30vsplit'
+        execute 'buffer' l:buf
+    else
+        execute 'topleft 30vsplit'
+        enew
+        silent! file WplusExplorer
+    endif
     let s:explorer_buf = bufnr('%')
-    
-    setlocal buftype=nofile bufhidden=wipe noswapfile
+    setfiletype wplus-explorer
+    call s:init_buffer()
+    call s:render(l:path)
+endfunction
+
+function! s:init_buffer() abort
+    setlocal buftype=nofile bufhidden=hide noswapfile
     setlocal nobuflisted nomodifiable nonumber norelativenumber
     setlocal cursorline winfixwidth
-    setfiletype wplus-explorer
 
     " Syntax highlighting
     syntax clear
@@ -82,8 +93,29 @@ function! s:open_explorer() abort
     nnoremap <buffer> r     :call <SID>on_rename()<CR>
     nnoremap <buffer> q     :close<CR>
     nnoremap <buffer> R     :call <SID>refresh()<CR>
+endfunction
 
-    call s:render(l:path)
+function! s:on_session_load() abort
+    " Give Vim a moment to settle after session load
+    call timer_start(50, {-> s:do_restore_explorer()})
+endfunction
+
+function! s:do_restore_explorer() abort
+    let l:cur_win = win_getid()
+    for l:w in range(1, winnr('$'))
+        let l:buf = winbufnr(l:w)
+        " Find explorer window by name
+        if bufname(l:buf) =~# 'WplusExplorer'
+            let s:explorer_buf = l:buf
+            call win_gotoid(win_getid(l:w))
+            setfiletype wplus-explorer
+            call s:init_buffer()
+            call s:render(getcwd())
+            call win_gotoid(l:cur_win)
+            redraw!
+            return
+        endif
+    endfor
 endfunction
 
 function! s:render(root) abort
@@ -200,4 +232,9 @@ endfunction
 function! wplus#explorer#setup() abort
     command! WexplorerToggle call wplus#explorer#toggle()
     nnoremap <silent> <leader>e :WexplorerToggle<CR>
+
+    augroup WplusExplorer
+        autocmd!
+        autocmd SessionLoadPost * call s:on_session_load()
+    augroup END
 endfunction

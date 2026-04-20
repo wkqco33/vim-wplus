@@ -49,7 +49,7 @@ endfunction
 function! s:clear(bufnr, lnum) abort
     try
         call prop_remove({'type': s:prop_type, 'bufnr': a:bufnr, 'all': 1},
-            \ a:lnum, a:lnum)
+                    \ a:lnum, a:lnum)
     catch
     endtry
 endfunction
@@ -81,16 +81,16 @@ function! s:on_blame(bufnr, lnum, lines, chan) abort
 
     let date = strftime(g:wplus_blame_date_format, epoch)
     let text = g:wplus_blame_prefix
-        \ . substitute(substitute(substitute(g:wplus_blame_template,
-        \   '<author>', author, ''), '<date>', date, ''), '<summary>', summary, '')
+                \ . substitute(substitute(substitute(g:wplus_blame_template,
+                \   '<author>', author, ''), '<date>', date, ''), '<summary>', summary, '')
 
     call s:clear(a:bufnr, a:lnum)
     try
         call prop_add(a:lnum, 0, {
-            \ 'type':   s:prop_type,
-            \ 'bufnr':  a:bufnr,
-            \ 'text':   text,
-            \ })
+                    \ 'type':   s:prop_type,
+                    \ 'bufnr':  a:bufnr,
+                    \ 'text':   text,
+                    \ })
     catch
     endtry
 endfunction
@@ -122,18 +122,18 @@ function! s:trigger() abort
 
     let lines = []
     let s:timer = timer_start(g:wplus_blame_delay, {_ ->
-        \ s:start_job(bufnr, lnum, root, file, lines)})
+                \ s:start_job(bufnr, lnum, root, file, lines)})
 endfunction
 
 function! s:start_job(bufnr, lnum, root, file, lines) abort
     let s:timer = -1
     let s:job = job_start(
-        \ ['git', '-C', a:root, 'blame', '--porcelain', '-L',
-        \   a:lnum . ',' . a:lnum, s:git_relpath(a:root, a:file)], {
-        \ 'out_cb':  {_, l -> add(a:lines, l)},
-        \ 'close_cb': function('s:on_blame', [a:bufnr, a:lnum, a:lines]),
-        \ 'err_cb':  {_ch, _msg -> 0},
-        \ })
+                \ ['git', '-C', a:root, 'blame', '--porcelain', '-L',
+                \   a:lnum . ',' . a:lnum, s:git_relpath(a:root, a:file)], {
+                \ 'out_cb':  {_, l -> add(a:lines, l)},
+                \ 'close_cb': function('s:on_blame', [a:bufnr, a:lnum, a:lines]),
+                \ 'err_cb':  {_ch, _msg -> 0},
+                \ })
 endfunction
 
 " ── public toggle ─────────────────────────────────────────────────────────
