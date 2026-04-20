@@ -116,8 +116,10 @@ function! wplus#gitgutter#refresh(bufnr) abort
     call s:update_branch(bufnr, root)
 endfunction
 
-function! s:on_diff_done(bufnr, lines, chan) abort
-    unlet! s:pending[a:bufnr]
+function! s:on_diff_done(bufnr, lines, job) abort
+    if has_key(s:pending, a:bufnr)
+        unlet s:pending[a:bufnr]
+    endif
     if !bufloaded(a:bufnr) | return | endif
     " Clear old signs
     silent! call sign_unplace(s:sign_group, {'buffer': a:bufnr})
