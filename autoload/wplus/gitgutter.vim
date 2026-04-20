@@ -11,6 +11,25 @@ let g:wplus_gitgutter_sign_delete = get(g:, 'wplus_gitgutter_sign_delete', '▁'
 let s:sign_group = 'wplus_gitgutter'
 let s:pending    = {}   " bufnr → job handle
 
+function! s:git_root(path) abort
+    let l:dir = fnamemodify(a:path, ':p:h')
+    while !empty(l:dir) && l:dir !=# '/'
+        if isdirectory(l:dir . '/.git')
+            return l:dir
+        endif
+        let l:parent = fnamemodify(l:dir, ':h')
+        if l:parent ==# l:dir
+            break
+        endif
+        let l:dir = l:parent
+    endwhile
+    return ''
+endfunction
+
+function! s:git_relpath(root, file) abort
+    return a:file[: len(a:root)] ==# a:root . '/' ? a:file[len(a:root) + 1 :] : a:file
+endfunction
+
 " ── sign definitions ──────────────────────────────────────────────────────
 
 function! s:define_signs() abort
@@ -71,6 +90,13 @@ function! wplus#gitgutter#refresh(bufnr) abort
     let bufnr = a:bufnr == 0 ? bufnr('%') : a:bufnr
     let file  = bufname(bufnr)
     if empty(file) || !filereadable(file) | return | endif
+    let root = s:git_root(file)
+    if empty(root)
+        silent! call sign_unplace(s:sign_group, {'buffer': bufnr})
+        call setbufvar(bufnr, 'wplus_git_branch', '')
+        return
+    endif
+    let relfile = s:git_relpath(root, fnamemodify(file, ':p'))
 
     " Kill previous pending job for this buffer
     if has_key(s:pending, bufnr)
@@ -80,14 +106,14 @@ function! wplus#gitgutter#refresh(bufnr) abort
 
     let lines  = []
     let Cb = function('s:on_diff_done', [bufnr, lines])
-    let job = job_start(['git', 'diff', '--unified=0', 'HEAD', '--', file], {
+    let job = job_start(['git', '-C', root, 'diff', '--unified=0', 'HEAD', '--', relfile], {
         \ 'out_cb':  {_, l -> add(lines, l)},
         \ 'close_cb': Cb,
         \ 'err_cb':  {_ch, _msg -> 0},
         \ })
     let s:pending[bufnr] = job
     " Also capture branch name while we're here
-    call s:update_branch(bufnr, file)
+    call s:update_branch(bufnr, root)
 endfunction
 
 function! s:on_diff_done(bufnr, lines, chan) abort
@@ -112,9 +138,9 @@ function! s:on_diff_done(bufnr, lines, chan) abort
     endif
 endfunction
 
-function! s:update_branch(bufnr, file) abort
+function! s:update_branch(bufnr, root) abort
     let lines = []
-    call job_start(['git', '-C', fnamemodify(a:file, ':h'), 'rev-parse', '--abbrev-ref', 'HEAD'], {
+    call job_start(['git', '-C', a:root, 'rev-parse', '--abbrev-ref', 'HEAD'], {
         \ 'out_cb':  {_, l -> add(lines, l)},
         \ 'close_cb': {_ -> s:set_branch(a:bufnr, lines)},
         \ 'err_cb':  {_ch, _msg -> 0},
