@@ -28,6 +28,12 @@
   - [whichkey — 키 힌트 팝업](#whichkey--키-힌트-팝업)
   - [bufdelete — 버퍼 삭제](#bufdelete--버퍼-삭제)
   - [quickfix — Quickfix 강화](#quickfix--quickfix-강화)
+  - [finder — 고속 퍼지 파인더](#finder--고속-퍼지-파인더)
+  - [explorer — 사이드바 탐색기](#explorer--사이드바-탐색기)
+  - [grep — 고속 검색](#grep--고속-검색)
+  - [root — 프로젝트 루트 자동 인식](#root--프로젝트-루트-자동-인식)
+  - [terminal — 터미널 토글](#terminal--터미널-토글)
+  - [lsp — 경량 LSP 연동](#lsp--경량-lsp-연동)
   - [altfile — 헤더↔소스 전환](#altfile--헤더소스-전환)
   - [repeat — . 반복 지원](#repeat---반복-지원)
 - [모듈 비활성화](#모듈-비활성화)
@@ -71,6 +77,12 @@ Plug 'your-user/vim-wplus'
 | `whichkey` | liuchengxu/vim-which-key |
 | `bufdelete` | moll/vim-bbye |
 | `quickfix` | romainl/vim-qf |
+| `finder` | junegunn/fzf.vim |
+| `explorer` | preservim/nerdtree |
+| `grep` | mhinz/vim-grepper |
+| `root` | airblade/vim-rooter |
+| `terminal` | voldikss/vim-floaterm (비슷한 기능) |
+| `lsp` | yegappan/lsp (Vim 9용 LSP) |
 | `altfile` | vim-scripts/a.vim |
 | `repeat` | tpope/vim-repeat |
 
@@ -340,6 +352,89 @@ call wplus#whichkey#register('q', 'quit')
 
 ---
 
+### finder — 고속 퍼지 파인더
+
+Vim 9의 `matchfuzzy()`와 팝업 윈도우를 사용하여 파일, 버퍼, 최근 파일을 빠르게 찾습니다.
+
+| 키 | 동작 |
+|----|------|
+| `<leader>p` | 파일 찾기 (Files) |
+| `<leader>b` | 버퍼 찾기 (Buffers) |
+| `<leader>m` | 최근 파일 찾기 (MRU) |
+
+**팝업 내 키 매핑**:
+- `Ctrl+n` / `Down`: 다음 항목
+- `Ctrl+p` / `Up`: 이전 항목
+- `Enter`: 선택 항목 열기
+- `Esc`: 닫기
+
+---
+
+### explorer — 사이드바 탐색기
+
+사이드바에서 프로젝트 파일을 관리합니다.
+
+| 키 | 동작 |
+|----|------|
+| `<leader>e` | 사이드바 토글 |
+
+**탐색기 내 키 매핑**:
+- `Enter`: 파일 열기 또는 디렉토리 이동
+- `a`: 새 파일/디렉토리 생성 (디렉토리는 이름 끝에 `/` 붙임)
+- `d`: 삭제
+- `r`: 이름 변경
+- `R`: 새로고침
+- `q`: 닫기
+
+---
+
+### grep — 고속 검색
+
+`ripgrep`(rg) 또는 `git grep`을 활용하여 프로젝트 전체를 빠르게 검색하고 Quickfix 창에 띄웁니다.
+
+| 키 / 명령 | 모드 | 동작 |
+|-----------|------|------|
+| `:Wgrep {pattern}` | Normal | 패턴 검색 후 Quickfix 오픈 |
+| `<leader>fg` | Normal | 커서 아래 단어로 프로젝트 검색 |
+| `<leader>fg` | Visual | 선택 영역으로 프로젝트 검색 |
+
+`rg`가 설치되어 있으면 `rg`를, 없으면 `git grep`을 우선적으로 사용합니다.
+
+---
+
+### root — 프로젝트 루트 자동 인식
+
+파일을 열 때 상위 디렉토리에서 `.git`, `go.mod`, `Makefile` 등을 찾아 자동으로 작업 디렉토리(`lcd`)를 변경합니다.
+
+- 별도의 설정 없이 자동으로 동작하며, 프로젝트 루트 기반의 검색 및 터미널 실행을 편리하게 해줍니다.
+
+---
+
+### terminal — 터미널 토글
+
+하단 스플릿 창으로 터미널을 빠르게 열고 닫습니다.
+
+| 키 / 명령 | 모드 | 동작 |
+|-----------|------|------|
+| `<leader>tt` / `:WplusTerminalToggle` | Normal | 터미널 토글 |
+| `<Esc><Esc>` | Terminal | 터미널 모드 탈출 (Normal 모드로) |
+
+---
+
+### lsp — 경량 LSP 연동
+
+복잡한 설정 없이 `gopls` 등 언어 서버의 핵심 기능을 활용합니다.
+
+| 키 | 동작 |
+|----|------|
+| `gd` | 정의 이동 (Go to Definition) |
+| `gr` | 참조 찾기 (References) |
+| `K` | 심볼 정보 요약 (Hover) |
+
+Go(`gopls`)를 우선 지원하며, 다른 언어는 `ctags` 및 `keywordprg`로 폴백됩니다.
+
+---
+
 ### altfile — 헤더↔소스 전환
 
 | 명령 | 동작 |
@@ -391,6 +486,12 @@ g:wplus_undotree_enabled     " Undo 사이드바
 g:wplus_whichkey_enabled     " 키 힌트 팝업
 g:wplus_bufdelete_enabled    " 버퍼 삭제
 g:wplus_quickfix_enabled     " Quickfix 강화
+g:wplus_finder_enabled       " 고속 퍼지 파인더
+g:wplus_explorer_enabled     " 사이드바 탐색기
+g:wplus_grep_enabled         " 고속 검색
+g:wplus_root_enabled         " 루트 자동 인식
+g:wplus_terminal_enabled     " 터미널 토글
+g:wplus_lsp_enabled          " 경량 LSP
 g:wplus_altfile_enabled      " 헤더↔소스 전환
 g:wplus_repeat_enabled       " . 반복 지원
 ```

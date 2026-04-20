@@ -23,6 +23,12 @@ let g:wplus_yankhighlight_enabled = get(g:, 'wplus_yankhighlight_enabled', 1)
 let g:wplus_textobj_enabled       = get(g:, 'wplus_textobj_enabled',       1)
 let g:wplus_bufdelete_enabled     = get(g:, 'wplus_bufdelete_enabled',     1)
 let g:wplus_quickfix_enabled      = get(g:, 'wplus_quickfix_enabled',      1)
+let g:wplus_grep_enabled          = get(g:, 'wplus_grep_enabled',          1)
+let g:wplus_root_enabled          = get(g:, 'wplus_root_enabled',          1)
+let g:wplus_terminal_enabled      = get(g:, 'wplus_terminal_enabled',      1)
+let g:wplus_lsp_enabled           = get(g:, 'wplus_lsp_enabled',           1)
+let g:wplus_finder_enabled        = get(g:, 'wplus_finder_enabled',        1)
+let g:wplus_explorer_enabled      = get(g:, 'wplus_explorer_enabled',      1)
 
 " ── load modules ──────────────────────────────────────────────────────────
 if g:wplus_commentary_enabled | call wplus#commentary#setup() | endif
@@ -43,3 +49,9 @@ if g:wplus_yankhighlight_enabled | call wplus#yankhighlight#setup() | endif
 if g:wplus_textobj_enabled       | call wplus#textobj#setup()       | endif
 if g:wplus_bufdelete_enabled     | call wplus#bufdelete#setup()     | endif
 if g:wplus_quickfix_enabled      | call wplus#quickfix#setup()      | endif
+if g:wplus_grep_enabled          | call wplus#grep#setup()          | endif
+if g:wplus_root_enabled          | call wplus#root#setup()          | endif
+if g:wplus_terminal_enabled      | call wplus#terminal#setup()      | endif
+if g:wplus_lsp_enabled           | call wplus#lsp#setup()           | endif
+if g:wplus_finder_enabled        | call wplus#finder#setup()        | endif
+if g:wplus_explorer_enabled      | call wplus#explorer#setup()      | endif

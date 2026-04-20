@@ -39,7 +39,8 @@ function! wplus#format#range() abort
     if exists('*CocAction') && s:coc_ready()
         call CocAction('formatSelected', visualmode())
     else
-        normal! gv=
+        silent normal! gv=
+        redraw!
         echo '[wplus] formatted selection (indent)'
     endif
 endfunction
@@ -127,6 +128,7 @@ function! s:run_stdin_fmt(cmd, bin) abort
     endif
 
     call winrestview(l:view)
+    redraw!
     echo '[wplus] formatted (' . a:bin . ')'
     return 1
 endfunction
@@ -142,7 +144,8 @@ endfunction
 
 function! s:vim_indent() abort
     let l:view = winsaveview()
-    normal! gg=G
+    silent normal! gg=G
     call winrestview(l:view)
+    redraw!
     echo '[wplus] formatted (vim indent)'
 endfunction

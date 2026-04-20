@@ -49,7 +49,7 @@ function! s:uncomment_line(lnum, left, right) abort
     call setline(a:lnum, result)
 endfunction
 
-function! s:toggle_range(first, last) abort
+function! wplus#commentary#toggle_range(first, last) abort
     let [left, right] = s:get_cs()
     " Determine action: uncomment only if ALL non-blank lines are commented
     let all_commented = 1
@@ -74,10 +74,10 @@ endfunction
 
 function! wplus#commentary#operator(type) abort
     if a:type ==# 'line' || a:type ==# 'V'
-        call s:toggle_range(line("'["), line("']"))
+        call wplus#commentary#toggle_range(line("'["), line("']"))
     elseif a:type ==# 'char' || a:type ==# 'v'
         " For simplicity treat char/v as full lines
-        call s:toggle_range(line("'["), line("']"))
+        call wplus#commentary#toggle_range(line("'["), line("']"))
     endif
     silent! call wplus#repeat#set("\<Plug>WplusCommentaryLine", v:count1)
 endfunction
@@ -85,7 +85,7 @@ endfunction
 " ── public API ────────────────────────────────────────────────────────────
 
 function! wplus#commentary#toggle_line() abort
-    call s:toggle_range(line('.'), line('.'))
+    call wplus#commentary#toggle_range(line('.'), line('.'))
     silent! call wplus#repeat#set("\<Plug>WplusCommentaryLine", v:count1)
 endfunction
 
@@ -94,8 +94,9 @@ function! wplus#commentary#setup() abort
     nnoremap <silent> gcc :call wplus#commentary#toggle_line()<CR>
     " gc{motion}
     nnoremap <silent> gc  :set operatorfunc=wplus#commentary#operator<CR>g@
-    " gc in visual
-    xnoremap <silent> gc  :<C-u>call s:toggle_range(line("'<"), line("'>"))<CR>
+    " gc / gcc in visual
+    xnoremap <silent> gc  :<C-u>call wplus#commentary#toggle_range(line("'<"), line("'>"))<CR>
+    xnoremap <silent> gcc :<C-u>call wplus#commentary#toggle_range(line("'<"), line("'>"))<CR>
     " Plug mappings for repeat
     nnoremap <silent> <Plug>WplusCommentaryLine :call wplus#commentary#toggle_line()<CR>
 endfunction
