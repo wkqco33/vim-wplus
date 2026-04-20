@@ -6,7 +6,7 @@ let g:autoloaded_wplus_indent = 1
 
 let g:wplus_indent_char          = get(g:, 'wplus_indent_char',          '▏')
 let g:wplus_indent_ft_exclude    = get(g:, 'wplus_indent_ft_exclude',
-    \ ['json', 'markdown', 'help', 'startify', 'NERDTree', 'tagbar', 'undotree'])
+            \ ['json', 'markdown', 'help', 'startify', 'NERDTree', 'tagbar', 'undotree'])
 
 " ── conceal-based guide ───────────────────────────────────────────────────
 " We replace leading spaces at each tab stop with the guide character via
