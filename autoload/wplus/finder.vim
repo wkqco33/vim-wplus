@@ -16,19 +16,6 @@ let s:state = {
     \ 'height': 0
     \ }
 
-function! s:run_callback(item) abort
-    if empty(a:item)
-        return
-    endif
-
-    if type(s:state.callback) == v:t_func
-        call call(s:state.callback, [a:item])
-        return
-    endif
-
-    execute s:state.callback . ' ' . fnameescape(a:item)
-endfunction
-
 function! wplus#finder#open(items, callback, title) abort
     let s:state.items = a:items
     let s:state.filtered = copy(a:items)
@@ -64,10 +51,25 @@ function! wplus#finder#filter(winid, key) abort
     if a:key == "\<Esc>" || a:key == "\<C-c>"
         call popup_close(a:winid)
         return 1
-    elseif a:key == "\<CR>"
+    elseif a:key == "\<CR>" || a:key == "\<C-v>" || a:key == "\<C-s>" || a:key == "\<C-t>"
         let l:res = get(s:state.filtered, s:state.selected, '')
         call popup_close(a:winid)
-        call s:run_callback(l:res)
+        if !empty(l:res)
+            if type(s:state.callback) == v:t_func
+                call call(s:state.callback, [l:res])
+            else
+                if a:key ==# "\<C-v>"
+                    let l:cmd = 'vsplit'
+                elseif a:key ==# "\<C-s>"
+                    let l:cmd = 'split'
+                elseif a:key ==# "\<C-t>"
+                    let l:cmd = 'tabedit'
+                else
+                    let l:cmd = s:state.callback
+                endif
+                execute l:cmd . ' ' . fnameescape(l:res)
+            endif
+        endif
         return 1
     elseif a:key == "\<C-n>" || a:key == "\<Down>"
         let s:state.selected = min([s:state.selected + 1, len(s:state.filtered) - 1])

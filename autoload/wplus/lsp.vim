@@ -5,6 +5,8 @@ let g:autoloaded_wplus_lsp = 1
 
 let s:servers = {} " ft -> {job, channel, last_id, requests, buffer}
 let s:diag_timers = {} " uri -> timer_id
+let s:pending_actions = []
+let s:sig_winid = -1
 let g:wplus_lsp_log_enabled = get(g:, 'wplus_lsp_log_enabled', 0)
 let g:wplus_lsp_signcolumn = get(g:, 'wplus_lsp_signcolumn', 'yes')
 
@@ -23,9 +25,11 @@ function! wplus#lsp#setup() abort
         autocmd!
         autocmd FileType go,c,cpp,python,dart,rust call s:on_filetype_changed()
     augroup END
-    nnoremap <silent> <Plug>WplusLspDefinition :call wplus#lsp#request('textDocument/definition')<CR>
-    nnoremap <silent> <Plug>WplusLspHover      :call wplus#lsp#request('textDocument/hover')<CR>
-    nnoremap <silent> <Plug>WplusLspReferences :call wplus#lsp#request('textDocument/references')<CR>
+    nnoremap <silent> <Plug>WplusLspDefinition  :call wplus#lsp#request('textDocument/definition')<CR>
+    nnoremap <silent> <Plug>WplusLspHover       :call wplus#lsp#request('textDocument/hover')<CR>
+    nnoremap <silent> <Plug>WplusLspReferences  :call wplus#lsp#request('textDocument/references')<CR>
+    nnoremap <silent> <Plug>WplusLspRename      :call wplus#lsp#rename()<CR>
+    nnoremap <silent> <Plug>WplusLspCodeAction  :call wplus#lsp#code_action()<CR>
 endfunction
 
 function! s:on_filetype_changed() abort
@@ -37,11 +41,21 @@ function! s:on_filetype_changed() abort
         autocmd BufWritePost <buffer> call s:did_save(&filetype)
         autocmd TextChanged,TextChangedI <buffer> call s:on_change(&filetype)
         autocmd CursorHold <buffer> call s:echo_diag()
+        autocmd InsertCharPre <buffer>
+            \ if v:char ==# '(' || v:char ==# ','
+            \   | call timer_start(100, {-> wplus#lsp#request('textDocument/signatureHelp')})
+            \ | endif
+        autocmd InsertLeave <buffer> call s:close_signature_help()
     augroup END
-    nmap <buffer><silent> gd <Plug>WplusLspDefinition
-    nmap <buffer><silent> K  <Plug>WplusLspHover
-    nmap <buffer><silent> gr <Plug>WplusLspReferences
-    inoremap <buffer><silent><expr> <Tab> pumvisible() ? "\<C-n>" : <SID>check_backspace() ? "\<Tab>" : "\<C-r>=wplus#lsp#request('textDocument/completion')\<CR>\<Ignore>"
+    nmap <buffer><silent> gd         <Plug>WplusLspDefinition
+    nmap <buffer><silent> K          <Plug>WplusLspHover
+    nmap <buffer><silent> gr         <Plug>WplusLspReferences
+    nmap <buffer><silent> <leader>rn <Plug>WplusLspRename
+    nmap <buffer><silent> <leader>ca <Plug>WplusLspCodeAction
+    inoremap <buffer><silent><expr> <Tab>
+        \ pumvisible() ? "\<C-n>" :
+        \ <SID>check_backspace() ? "\<Tab>" :
+        \ "\<C-r>=wplus#lsp#request('textDocument/completion')\<CR>\<Ignore>"
 endfunction
 
 function! s:ensure_signcolumn() abort
@@ -143,7 +157,19 @@ function! s:start_server(ft) abort
     if !has_key(l:cmds, a:ft) || !executable(l:cmds[a:ft][0]) | return | endif
     let l:job = job_start(l:cmds[a:ft], {'in_mode': 'raw', 'out_mode': 'raw', 'out_cb': {c, m -> s:on_stdout(a:ft, c, m)}, 'err_cb': {c, m -> s:log(a:ft, 'STDERR', m)}})
     let s:servers[a:ft] = {'job': l:job, 'channel': job_getchannel(l:job), 'last_id': 0, 'requests': {}, 'buffer': ''}
-    call s:send(a:ft, 'initialize', {'processId': getpid(), 'rootUri': s:get_uri(getcwd()), 'capabilities': {'textDocument': {'synchronization': {'didChange': 1, 'willSave': v:true, 'didSave': v:true}, 'hover': {'contentFormat': ['plaintext', 'markdown']}, 'definition': {'dynamicRegistration': v:true}, 'references': {'dynamicRegistration': v:true}, 'completion': {'completionItem': {'snippetSupport': v:false}}}}})
+    call s:send(a:ft, 'initialize', {
+        \ 'processId': getpid(),
+        \ 'rootUri': s:get_uri(getcwd()),
+        \ 'capabilities': {'textDocument': {
+        \   'synchronization': {'didChange': 1, 'willSave': v:true, 'didSave': v:true},
+        \   'hover': {'contentFormat': ['plaintext', 'markdown']},
+        \   'definition': {'dynamicRegistration': v:true},
+        \   'references': {'dynamicRegistration': v:true},
+        \   'completion': {'completionItem': {'snippetSupport': v:false}},
+        \   'rename': {'dynamicRegistration': v:true, 'prepareSupport': v:false},
+        \   'codeAction': {'dynamicRegistration': v:true, 'codeActionLiteralSupport': {'codeActionKind': {'valueSet': []}}},
+        \   'signatureHelp': {'signatureInformation': {'documentationFormat': ['plaintext', 'markdown']}},
+        \ }}})
 endfunction
 
 function! s:send(ft, method, params, ...) abort
@@ -218,6 +244,12 @@ function! s:handle_request_result(ft, method, result) abort
         call s:show_references(a:result)
     elseif a:method ==# 'textDocument/completion'
         call s:show_completion(a:result)
+    elseif a:method ==# 'textDocument/rename'
+        call s:apply_workspace_edit(a:result)
+    elseif a:method ==# 'textDocument/codeAction'
+        call s:show_code_actions(a:result)
+    elseif a:method ==# 'textDocument/signatureHelp'
+        call s:show_signature_help(a:result)
     endif
 endfunction
 
@@ -341,6 +373,50 @@ function! wplus#lsp#request(method) abort
     call s:send(l:ft, a:method, l:params, 0)
 endfunction
 
+function! wplus#lsp#rename() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:word = expand('<cword>')
+    if empty(l:word) | return | endif
+    let l:new_name = input('Rename ' . l:word . ' → ')
+    if empty(l:new_name) || l:new_name ==# l:word | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:params = {
+        \ 'textDocument': {'uri': l:uri},
+        \ 'position': {'line': line('.') - 1, 'character': col('.') - 1},
+        \ 'newName': l:new_name,
+        \ }
+    call s:send(l:ft, 'textDocument/rename', l:params, 0)
+endfunction
+
+function! wplus#lsp#code_action() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:lnum = line('.')
+    let l:diags = getbufvar(bufnr('%'), 'wplus_lsp_diags', {})
+    let l:diag_items = []
+    if has_key(l:diags, l:lnum)
+        let l:d = l:diags[l:lnum]
+        call add(l:diag_items, {
+            \ 'message': l:d.msg,
+            \ 'severity': l:d.sev,
+            \ 'range': {'start': {'line': l:lnum - 1, 'character': 0}, 'end': {'line': l:lnum - 1, 'character': 0}},
+            \ })
+    endif
+    let l:params = {
+        \ 'textDocument': {'uri': l:uri},
+        \ 'range': {
+        \   'start': {'line': l:lnum - 1, 'character': col('.') - 1},
+        \   'end': {'line': l:lnum - 1, 'character': col('.') - 1},
+        \ },
+        \ 'context': {'diagnostics': l:diag_items},
+        \ }
+    call s:send(l:ft, 'textDocument/codeAction', l:params, 0)
+endfunction
+
 function! s:goto_location(result) abort
     let l:loc = type(a:result) == v:t_list ? get(a:result, 0) : a:result
     if empty(l:loc) | return | endif
@@ -385,4 +461,120 @@ function! s:show_completion(result) abort
     let l:start = col('.') - 1
     while l:start > 0 && getline('.')[l:start - 1] =~# '\k' | let l:start -= 1 | endwhile
     call complete(l:start + 1, l:matches)
+endfunction
+
+" ── rename ────────────────────────────────────────────────────────────────
+
+function! s:apply_workspace_edit(edit) abort
+    if empty(a:edit) | return | endif
+    if has_key(a:edit, 'documentChanges')
+        for l:change in a:edit.documentChanges
+            if has_key(l:change, 'textDocument')
+                call s:apply_text_edits(s:decode_uri_path(l:change.textDocument.uri), l:change.edits)
+            endif
+        endfor
+    elseif has_key(a:edit, 'changes')
+        for [l:uri, l:edits] in items(a:edit.changes)
+            call s:apply_text_edits(s:decode_uri_path(l:uri), l:edits)
+        endfor
+    endif
+endfunction
+
+function! s:apply_text_edits(path, edits) abort
+    let l:abs = fnamemodify(a:path, ':p')
+    if bufnr(l:abs) == -1
+        silent execute 'badd ' . fnameescape(l:abs)
+    endif
+    let l:bufnr = bufnr(l:abs)
+    if !bufloaded(l:bufnr)
+        call bufload(l:bufnr)
+    endif
+
+    " Reverse sort: bottom-to-top to preserve line numbers during edits
+    let l:sorted = sort(copy(a:edits), {a, b ->
+        \ a.range.start.line != b.range.start.line
+        \   ? b.range.start.line - a.range.start.line
+        \   : b.range.start.character - a.range.start.character})
+
+    for l:e in l:sorted
+        let l:sl = l:e.range.start.line + 1
+        let l:sc = l:e.range.start.character
+        let l:el = l:e.range.end.line + 1
+        let l:ec = l:e.range.end.character
+
+        let l:start_line = get(getbufline(l:bufnr, l:sl), 0, '')
+        let l:end_line   = l:el ==# l:sl ? l:start_line : get(getbufline(l:bufnr, l:el), 0, '')
+        let l:prefix = l:sc > 0 ? l:start_line[:l:sc - 1] : ''
+        let l:suffix = l:end_line[l:ec:]
+
+        call deletebufline(l:bufnr, l:sl, l:el)
+        call append(l:sl - 1, split(l:prefix . l:e.newText . l:suffix, "\n", 1))
+    endfor
+
+    call setbufvar(l:bufnr, '&modified', 1)
+endfunction
+
+" ── code action ───────────────────────────────────────────────────────────
+
+function! s:show_code_actions(result) abort
+    if empty(a:result)
+        echohl WarningMsg | echo 'No code actions available' | echohl None
+        return
+    endif
+    let s:pending_actions = a:result
+    let l:titles = map(copy(a:result), 'get(v:val, "title", "?")')
+    call wplus#finder#open(l:titles, function('s:execute_code_action'), 'Code Actions')
+endfunction
+
+function! s:execute_code_action(title) abort
+    for l:action in s:pending_actions
+        if get(l:action, 'title', '') ==# a:title
+            if has_key(l:action, 'edit')
+                call s:apply_workspace_edit(l:action.edit)
+            endif
+            if has_key(l:action, 'command')
+                let l:cmd = type(l:action.command) == v:t_dict
+                    \ ? l:action.command
+                    \ : {'command': l:action.command, 'arguments': get(l:action, 'arguments', [])}
+                let l:ft = &filetype
+                if has_key(s:servers, l:ft)
+                    call s:send(l:ft, 'workspace/executeCommand', l:cmd, 0)
+                endif
+            endif
+            return
+        endif
+    endfor
+endfunction
+
+" ── signature help ────────────────────────────────────────────────────────
+
+function! s:show_signature_help(result) abort
+    call s:close_signature_help()
+    if empty(a:result) | return | endif
+    let l:sigs = get(a:result, 'signatures', [])
+    if empty(l:sigs) | return | endif
+    let l:idx = get(a:result, 'activeSignature', 0)
+    let l:sig = l:sigs[min([l:idx, len(l:sigs) - 1])]
+    let l:lines = [get(l:sig, 'label', '')]
+    let l:doc = get(l:sig, 'documentation', '')
+    if type(l:doc) == v:t_dict | let l:doc = get(l:doc, 'value', '') | endif
+    if !empty(l:doc)
+        let l:first = split(l:doc, "\n")[0]
+        if !empty(l:first) | call add(l:lines, l:first) | endif
+    endif
+    let s:sig_winid = popup_atcursor(l:lines, {
+        \ 'padding': [0,1,0,1],
+        \ 'border': [1,1,1,1],
+        \ 'moved': 'any',
+        \ 'highlight': 'Normal',
+        \ 'borderhighlight': ['Special'],
+        \ 'maxwidth': float2nr(&columns * 0.6),
+        \ })
+endfunction
+
+function! s:close_signature_help() abort
+    if s:sig_winid != -1
+        silent! call popup_close(s:sig_winid)
+        let s:sig_winid = -1
+    endif
 endfunction

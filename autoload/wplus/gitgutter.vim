@@ -84,6 +84,36 @@ function! s:parse_diff(lines) abort
     return result
 endfunction
 
+" ── unified-diff hunk parser → list of {new_start, new_count, lines} ─────
+
+function! s:parse_hunks(lines) abort
+    let l:hunks = []
+    let l:current = {}
+    for l:line in a:lines
+        if l:line =~# '^@@'
+            if !empty(l:current)
+                call add(l:hunks, l:current)
+            endif
+            let l:m = matchlist(l:line, '^@@ -\d\+\%(,\d\+\)\? +\(\d\+\)\%(,\(\d\+\)\)\? @@')
+            if !empty(l:m)
+                let l:current = {
+                    \ 'new_start': str2nr(l:m[1]),
+                    \ 'new_count': empty(l:m[2]) ? 1 : str2nr(l:m[2]),
+                    \ 'lines': [l:line],
+                    \ }
+            else
+                let l:current = {}
+            endif
+        elseif !empty(l:current)
+            call add(l:current.lines, l:line)
+        endif
+    endfor
+    if !empty(l:current)
+        call add(l:hunks, l:current)
+    endif
+    return l:hunks
+endfunction
+
 " ── async refresh ─────────────────────────────────────────────────────────
 
 function! wplus#gitgutter#refresh(bufnr) abort
@@ -134,6 +164,15 @@ function! s:on_diff_done(bufnr, lines, job) abort
             let id += 1
         endif
     endfor
+    " Store hunk data for navigation/preview/staging
+    call setbufvar(a:bufnr, 'wplus_gitgutter_hunks', s:parse_hunks(a:lines))
+    " Store file header lines (before first @@) for patch construction
+    let l:header = []
+    for l:line in a:lines
+        if l:line =~# '^@@' | break | endif
+        call add(l:header, l:line)
+    endfor
+    call setbufvar(a:bufnr, 'wplus_gitgutter_diff_header', l:header)
     " Trigger statusline refresh for diagnostic counts
     if exists('#User#WplusGitGutterUpdate')
         doautocmd User WplusGitGutterUpdate
@@ -157,6 +196,95 @@ function! s:set_branch(bufnr, lines) abort
     endif
 endfunction
 
+" ── hunk helpers ──────────────────────────────────────────────────────────
+
+function! s:find_hunk_at(lnum) abort
+    let l:hunks = getbufvar(bufnr('%'), 'wplus_gitgutter_hunks', [])
+    for l:h in l:hunks
+        let l:end = l:h.new_start + max([l:h.new_count - 1, 0])
+        if a:lnum >= l:h.new_start && a:lnum <= l:end
+            return l:h
+        endif
+    endfor
+    return {}
+endfunction
+
+function! wplus#gitgutter#next_hunk() abort
+    let l:hunks = getbufvar(bufnr('%'), 'wplus_gitgutter_hunks', [])
+    let l:lnum = line('.')
+    for l:h in l:hunks
+        if l:h.new_start > l:lnum
+            execute l:h.new_start
+            return
+        endif
+    endfor
+    echohl WarningMsg | echo 'No more hunks' | echohl None
+endfunction
+
+function! wplus#gitgutter#prev_hunk() abort
+    let l:hunks = getbufvar(bufnr('%'), 'wplus_gitgutter_hunks', [])
+    let l:lnum = line('.')
+    let l:found = {}
+    for l:h in l:hunks
+        if l:h.new_start < l:lnum
+            let l:found = l:h
+        endif
+    endfor
+    if !empty(l:found)
+        execute l:found.new_start
+    else
+        echohl WarningMsg | echo 'No previous hunks' | echohl None
+    endif
+endfunction
+
+function! wplus#gitgutter#preview_hunk() abort
+    let l:h = s:find_hunk_at(line('.'))
+    if empty(l:h)
+        echohl WarningMsg | echo 'No hunk at cursor' | echohl None
+        return
+    endif
+    call popup_atcursor(l:h.lines, {
+        \ 'title': ' Hunk Preview ',
+        \ 'padding': [0,1,0,1],
+        \ 'border': [1,1,1,1],
+        \ 'moved': 'any',
+        \ 'highlight': 'Normal',
+        \ 'borderhighlight': ['Special'],
+        \ 'maxwidth': float2nr(&columns * 0.7),
+        \ 'maxheight': 20,
+        \ })
+endfunction
+
+function! wplus#gitgutter#stage_hunk() abort
+    let l:bufnr = bufnr('%')
+    let l:h = s:find_hunk_at(line('.'))
+    if empty(l:h)
+        echohl WarningMsg | echo 'No hunk at cursor' | echohl None
+        return
+    endif
+    let l:file = fnamemodify(bufname(l:bufnr), ':p')
+    let l:root = s:git_root(l:file)
+    if empty(l:root)
+        echohl ErrorMsg | echo 'Not in a git repository' | echohl None
+        return
+    endif
+    let l:header = getbufvar(l:bufnr, 'wplus_gitgutter_diff_header', [])
+    if empty(l:header)
+        echohl ErrorMsg | echo 'No diff header available — save the file first' | echohl None
+        return
+    endif
+    let l:tmp = tempname()
+    call writefile(l:header + l:h.lines, l:tmp)
+    let l:out = system('git -C ' . shellescape(l:root) . ' apply --cached ' . shellescape(l:tmp))
+    call delete(l:tmp)
+    if v:shell_error != 0
+        echohl ErrorMsg | echo 'Stage failed: ' . trim(l:out) | echohl None
+    else
+        echo 'Hunk staged'
+        call wplus#gitgutter#refresh(l:bufnr)
+    endif
+endfunction
+
 " ── setup ─────────────────────────────────────────────────────────────────
 
 function! wplus#gitgutter#setup() abort
@@ -169,4 +297,9 @@ function! wplus#gitgutter#setup() abort
             \ call wplus#gitgutter#refresh(bufnr('%'))
         autocmd ColorScheme * call s:init_highlights()
     augroup END
+
+    nnoremap <silent> ]h :call wplus#gitgutter#next_hunk()<CR>
+    nnoremap <silent> [h :call wplus#gitgutter#prev_hunk()<CR>
+    nnoremap <silent> <leader>hp :call wplus#gitgutter#preview_hunk()<CR>
+    nnoremap <silent> <leader>hs :call wplus#gitgutter#stage_hunk()<CR>
 endfunction
