@@ -18,11 +18,15 @@ CONTENTS                                                      *wplus-contents*
  13. Which Key ................. |wplus-whichkey|
  14. Undo Tree ................. |wplus-undotree|
  15. Surround .................. |wplus-surround|
+ 16. Grep ...................... |wplus-grep|
+ 17. Root ...................... |wplus-root|
+ 18. Terminal .................. |wplus-terminal|
+ 19. LSP ....................... |wplus-lsp|
 
 ==============================================================================
 1. INTRODUCTION                                                 *wplus-intro*
 
-vim-wplus is a single Vim plugin that replaces 13 commonly-used plugins with
+vim-wplus is a single Vim plugin that replaces 17 commonly-used plugins with
 pure VimScript implementations. Requires Vim 9.1+ with +job +channel
 +popupwin +signs.
 
@@ -50,6 +54,10 @@ To disable individual modules before the plugin loads: >
   whichkey        vim-which-key
   undotree        undotree
   surround        vim-surround
+  grep            vim-grepper / ripgrep
+  root            vim-rooter
+  terminal        vim-floaterm
+  lsp             yegappan/lsp
 
 ==============================================================================
 3. COMMENTARY                                             *wplus-commentary*
@@ -221,6 +229,53 @@ Example pairs: ( ) [ ] { } < > " ' `
   - ys2w"   → surround next 2 words with double quotes
   - cs({    → change ( to { with spaces: { text }
   - ds"     → delete surrounding double quotes
+
+==============================================================================
+16. GREP                                                         *wplus-grep*
+
+Replaces: vim-grepper / ripgrep integration
+
+Fast grep integration using ripgrep (rg) or git grep.
+
+Commands: >
+    :Wgrep {pattern}  Search for pattern and open quickfix
+<
+Mappings: >
+    <leader>fg        Search for word under cursor (Normal or Visual)
+<
+
+==============================================================================
+17. ROOT                                                         *wplus-root*
+
+Replaces: vim-rooter
+
+Automatically changes the current window's directory (lcd) to the project
+root when opening a file. Looks for .git, go.mod, Makefile, etc.
+
+==============================================================================
+18. TERMINAL                                                 *wplus-terminal*
+
+Replaces: vim-floaterm (split version)
+
+Quickly toggle a terminal in a bottom split.
+
+Mappings: >
+    <leader>tt        Toggle terminal split
+    <Esc><Esc>        (Terminal mode) Exit to Normal mode
+<
+
+==============================================================================
+19. LSP                                                           *wplus-lsp*
+
+Replaces: yegappan/lsp (minimal features)
+
+Provides minimal LSP features like Go to Definition and Hover information.
+Prioritizes Go (gopls) and falls back to tags for other languages.
+
+Mappings: >
+    gd                Go to Definition
+    K                 Show Hover information
+<
 
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:

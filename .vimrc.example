@@ -1,0 +1,116 @@
+" ============================================================
+" vim-wplus 기반 초경량화된 .vimrc.example
+" 외부 의존성을 제거하고 wplus 모듈만으로 구성된 최적의 설정
+" ============================================================
+
+set nocompatible
+set encoding=utf-8
+let mapleader = " "
+
+" ── vim-plug 플러그인 관리 ──────────────────────────────────
+" 의존성이 거의 없는 최소한의 구성입니다.
+call plug#begin('~/.vim/plugged')
+
+" 메인 플러그인 (대부분의 기능을 대체함)
+Plug '/home/seoyc/Workspace/utils/vim-wplus'
+
+" UI / 필수 도구
+Plug 'morhetz/gruvbox'                  " 컬러 테마
+Plug 'tpope/vim-fugitive'               " Git 명령어 통합 (:Git)
+Plug 'preservim/tagbar'                 " 코드 구조 보기 (ctags 필요)
+Plug 'mg979/vim-visual-multi', {'branch': 'master'}  " 멀티 커서 (선택 사항)
+
+" 언어별 Syntax (Vim 내장보다 강력한 하이라이팅을 원할 때만 유지)
+Plug 'sheerun/vim-polyglot'
+
+" * 아래 플러그인들은 wplus 모듈로 완전히 대체 가능하여 제거되었습니다:
+" - neoclide/coc.nvim         -> wplus/lsp + wplus/format
+" - junegunn/fzf / fzf.vim    -> wplus/finder + wplus/grep
+" - preservim/nerdtree        -> wplus/explorer
+" - dense-analysis/ale        -> wplus/lsp + wplus/format
+" - tpope/vim-commentary      -> wplus/commentary
+" - airblade/vim-gitgutter     -> wplus/gitgutter
+" - mbbill/undotree           -> wplus/undotree
+
+call plug#end()
+
+" ── 기본 설정 ──────────────────────────────────────────────
+syntax on
+filetype plugin indent on
+
+set fileencoding=utf-8
+set fileencodings=utf-8,cp949,euc-kr,latin1
+set number relativenumber
+set cursorline
+set signcolumn=yes
+
+set tabstop=4 shiftwidth=4 expandtab autoindent
+set hlsearch incsearch ignorecase smartcase
+set hidden nobackup noswapfile
+set undofile undodir=~/.vim/undodir
+set scrolloff=8 sidescrolloff=8
+set wrap linebreak
+set clipboard=unnamedplus
+set mouse=a
+set wildmenu wildmode=longest:full,full
+set pumheight=10
+set title
+set nrformats-=octal
+set list listchars=tab:→\ ,trail:·,nbsp:␣
+set updatetime=300 timeoutlen=500
+set shortmess+=c
+set splitbelow splitright
+set colorcolumn=80,120
+
+" ── 컬러 테마 ──────────────────────────────────────────────
+set termguicolors
+set background=dark
+silent! colorscheme gruvbox
+
+" ── 키 매핑 (wplus 핵심 기능) ──────────────────────────────
+
+" 1. 탐색 및 검색
+nnoremap <leader>e :WexplorerToggle<CR>
+nnoremap <leader>p :WfindFiles<CR>
+nnoremap <leader>b :WfindBuffers<CR>
+nnoremap <leader>m :WfindMRU<CR>
+nnoremap <leader>fg :Wgrep <C-r><C-w><CR>
+
+" 2. 개발 도구 (LSP)
+" gd : 정의 이동 (Definition)
+" K  : 심볼 정보 (Hover)
+" gr : 참조 찾기 (References)
+
+" 3. 터미널 및 기타
+nnoremap <leader>tt :WplusTerminalToggle<CR>
+nnoremap <leader>u  :UndotreeToggle<CR>
+nnoremap <leader>bd :Bdelete<CR>
+nnoremap <leader>bl :BlamerToggle<CR>
+
+" 4. 일반 편의 매핑
+nnoremap <leader>t :TagbarToggle<CR>
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l
+nnoremap <Tab>   :bnext<CR>
+nnoremap <S-Tab> :bprev<CR>
+nnoremap <silent> <leader>h :noh<CR>
+nnoremap <leader>w :w<CR>
+nnoremap <leader>q :q<CR>
+nnoremap <leader>Q :qa!<CR>
+
+" ── 자동 명령 ──────────────────────────────────────────────
+
+" 파일 열 때 마지막 커서 위치로 복귀
+augroup restore_cursor
+    autocmd!
+    autocmd BufReadPost *
+        \ if line("'\"") > 1 && line("'\"") <= line("$") |
+        \   exe "normal! g'\"" |
+        \ endif
+augroup END
+
+" ── undodir 생성 ───────────────────────────────────────────
+let s:undodir = expand('~/.vim/undodir')
+if !isdirectory(s:undodir) | call mkdir(s:undodir, 'p') | endif
