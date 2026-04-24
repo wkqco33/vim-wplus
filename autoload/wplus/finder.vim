@@ -50,6 +50,7 @@ endfunction
 function! wplus#finder#filter(winid, key) abort
     if a:key == "\<Esc>" || a:key == "\<C-c>"
         call popup_close(a:winid)
+        call s:cleanup_state()
         return 1
     elseif a:key == "\<CR>" || a:key == "\<C-v>" || a:key == "\<C-s>" || a:key == "\<C-t>"
         let l:res = get(s:state.filtered, s:state.selected, '')
@@ -70,6 +71,7 @@ function! wplus#finder#filter(winid, key) abort
                 execute l:cmd . ' ' . fnameescape(l:res)
             endif
         endif
+        call s:cleanup_state()
         return 1
     elseif a:key == "\<C-n>" || a:key == "\<Down>"
         let s:state.selected = min([s:state.selected + 1, len(s:state.filtered) - 1])
@@ -120,6 +122,17 @@ function! s:update_display() abort
     let l:cursor = len(l:visible.items) > 0 ? (s:state.selected - l:visible.offset + 3) : 1
     call win_execute(s:state.winid, 'execute ' . l:cursor)
     redraw
+endfunction
+
+function! s:cleanup_state() abort
+    " Clear state to free memory
+    let s:state.items = []
+    let s:state.filtered = []
+    let s:state.query = ''
+    let s:state.callback = ''
+    let s:state.selected = 0
+    let s:state.winid = -1
+    let s:state.bufnr = -1
 endfunction
 
 " ── Sources ────────────────────────────────────────────────────────────────

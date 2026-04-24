@@ -7,6 +7,9 @@ let s:servers = {} " ft -> {job, channel, last_id, requests, buffer}
 let s:diag_timers = {} " uri -> timer_id
 let s:pending_actions = []
 let s:sig_winid = -1
+let s:def_cache = {} " uri:line:col -> definition result (cached)
+let s:ref_cache = {} " uri:line:col -> references result (cached)
+let s:symbol_cache = {} " uri -> {line_count, timestamp, symbols} (symbol info cache)
 let g:wplus_lsp_log_enabled = get(g:, 'wplus_lsp_log_enabled', 0)
 let g:wplus_lsp_signcolumn = get(g:, 'wplus_lsp_signcolumn', 'yes')
 
@@ -286,7 +289,19 @@ function! s:handle_response(ft, resp) abort
     if empty(l:method) | return | endif
     unlet s:servers[a:ft].requests[l:id]
     if has_key(a:resp, 'error') | return | endif
-    call s:handle_request_result(a:ft, l:method, get(a:resp, 'result', {}))
+    
+    let l:result = get(a:resp, 'result', {})
+    
+    " Cache definition and references results
+    if (l:method ==# 'textDocument/definition' || l:method ==# 'textDocument/references') && !empty(l:result)
+        let l:uri = s:get_buf_uri(bufnr('%'))
+        if !empty(l:uri)
+            let l:cache = l:method ==# 'textDocument/definition' ? s:def_cache : s:ref_cache
+            call s:store_cache(l:cache, l:uri, line('.') - 1, col('.') - 1, l:result)
+        endif
+    endif
+    
+    call s:handle_request_result(a:ft, l:method, l:result)
 endfunction
 
 function! s:diag_style(sev) abort
@@ -388,11 +403,41 @@ function! s:echo_diag() abort
     endif
 endfunction
 
+function! s:make_cache_key(uri, lnum, col) abort
+    return a:uri . ':' . a:lnum . ':' . a:col
+endfunction
+
+function! s:lookup_cache(cache, uri, lnum, col) abort
+    let l:key = s:make_cache_key(a:uri, a:lnum, a:col)
+    return get(a:cache, l:key, v:null)
+endfunction
+
+function! s:store_cache(cache, uri, lnum, col, result) abort
+    let l:key = s:make_cache_key(a:uri, a:lnum, a:col)
+    let a:cache[l:key] = a:result
+endfunction
+
 function! wplus#lsp#request(method) abort
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:params = s:get_request_params(a:method)
     if empty(l:params) | return | endif
+    
+    " Check cache for definition/references before requesting
+    if a:method ==# 'textDocument/definition'
+        let l:cached = s:lookup_cache(s:def_cache, l:params.textDocument.uri, l:params.position.line, l:params.position.character)
+        if l:cached isnot v:null
+            call s:handle_request_result(l:ft, a:method, l:cached)
+            return
+        endif
+    elseif a:method ==# 'textDocument/references'
+        let l:cached = s:lookup_cache(s:ref_cache, l:params.textDocument.uri, l:params.position.line, l:params.position.character)
+        if l:cached isnot v:null
+            call s:handle_request_result(l:ft, a:method, l:cached)
+            return
+        endif
+    endif
+    
     call s:send(l:ft, a:method, l:params, 0)
 endfunction
 
@@ -619,6 +664,11 @@ function! s:cleanup_all() abort
     let s:diag_timers = {}
     let s:pending_actions = []
     
+    " Clear caches to free memory
+    let s:def_cache = {}
+    let s:ref_cache = {}
+    let s:symbol_cache = {}
+    
     " Close all LSP servers gracefully
     for l:ft in keys(s:servers)
         let l:server = s:servers[l:ft]
@@ -629,3 +679,4 @@ function! s:cleanup_all() abort
     endfor
     let s:servers = {}
 endfunction
+
