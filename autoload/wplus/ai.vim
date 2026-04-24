@@ -1,13 +1,18 @@
-" wplus/ai.vim — AI assistant with OpenAI/Claude integration
+" wplus/ai.vim — AI assistant with OpenAI/Claude/Azure OpenAI integration
 
 if exists('g:autoloaded_wplus_ai') | finish | endif
 let g:autoloaded_wplus_ai = 1
 
-let g:wplus_ai_provider = get(g:, 'wplus_ai_provider', 'openai') " 'openai' or 'claude'
+let g:wplus_ai_provider = get(g:, 'wplus_ai_provider', 'openai') " 'openai', 'claude', or 'azure'
 let g:wplus_ai_model = get(g:, 'wplus_ai_model', '')
 let g:wplus_ai_api_key = get(g:, 'wplus_ai_api_key', '')
 let g:wplus_ai_temperature = get(g:, 'wplus_ai_temperature', 0.7)
 let g:wplus_ai_max_tokens = get(g:, 'wplus_ai_max_tokens', 2000)
+
+" Azure-specific settings
+let g:wplus_ai_azure_resource = get(g:, 'wplus_ai_azure_resource', '')  " e.g., 'my-resource'
+let g:wplus_ai_azure_deployment = get(g:, 'wplus_ai_azure_deployment', '')  " e.g., 'gpt-4'
+let g:wplus_ai_azure_api_version = get(g:, 'wplus_ai_azure_api_version', '2024-02-15-preview')
 
 let s:requests = {} " request_id -> {job, bufnr, start_lnum, status}
 let s:response_buffer = ''
@@ -15,6 +20,14 @@ let s:response_buffer = ''
 function! s:get_api_endpoint() abort
     if g:wplus_ai_provider ==# 'claude'
         return 'https://api.anthropic.com/v1/messages'
+    elseif g:wplus_ai_provider ==# 'azure'
+        if empty(g:wplus_ai_azure_resource) || empty(g:wplus_ai_azure_deployment)
+            call wplus#util#error_msg('ai', 'Azure: resource and deployment must be configured')
+            return ''
+        endif
+        return 'https://' . g:wplus_ai_azure_resource . '.openai.azure.com/openai/deployments/' 
+                    \ . g:wplus_ai_azure_deployment . '/chat/completions'
+                    \ . '?api-version=' . g:wplus_ai_azure_api_version
     else
         return 'https://api.openai.com/v1/chat/completions'
     endif
@@ -30,6 +43,8 @@ function! s:get_request_headers() abort
     if g:wplus_ai_provider ==# 'claude'
         call add(l:headers, 'x-api-key: ' . g:wplus_ai_api_key)
         call add(l:headers, 'anthropic-version: 2023-06-01')
+    elseif g:wplus_ai_provider ==# 'azure'
+        call add(l:headers, 'api-key: ' . g:wplus_ai_api_key)
     else
         call add(l:headers, 'Authorization: Bearer ' . g:wplus_ai_api_key)
     endif
@@ -49,6 +64,7 @@ function! s:build_request_payload(prompt) abort
             \ 'temperature': g:wplus_ai_temperature
             \ })
     else
+        " Both OpenAI and Azure OpenAI use same request format (chat completions)
         return json_encode({
             \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo',
             \ 'max_tokens': g:wplus_ai_max_tokens,
@@ -193,7 +209,13 @@ function! wplus#ai#setup() abort
     
     " Warn if not configured, but still register commands
     if empty(g:wplus_ai_api_key) || empty(g:wplus_ai_model)
-        call wplus#util#warn_msg('ai', 'API not fully configured. Set g:wplus_ai_provider, g:wplus_ai_model, g:wplus_ai_api_key')
+        if g:wplus_ai_provider ==# 'azure'
+            call wplus#util#warn_msg('ai', 'Azure: Set g:wplus_ai_api_key, g:wplus_ai_azure_resource, g:wplus_ai_azure_deployment')
+        elseif g:wplus_ai_provider ==# 'claude'
+            call wplus#util#warn_msg('ai', 'Claude: Set g:wplus_ai_api_key, g:wplus_ai_model')
+        else
+            call wplus#util#warn_msg('ai', 'OpenAI: Set g:wplus_ai_api_key, g:wplus_ai_model')
+        endif
     endif
     
     " Commands
