@@ -24,6 +24,8 @@ function! wplus#lsp#setup() abort
     augroup WplusLSP
         autocmd!
         autocmd FileType go,c,cpp,python,dart,rust call s:on_filetype_changed()
+        autocmd BufDelete * call s:on_buf_delete()
+        autocmd VimLeavePre * call s:cleanup_all()
     augroup END
     nnoremap <silent> <Plug>WplusLspDefinition  :call wplus#lsp#request('textDocument/definition')<CR>
     nnoremap <silent> <Plug>WplusLspHover       :call wplus#lsp#request('textDocument/hover')<CR>
@@ -43,7 +45,7 @@ function! s:on_filetype_changed() abort
         autocmd CursorHold <buffer> call s:echo_diag()
         autocmd InsertCharPre <buffer>
             \ if v:char ==# '(' || v:char ==# ','
-            \   | call timer_start(100, {-> wplus#lsp#request('textDocument/signatureHelp')})
+            \   | call s:throttle_signature_help()
             \ | endif
         autocmd InsertLeave <buffer> call s:close_signature_help()
     augroup END
@@ -56,6 +58,23 @@ function! s:on_filetype_changed() abort
         \ pumvisible() ? "\<C-n>" :
         \ <SID>check_backspace() ? "\<Tab>" :
         \ "\<C-r>=wplus#lsp#request('textDocument/completion')\<CR>\<Ignore>"
+endfunction
+
+function! s:throttle_signature_help() abort
+    let l:buf = bufnr('%')
+    let l:sig_timer = getbufvar(l:buf, 'wplus_lsp_sig_timer', -1)
+    if l:sig_timer != -1
+        return
+    endif
+    let l:timer = timer_start(100, {-> s:do_signature_help(l:buf)})
+    call setbufvar(l:buf, 'wplus_lsp_sig_timer', l:timer)
+endfunction
+
+function! s:do_signature_help(buf) abort
+    if bufnr('%') == a:buf
+        call wplus#lsp#request('textDocument/signatureHelp')
+    endif
+    call setbufvar(a:buf, 'wplus_lsp_sig_timer', -1)
 endfunction
 
 function! s:ensure_signcolumn() abort
@@ -129,7 +148,11 @@ endfunction
 function! s:on_change(ft) abort
     if !has_key(s:servers, a:ft) | return | endif
     let l:buf = bufnr('%')
-    silent! timer_stop(getbufvar(l:buf, 'wplus_lsp_timer', -1))
+    " Cancel previous timer to prevent duplicate timers
+    let l:timer_id = getbufvar(l:buf, 'wplus_lsp_timer', -1)
+    if l:timer_id != -1
+        silent! timer_stop(l:timer_id)
+    endif
     let l:timer = timer_start(800, {-> s:send_change(l:buf, a:ft)})
     call setbufvar(l:buf, 'wplus_lsp_timer', l:timer)
 endfunction
@@ -577,4 +600,32 @@ function! s:close_signature_help() abort
         silent! call popup_close(s:sig_winid)
         let s:sig_winid = -1
     endif
+endfunction
+
+function! s:on_buf_delete() abort
+    " Clean up any timers for this buffer
+    let l:buf = bufnr('%')
+    let l:timer_id = getbufvar(l:buf, 'wplus_lsp_timer', -1)
+    if l:timer_id != -1
+        silent! timer_stop(l:timer_id)
+    endif
+endfunction
+
+function! s:cleanup_all() abort
+    " Stop all pending timers
+    for l:uri in keys(s:diag_timers)
+        silent! timer_stop(s:diag_timers[l:uri])
+    endfor
+    let s:diag_timers = {}
+    let s:pending_actions = []
+    
+    " Close all LSP servers gracefully
+    for l:ft in keys(s:servers)
+        let l:server = s:servers[l:ft]
+        if job_status(l:server.job) ==# 'run'
+            call s:send(l:ft, 'shutdown', {}, 0)
+            silent! call job_stop(l:server.job)
+        endif
+    endfor
+    let s:servers = {}
 endfunction

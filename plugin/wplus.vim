@@ -11,6 +11,9 @@ let s:modules = [
     \ 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo',
     \ ]
 
+" Validate user configuration
+call s:validate_config()
+
 for s:module in s:modules
     let s:toggle = 'wplus_' . s:module . '_enabled'
     let g:[s:toggle] = get(g:, s:toggle, 1)
@@ -21,6 +24,66 @@ for s:module in s:modules
         endif
     endif
 endfor
+
+function! s:validate_config() abort
+    " Validate numeric settings
+    if exists('g:wplus_explorer_max_entries')
+        if type(g:wplus_explorer_max_entries) != v:t_number || g:wplus_explorer_max_entries < 1
+            let g:wplus_explorer_max_entries = 1000
+            echomsg '[wplus] Warning: wplus_explorer_max_entries must be a positive number, reset to 1000'
+        endif
+    endif
+    if exists('g:wplus_explorer_max_depth')
+        if type(g:wplus_explorer_max_depth) != v:t_number || g:wplus_explorer_max_depth < 1
+            let g:wplus_explorer_max_depth = 8
+            echomsg '[wplus] Warning: wplus_explorer_max_depth must be a positive number, reset to 8'
+        endif
+    endif
+    if exists('g:wplus_undotree_width')
+        if type(g:wplus_undotree_width) != v:t_number || g:wplus_undotree_width < 1
+            let g:wplus_undotree_width = 30
+            echomsg '[wplus] Warning: wplus_undotree_width must be a positive number, reset to 30'
+        endif
+    endif
+    if exists('g:wplus_blame_delay')
+        if type(g:wplus_blame_delay) != v:t_number || g:wplus_blame_delay < 0
+            let g:wplus_blame_delay = 500
+            echomsg '[wplus] Warning: wplus_blame_delay must be a non-negative number, reset to 500'
+        endif
+    endif
+    if exists('g:wplus_illuminate_delay')
+        if type(g:wplus_illuminate_delay) != v:t_number || g:wplus_illuminate_delay < 0
+            let g:wplus_illuminate_delay = 200
+            echomsg '[wplus] Warning: wplus_illuminate_delay must be a non-negative number, reset to 200'
+        endif
+    endif
+    if exists('g:wplus_yank_duration')
+        if type(g:wplus_yank_duration) != v:t_number || g:wplus_yank_duration < 0
+            let g:wplus_yank_duration = 250
+            echomsg '[wplus] Warning: wplus_yank_duration must be a non-negative number, reset to 250'
+        endif
+    endif
+    
+    " Validate string settings
+    if exists('g:wplus_indent_char')
+        if type(g:wplus_indent_char) != v:t_string || len(g:wplus_indent_char) == 0
+            let g:wplus_indent_char = '▏'
+            echomsg '[wplus] Warning: wplus_indent_char must be a non-empty string, reset to ▏'
+        endif
+    endif
+    if exists('g:wplus_blame_prefix')
+        if type(g:wplus_blame_prefix) != v:t_string
+            let g:wplus_blame_prefix = '   '
+            echomsg '[wplus] Warning: wplus_blame_prefix must be a string, reset to spaces'
+        endif
+    endif
+    if exists('g:wplus_blame_template')
+        if type(g:wplus_blame_template) != v:t_string
+            let g:wplus_blame_template = '<author>, <date> • <summary>'
+            echomsg '[wplus] Warning: wplus_blame_template must be a string, reset to default'
+        endif
+    endif
+endfunction
 
 function! s:on_session_load() abort
     let l:cur_tab = tabpagenr()
