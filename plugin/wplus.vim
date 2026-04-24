@@ -4,28 +4,6 @@
 if exists('g:loaded_wplus') | finish | endif
 let g:loaded_wplus = 1
 
-let s:modules = [
-    \ 'commentary', 'pairs', 'repeat', 'altfile', 'indent', 'statusline',
-    \ 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree',
-    \ 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix',
-    \ 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo',
-    \ 'colorscheme', 'snippet', 'conflict', 'ai',
-    \ ]
-
-" Validate user configuration
-call s:validate_config()
-
-for s:module in s:modules
-    let s:toggle = 'wplus_' . s:module . '_enabled'
-    let g:[s:toggle] = get(g:, s:toggle, 1)
-    if get(g:, s:toggle, 0)
-        " Check if autoload file exists before calling setup to avoid errors
-        if filereadable(expand('<sfile>:h:h') . '/autoload/wplus/' . s:module . '.vim')
-            execute 'call wplus#' . s:module . '#setup()'
-        endif
-    endif
-endfor
-
 function! s:validate_config() abort
     " Validate numeric settings
     if exists('g:wplus_explorer_max_entries')
@@ -85,6 +63,31 @@ function! s:validate_config() abort
         endif
     endif
 endfunction
+
+let s:modules = [
+    \ 'commentary', 'pairs', 'repeat', 'altfile', 'indent', 'statusline',
+    \ 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree',
+    \ 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix',
+    \ 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo',
+    \ 'colorscheme', 'snippet', 'conflict', 'ai',
+    \ ]
+
+" Validate user configuration
+call s:validate_config()
+
+" Load and setup modules
+for s:module in s:modules
+    let s:toggle = 'wplus_' . s:module . '_enabled'
+    let g:[s:toggle] = get(g:, s:toggle, 1)
+    if get(g:, s:toggle, 1)
+        try
+            execute 'call wplus#' . s:module . '#setup()'
+        catch
+            " Module setup failed, continue loading other modules
+        endtry
+    endif
+endfor
+unlet s:module s:toggle
 
 function! s:on_session_load() abort
     let l:cur_tab = tabpagenr()

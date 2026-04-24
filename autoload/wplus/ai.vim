@@ -174,32 +174,27 @@ function! s:send_request(bufnr, lnum, prompt) abort
         \ l:endpoint], {
         \ 'out_cb': function('s:on_response', [a:bufnr, a:lnum]),
         \ 'close_cb': function('s:on_response_complete', [a:bufnr, a:lnum]),
-        \ 'err_cb': function('s:on_error'),
+        \ 'err_cb': function('s:on_error')
         \ })
     
     let s:requests[l:request_id] = {'job': l:job, 'bufnr': a:bufnr}
     call wplus#util#info_msg('ai', 'sending request...')
 endfunction
 
-function! s:on_error(job, msg) abort
+function! s:on_error(channel, msg) abort
     call wplus#util#error_msg('ai', 'request error: ' . a:msg)
 endfunction
 
 function! wplus#ai#setup() abort
-    if empty(g:wplus_ai_api_key)
-        call wplus#util#warn_msg('ai', 'API key not configured (g:wplus_ai_api_key)')
-        return
-    endif
-    
-    if empty(g:wplus_ai_model)
-        call wplus#util#warn_msg('ai', 'model not configured (g:wplus_ai_model)')
-        return
-    endif
-    
     augroup WplusAI
         autocmd!
         autocmd VimLeavePre * for req in values(s:requests) | silent! call job_stop(req.job) | endfor
     augroup END
+    
+    " Warn if not configured, but still register commands
+    if empty(g:wplus_ai_api_key) || empty(g:wplus_ai_model)
+        call wplus#util#warn_msg('ai', 'API not fully configured. Set g:wplus_ai_provider, g:wplus_ai_model, g:wplus_ai_api_key')
+    endif
     
     " Commands
     command! -range WaiComment   call wplus#ai#comment('visual')

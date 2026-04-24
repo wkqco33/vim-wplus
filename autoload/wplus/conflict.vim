@@ -122,31 +122,21 @@ endfunction
 
 function! s:highlight_conflicts() abort
     " Clear previous highlights
-    call prop_remove({'type': 'WplusConflictMarker', 'all': 1})
-    call prop_remove({'type': 'WplusConflictOurs', 'all': 1})
-    call prop_remove({'type': 'WplusConflictTheirs', 'all': 1})
+    try
+        call prop_remove({'type': 'WplusConflictMarker', 'all': 1})
+    catch
+    endtry
     
     if empty(s:conflicts) | return | endif
     
     for l:idx in range(len(s:conflicts))
         let l:conf = s:conflicts[l:idx]
         
-        " Highlight markers
+        " Add text markers for conflict locations
         try
-            call prop_add(l:conf.lnum_start - 1, 0, {
+            call prop_add(l:conf.lnum_start - 1, 1, {
                 \ 'type': 'WplusConflictMarker',
-                \ 'text': '<<< OURS',
-                \ 'text_align': 'above'
-                \ })
-            call prop_add(l:conf.lnum_sep - 1, 0, {
-                \ 'type': 'WplusConflictMarker',
-                \ 'text': '=== SEPARATOR',
-                \ 'text_align': 'above'
-                \ })
-            call prop_add(l:conf.lnum_end - 1, 0, {
-                \ 'type': 'WplusConflictMarker',
-                \ 'text': '>>> THEIRS',
-                \ 'text_align': 'above'
+                \ 'text': '<<< OURS'
                 \ })
         catch
         endtry
