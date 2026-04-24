@@ -14,8 +14,9 @@ let g:wplus_ai_azure_resource = get(g:, 'wplus_ai_azure_resource', '')  " e.g., 
 let g:wplus_ai_azure_deployment = get(g:, 'wplus_ai_azure_deployment', '')  " e.g., 'gpt-4'
 let g:wplus_ai_azure_api_version = get(g:, 'wplus_ai_azure_api_version', '2024-02-15-preview')
 
-let s:requests = {} " request_id -> {job, bufnr, start_lnum, status}
-let s:response_buffer = ''
+let s:requests = {} " request_id -> {job, bufnr, lnum, response_buffer}
+let s:request_id = '' " current request_id
+
 
 function! s:get_api_endpoint() abort
     if g:wplus_ai_provider ==# 'claude'
@@ -77,14 +78,24 @@ function! s:build_request_payload(prompt) abort
     endif
 endfunction
 
-function! s:on_response(job, bufnr, start_lnum, data) abort
-    let s:response_buffer .= join(a:data, '')
+function! s:on_response(channel, msg) abort
+    if !empty(s:request_id) && has_key(s:requests, s:request_id)
+        let s:requests[s:request_id].response_buffer .= a:msg
+    endif
 endfunction
 
-function! s:on_response_complete(job, bufnr, start_lnum) abort
+function! s:on_response_complete(channel) abort
+    if empty(s:request_id) || !has_key(s:requests, s:request_id)
+        return
+    endif
+    
     " Parse response based on provider
-    let l:response = s:response_buffer
-    let s:response_buffer = ''
+    let l:response = s:requests[s:request_id].response_buffer
+    let l:bufnr = s:requests[s:request_id].bufnr
+    let l:lnum = s:requests[s:request_id].lnum
+    
+    call remove(s:requests, s:request_id)
+    let s:request_id = ''
     
     if empty(l:response)
         call wplus#util#error_msg('ai', 'empty response from API')
@@ -182,18 +193,24 @@ function! s:send_request(bufnr, lnum, prompt) abort
     if empty(l:headers) | return | endif
     
     let l:payload = s:build_request_payload(a:prompt)
-    let l:request_id = reltimestr(reltime()) | " use timestamp as unique ID
+    let l:request_id = reltimestr(reltime()) " use timestamp as unique ID
     
     let l:job = job_start(['curl', '-s', '-X', 'POST',
         \ '-H', 'Content-Type: application/json',
         \ '-d', l:payload,
         \ l:endpoint], {
-        \ 'out_cb': function('s:on_response', [a:bufnr, a:lnum]),
-        \ 'close_cb': function('s:on_response_complete', [a:bufnr, a:lnum]),
+        \ 'out_cb': function('s:on_response'),
+        \ 'close_cb': function('s:on_response_complete'),
         \ 'err_cb': function('s:on_error')
         \ })
     
-    let s:requests[l:request_id] = {'job': l:job, 'bufnr': a:bufnr}
+    let s:request_id = l:request_id
+    let s:requests[l:request_id] = {
+        \ 'job': l:job,
+        \ 'bufnr': a:bufnr,
+        \ 'lnum': a:lnum,
+        \ 'response_buffer': ''
+        \ }
     call wplus#util#info_msg('ai', 'sending request...')
 endfunction
 
