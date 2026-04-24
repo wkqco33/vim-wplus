@@ -95,7 +95,8 @@ function! s:filter_items() abort
     if empty(s:state.query)
         let s:state.filtered = copy(s:state.items)
     else
-        let s:state.filtered = matchfuzzy(s:state.items, s:state.query)
+        " Use matchfuzzy with limit for large result sets
+        let s:state.filtered = matchfuzzy(s:state.items, s:state.query, {'limit': 10000})
     endif
     let s:state.selected = 0
 endfunction
