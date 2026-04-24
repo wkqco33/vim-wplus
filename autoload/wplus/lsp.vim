@@ -59,6 +59,7 @@ function! s:on_filetype_changed() abort
     nmap <buffer><silent> <leader>rn <Plug>WplusLspRename
     nmap <buffer><silent> <leader>ca <Plug>WplusLspCodeAction
     inoremap <buffer><silent><expr> <Tab>
+        \ (get(g:, 'wplus_ai_enabled', 1) && get(g:, 'wplus_ai_suggest_enabled', 1) && wplus#ai#has_suggestion()) ? wplus#ai#accept_suggestion() :
         \ pumvisible() ? "\<C-n>" :
         \ <SID>check_backspace() ? "\<Tab>" :
         \ "\<C-r>=wplus#lsp#request('textDocument/completion')\<CR>\<Ignore>"
@@ -692,4 +693,3 @@ function! s:cleanup_all() abort
     endfor
     let s:servers = {}
 endfunction
-

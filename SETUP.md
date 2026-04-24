@@ -171,7 +171,7 @@ InsertMode에서 자동으로 AI 완성 제안을 Ghost Text로 표시합니다.
 - 입력 모드에서 타이핑을 멈추면 설정된 delay 후 자동으로 제안 표시
 - Tab 키로 제안 수락
 - Escape나 다른 키를 누르면 제안 취소
-- 회색(Comment 색상)으로 표시되어 실제 텍스트와 구분 가능
+- 회색(NonText highlight)으로 표시되어 실제 텍스트와 구분 가능
 
 **설정:**
 ```vimscript
@@ -179,6 +179,7 @@ let g:wplus_ai_suggest_enabled = 1               " 활성화 여부 (기본값: 
 let g:wplus_ai_suggest_delay = 500               " 제안 지연 시간 (ms)
 let g:wplus_ai_suggest_context_lines = 50        " 컨텍스트 수집 라인 수
 let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
+" let g:wplus_ai_suggest_debug = 1               " 디버그 로그 출력
 ```
 
 **인자 설명:**
@@ -203,9 +204,11 @@ let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
 
 **Key Mapping:**
 ```vimscript
-imap <Tab> <Cmd>call wplus#ai#accept_suggestion()<CR>
+inoremap <expr> <Tab> wplus#ai#accept_suggestion()
 nnoremap <Leader>ai :WaiToggleSuggest<CR>
 ```
+
+이미 `<Tab>`을 LSP 또는 snippet 이동에 쓰고 있다면 Ghost Text는 다른 키에 매핑하는 것이 안전합니다.
 
 ---
 

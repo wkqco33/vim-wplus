@@ -68,10 +68,9 @@ function! wplus#conflict#resolve_ours() abort
     let l:conf = s:conflicts[s:current_conflict]
     let l:bufnr = bufnr('%')
     
-    " Delete conflict markers and theirs
-    " Keep ours, remove markers and theirs
+    " Keep ours, remove start marker and separator..end range.
+    call deletebufline(l:bufnr, l:conf.lnum_sep, l:conf.lnum_end)
     call deletebufline(l:bufnr, l:conf.lnum_start, l:conf.lnum_start)
-    call deletebufline(l:bufnr, l:conf.lnum_sep + 1, l:conf.lnum_end)
     
     " Recalculate remaining conflicts
     call s:find_conflicts()
@@ -84,12 +83,9 @@ function! wplus#conflict#resolve_theirs() abort
     let l:conf = s:conflicts[s:current_conflict]
     let l:bufnr = bufnr('%')
     
-    " Delete conflict markers and ours, keep theirs
+    " Remove start marker..separator, then remove the shifted end marker.
     call deletebufline(l:bufnr, l:conf.lnum_start, l:conf.lnum_sep)
-    
-    " Adjust lnum_end after deletion
-    let l:adjust = l:conf.lnum_sep - l:conf.lnum_start + 1
-    let l:new_end = l:conf.lnum_end - l:adjust
+    let l:new_end = l:conf.lnum_end - (l:conf.lnum_sep - l:conf.lnum_start + 1)
     call deletebufline(l:bufnr, l:new_end, l:new_end)
     
     " Recalculate
@@ -103,17 +99,10 @@ function! wplus#conflict#resolve_both() abort
     let l:conf = s:conflicts[s:current_conflict]
     let l:bufnr = bufnr('%')
     
-    " Keep both ours and theirs, remove markers
-    call deletebufline(l:bufnr, l:conf.lnum_start, l:conf.lnum_start) " <<<<<<<
-    
-    " Adjust sep line
-    let l:new_sep = l:conf.lnum_sep - 1
-    call deletebufline(l:bufnr, l:new_sep, l:new_sep) " =======
-    
-    " Adjust end
-    let l:adjust = 2
-    let l:new_end = l:conf.lnum_end - l:adjust
-    call deletebufline(l:bufnr, l:new_end, l:new_end) " >>>>>>>
+    " Remove markers from bottom to top so line numbers stay valid.
+    call deletebufline(l:bufnr, l:conf.lnum_end, l:conf.lnum_end)
+    call deletebufline(l:bufnr, l:conf.lnum_sep, l:conf.lnum_sep)
+    call deletebufline(l:bufnr, l:conf.lnum_start, l:conf.lnum_start)
     
     " Recalculate
     call s:find_conflicts()
