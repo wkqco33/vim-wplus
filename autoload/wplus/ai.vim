@@ -338,26 +338,33 @@ endfunction
 " Accept current suggestion
 function! wplus#ai#accept_suggestion() abort
     if empty(s:suggest_content)
+        " No suggestion, insert normal tab
         return "\<Tab>"
     endif
     
     let l:content = s:suggest_content
     call s:dismiss_suggestion()
     
-    " Insert the suggestion
-    let l:lines = split(l:content, "\n")
+    " Insert suggestion text at cursor position
+    call wplus#util#info_msg('ai', 'suggestion accepted')
+    
+    " Simply append the suggestion to current line
+    let l:line = getline('.')
+    let l:col = col('.')
+    let l:new_line = l:line[:l:col - 2] . l:content . l:line[l:col - 1:]
+    
+    let l:lines = split(l:new_line, "\n")
     if len(l:lines) > 1
-        " Insert remaining lines
+        " Multi-line suggestion
+        call setline('.', l:lines[0])
         for l:i in range(1, len(l:lines) - 1)
             call append(line('.'), l:lines[l:i])
         endfor
-    endif
-    
-    " Append first line to current line
-    if !empty(l:lines[0])
-        call append(line('.') - 1, getline('.')[:-1] . l:lines[0])
-        call setline(line('.'), '')
-        call cursor(line('.'), col('.') + len(l:lines[0]))
+        call cursor(line('.') + len(l:lines) - 1, len(l:lines[-1]) + 1)
+    else
+        " Single-line suggestion
+        call setline('.', l:new_line)
+        call cursor(line('.'), l:col + len(l:content))
     endif
     
     return ''
