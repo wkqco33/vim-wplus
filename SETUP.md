@@ -65,6 +65,7 @@ let g:wplus_ai_azure_api_version = '2024-02-15-preview'  " (선택사항)
 :WaiComment         " 선택 영역에 주석 추가
 :WaiComplete        " 코드 완성 제안 표시
 :'<,'>WaiRefactor   " 선택 영역 리팩토링
+:WaiToggleSuggest   " Ghost Text 자동완성 on/off
 ```
 
 #### 키 매핑 예시
@@ -72,6 +73,51 @@ let g:wplus_ai_azure_api_version = '2024-02-15-preview'  " (선택사항)
 nnoremap <leader>ac :WaiComment<CR>
 nnoremap <leader>ao :WaiComplete<CR>
 vnoremap <leader>ar :WaiRefactor<CR>
+nnoremap <leader>at :WaiToggleSuggest<CR>
+```
+
+#### Ghost Text 자동완성
+
+InsertMode에서 자동으로 AI 완성 제안을 Ghost Text로 표시합니다.
+
+**작동 방식:**
+- 입력 모드에서 타이핑을 멈추면 설정된 delay 후 자동으로 제안 표시
+- Tab 키로 제안 수락
+- Escape나 다른 키를 누르면 제안 취소
+- 회색(Comment 색상)으로 표시되어 실제 텍스트와 구분 가능
+
+**설정:**
+```vimscript
+let g:wplus_ai_suggest_enabled = 1               " 활성화 여부 (기본값: 1)
+let g:wplus_ai_suggest_delay = 500               " 제안 지연 시간 (ms)
+let g:wplus_ai_suggest_context_lines = 50        " 컨텍스트 수집 라인 수
+let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
+```
+
+**인자 설명:**
+- `suggest_enabled`: 자동완성 기능 활성화/비활성화
+- `suggest_delay`: 입력 후 제안까지 대기시간 (밀리초)
+  - 작을수록 빠르지만 API 비용 증가
+  - 큰값일수록 느림 (기본 500ms)
+  - 5회 타이핑 후 delay 자동 2배 증가 (빠른 입력 시 불필요한 요청 감소)
+- `context_lines`: 제안 컨텍스트로 포함할 이전 라인 수
+- `suffix_lines`: 제안 컨텍스트로 포함할 이후 라인 수
+
+**언어별 Context 추출:**
+- Go: `func` 함수명 추출, 함수 경계 인식
+- Python: `def`/`class` 추출, 들여쓰기 기반 scope
+- TypeScript/JavaScript: `function`, `class`, `const/let/var` 추출
+- Rust: `fn`, `struct`, `impl`, `trait` 추출
+- Java: `class`, `interface`, `enum` 추출
+- Kotlin: `fun`, `class`, `object` 추출
+- Ruby: `def`, `class`, `module` 추출
+- Lua: `function` 추출
+- C/C++: 함수 선언 추출
+
+**Key Mapping:**
+```vimscript
+imap <Tab> <Cmd>call wplus#ai#accept_suggestion()<CR>
+nnoremap <Leader>ai :WaiToggleSuggest<CR>
 ```
 
 ---
