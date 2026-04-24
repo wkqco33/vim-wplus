@@ -14,8 +14,21 @@ let g:wplus_ai_azure_resource = get(g:, 'wplus_ai_azure_resource', '')  " e.g., 
 let g:wplus_ai_azure_deployment = get(g:, 'wplus_ai_azure_deployment', '')  " e.g., 'gpt-4'
 let g:wplus_ai_azure_api_version = get(g:, 'wplus_ai_azure_api_version', '2024-02-15-preview')
 
+" Ghost Text auto-suggestion settings
+let g:wplus_ai_suggest_enabled = get(g:, 'wplus_ai_suggest_enabled', 1)
+let g:wplus_ai_suggest_delay = get(g:, 'wplus_ai_suggest_delay', 500)
+let g:wplus_ai_suggest_context_lines = get(g:, 'wplus_ai_suggest_context_lines', 50)
+let g:wplus_ai_suggest_suffix_lines = get(g:, 'wplus_ai_suggest_suffix_lines', 20)
+
 let s:requests = {} " request_id -> {job, bufnr, lnum, response_buffer}
 let s:request_id = '' " current request_id
+
+" Ghost Text state
+let s:suggest_content = '' " current suggestion content
+let s:suggest_line = 0 " line where suggestion was requested
+let s:suggest_col = 0 " column where suggestion was requested
+let s:suggest_timer = v:null
+let s:suggest_keystroke_count = 0 " keystroke counter for adaptive delay
 
 
 function! s:get_api_endpoint() abort
@@ -245,9 +258,295 @@ function! wplus#ai#setup() abort
     command! -range WaiComment   call wplus#ai#comment('visual')
     command! -nargs=? WaiComplete call wplus#ai#complete(<q-args> != '' ? <q-args> : 5)
     command! -range WaiRefactor  call wplus#ai#refactor()
+    command! WaiToggleSuggest    call wplus#ai#toggle_suggest()
+    command! WaiAcceptSuggest    call wplus#ai#accept_suggestion()
     
     " Mappings
     nnoremap <silent> <Plug>WaiComment   :WaiComment<CR>
     nnoremap <silent> <Plug>WaiComplete  :WaiComplete<CR>
     xnoremap <silent> <Plug>WaiRefactor  :WaiRefactor<CR>
+    nnoremap <silent> <Plug>WaiToggleSuggest :WaiToggleSuggest<CR>
+    
+    " Ghost Text auto-suggest
+    if g:wplus_ai_suggest_enabled
+        augroup WplusAISuggest
+            autocmd!
+            autocmd InsertEnter * call s:on_insert_enter()
+            autocmd InsertLeave * call s:dismiss_suggestion()
+            autocmd InsertTextChangedI * call s:on_text_changed()
+        augroup END
+    endif
+endfunction
+
+" ── Ghost Text Suggestion Functions ────────────────────────────────────────────
+
+" Show Ghost Text suggestion with textprop
+function! s:show_suggestion() abort
+    call prop_remove({'type': 'WplusAISuggest', 'all': 1})
+    
+    if empty(s:suggest_content) | return | endif
+    
+    let l:lines = split(s:suggest_content, "\n", 1)
+    let l:line = line('.')
+    let l:col = col('.')
+    
+    try
+        " First line appended to current line
+        if !empty(l:lines[0])
+            call prop_add(l:line, l:col, {
+                \ 'type': 'WplusAISuggest',
+                \ 'text': l:lines[0],
+                \ 'id': 1,
+                \ })
+        endif
+        
+        " Remaining lines as virtual lines below
+        let l:i = 1
+        while l:i < len(l:lines)
+            let l:text = l:lines[l:i]
+            if empty(l:text) | let l:text = ' ' | endif
+            call prop_add(l:line, 0, {
+                \ 'type': 'WplusAISuggest',
+                \ 'text': l:text,
+                \ 'text_align': 'below',
+                \ 'id': 1 + l:i,
+                \ })
+            let l:i += 1
+        endwhile
+        
+        redraw
+    catch
+        return
+    endtry
+endfunction
+
+" Dismiss current suggestion
+function! s:dismiss_suggestion() abort
+    let s:suggest_content = ''
+    let s:suggest_line = 0
+    let s:suggest_col = 0
+    let s:suggest_keystroke_count = 0
+    
+    if s:suggest_timer != v:null
+        call timer_stop(s:suggest_timer)
+        let s:suggest_timer = v:null
+    endif
+    
+    call prop_remove({'type': 'WplusAISuggest', 'all': 1})
+endfunction
+
+" Accept current suggestion
+function! wplus#ai#accept_suggestion() abort
+    if empty(s:suggest_content)
+        return "\<Tab>"
+    endif
+    
+    let l:content = s:suggest_content
+    call s:dismiss_suggestion()
+    
+    " Insert the suggestion
+    let l:lines = split(l:content, "\n")
+    if len(l:lines) > 1
+        " Insert remaining lines
+        for l:i in range(1, len(l:lines) - 1)
+            call append(line('.'), l:lines[l:i])
+        endfor
+    endif
+    
+    " Append first line to current line
+    if !empty(l:lines[0])
+        call append(line('.') - 1, getline('.')[:-1] . l:lines[0])
+        call setline(line('.'), '')
+        call cursor(line('.'), col('.') + len(l:lines[0]))
+    endif
+    
+    return ''
+endfunction
+
+" Toggle suggestions on/off
+function! wplus#ai#toggle_suggest() abort
+    let g:wplus_ai_suggest_enabled = !g:wplus_ai_suggest_enabled
+    if g:wplus_ai_suggest_enabled
+        call wplus#util#info_msg('ai', 'Ghost Text suggestions enabled')
+        augroup WplusAISuggest
+            autocmd!
+            autocmd InsertEnter * call s:on_insert_enter()
+            autocmd InsertLeave * call s:dismiss_suggestion()
+            autocmd InsertTextChangedI * call s:on_text_changed()
+        augroup END
+    else
+        call wplus#util#info_msg('ai', 'Ghost Text suggestions disabled')
+        call s:dismiss_suggestion()
+        augroup WplusAISuggest
+            autocmd!
+        augroup END
+    endif
+endfunction
+
+" Timer callback for delayed suggestion trigger
+function! s:on_suggest_timer(timer) abort
+    " Check if cursor is still in same position
+    if line('.') != s:suggest_line || col('.') != s:suggest_col
+        return
+    endif
+    
+    " Skip if in comment
+    if wplus#ai#context#is_in_comment()
+        return
+    endif
+    
+    let l:prefix = wplus#ai#context#get_prefix(s:suggest_line, s:suggest_col)
+    let l:suffix = wplus#ai#context#get_suffix(s:suggest_line, s:suggest_col)
+    
+    " Don't suggest if prefix is empty or only whitespace
+    if empty(trim(l:prefix)) && empty(trim(l:suffix))
+        return
+    endif
+    
+    " Build suggestion request
+    let l:prompt = "Complete the following code. Return only the completion without explanation or markdown:\n\n"
+          \ . "Prefix:\n" . l:prefix . "\n\n"
+          \ . "Suffix:\n" . l:suffix . "\n\n"
+          \ . "Completion:"
+    
+    call s:send_suggest_request(l:prefix, l:suffix, l:prompt)
+endfunction
+
+" TextChangedI handler for Ghost Text
+function! s:on_text_changed() abort
+    if !g:wplus_ai_suggest_enabled
+        return
+    endif
+    
+    let s:suggest_keystroke_count += 1
+    call s:dismiss_suggestion()
+    
+    let l:delay = g:wplus_ai_suggest_delay
+    if s:suggest_keystroke_count > 5
+        let l:delay = l:delay * 2
+    endif
+    
+    let s:suggest_timer = timer_start(l:delay, function('s:on_suggest_timer'))
+endfunction
+
+" InsertEnter handler
+function! s:on_insert_enter() abort
+    let s:suggest_keystroke_count = 0
+endfunction
+
+" Build suggestion prompt for all providers
+function! s:build_suggest_payload(prefix, suffix) abort
+    let l:system_msg = 'You are a code completion assistant. Complete the code based on context. Return only the completion without explanation or code blocks.'
+    let l:prompt = "Complete this code:\n\nPrefix:\n" . a:prefix . "\n\nSuffix:\n" . a:suffix
+    
+    if g:wplus_ai_provider ==# 'claude'
+        return json_encode({
+            \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'claude-3-sonnet-20240229',
+            \ 'max_tokens': 500,
+            \ 'system': l:system_msg,
+            \ 'messages': [{'role': 'user', 'content': l:prompt}],
+            \ 'temperature': 0.5
+            \ })
+    else
+        return json_encode({
+            \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo',
+            \ 'max_tokens': 500,
+            \ 'temperature': 0.5,
+            \ 'messages': [
+            \   {'role': 'system', 'content': l:system_msg},
+            \   {'role': 'user', 'content': l:prompt}
+            \ ]
+            \ })
+    endif
+endfunction
+
+" Response handler for suggestions
+function! s:on_suggest_response(channel, msg) abort
+    if !empty(s:request_id) && has_key(s:requests, s:request_id)
+        let s:requests[s:request_id].response_buffer .= a:msg
+    endif
+endfunction
+
+" Complete response handler for suggestions
+function! s:on_suggest_response_complete(channel) abort
+    if empty(s:request_id) || !has_key(s:requests, s:request_id)
+        return
+    endif
+    
+    let l:response = s:requests[s:request_id].response_buffer
+    call remove(s:requests, s:request_id)
+    let s:request_id = ''
+    
+    if empty(l:response)
+        return
+    endif
+    
+    try
+        let l:json = json_decode(l:response)
+    catch
+        return
+    endtry
+    
+    let l:content = ''
+    if g:wplus_ai_provider ==# 'claude'
+        if has_key(l:json, 'content') && len(l:json.content) > 0
+            let l:content = l:json.content[0].text
+        endif
+    else
+        if has_key(l:json, 'choices') && len(l:json.choices) > 0
+            let l:content = l:json.choices[0].message.content
+        endif
+    endif
+    
+    if empty(l:content)
+        return
+    endif
+    
+    " Clean up response (remove markdown code blocks if present)
+    let l:content = substitute(l:content, '```.*\n', '', 'g')
+    let l:content = substitute(l:content, '```', '', 'g')
+    let l:content = trim(l:content)
+    
+    " Only update if cursor is still at request position
+    if line('.') == s:suggest_line && col('.') == s:suggest_col
+        let s:suggest_content = l:content
+        call s:show_suggestion()
+    endif
+endfunction
+
+" Send suggestion request to AI
+function! s:send_suggest_request(prefix, suffix, prompt) abort
+    if empty(g:wplus_ai_api_key) || empty(g:wplus_ai_model)
+        return
+    endif
+    
+    let l:endpoint = s:get_api_endpoint()
+    let l:headers = s:get_request_headers()
+    if empty(l:headers) | return | endif
+    
+    let l:payload = s:build_suggest_payload(a:prefix, a:suffix)
+    let l:request_id = reltimestr(reltime())
+    
+    let l:cmd = ['curl', '-s', '-X', 'POST', '-d', l:payload, l:endpoint]
+    
+    " Add headers
+    for l:header in l:headers
+        call insert(l:cmd, l:header, 2)
+        call insert(l:cmd, '-H', 2)
+    endfor
+    
+    let l:job = job_start(l:cmd, {
+        \ 'out_cb': function('s:on_suggest_response'),
+        \ 'close_cb': function('s:on_suggest_response_complete'),
+        \ })
+    
+    let s:request_id = l:request_id
+    let s:suggest_line = line('.')
+    let s:suggest_col = col('.')
+    let s:requests[l:request_id] = {
+        \ 'job': l:job,
+        \ 'bufnr': bufnr('%'),
+        \ 'lnum': line('.'),
+        \ 'response_buffer': ''
+        \ }
 endfunction

@@ -11,7 +11,7 @@ let mapleader = " "
 call plug#begin('~/.vim/plugged')
 
 " 메인 플러그인 (wplus - 31개 모듈 포함)
-Plug '/path/to/vim-wplus'
+Plug '/home/wkqco/Workspace/utils/vim-wplus'
 
 " UI / 필수 도구
 Plug 'morhetz/gruvbox'                  " 컬러 테마
@@ -139,11 +139,11 @@ let g:wplus_session_auto_save = 1
 "
 
 " OpenAI 설정
-let g:wplus_ai_provider = 'openai'
-let g:wplus_ai_api_key = ''               " API 키 필수 설정
-let g:wplus_ai_model = 'gpt-3.5-turbo'   " gpt-3.5-turbo, gpt-4
-let g:wplus_ai_temperature = 0.7         " 0.0~1.0 (낮을수록 결정적)
-let g:wplus_ai_max_tokens = 2000
+" let g:wplus_ai_provider = 'openai'
+" let g:wplus_ai_api_key = ''               " API 키 필수 설정
+" let g:wplus_ai_model = 'gpt-3.5-turbo'   " gpt-3.5-turbo, gpt-4
+" let g:wplus_ai_temperature = 0.7         " 0.0~1.0 (낮을수록 결정적)
+" let g:wplus_ai_max_tokens = 2000
 
 " Claude 설정 (provider='claude'일 때)
 " let g:wplus_ai_provider = 'claude'
@@ -151,23 +151,12 @@ let g:wplus_ai_max_tokens = 2000
 " let g:wplus_ai_model = 'claude-3-sonnet-20240229'
 
 " Azure OpenAI 설정 (provider='azure'일 때)
-" let g:wplus_ai_provider = 'azure'
-" let g:wplus_ai_api_key = ''
-" let g:wplus_ai_model = 'gpt-4'
-" let g:wplus_ai_azure_resource = 'my-company-ai'        " Azure 리소스명
-" let g:wplus_ai_azure_deployment = 'gpt-4-deployment'   " 배포명
-" let g:wplus_ai_azure_api_version = '2024-02-15-preview'
-
-" Ghost Text 자동완성 설정
-" InsertMode에서 자동으로 AI 제안을 Ghost Text로 표시
-let g:wplus_ai_suggest_enabled = 1               " 자동완성 활성화 여부
-let g:wplus_ai_suggest_delay = 500               " 제안까지의 대기 시간 (ms)
-let g:wplus_ai_suggest_context_lines = 50        " prefix 수집 라인 수
-let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
-
-" Ghost Text 키 매핑
-imap <Tab>       <Cmd>call wplus#ai#accept_suggestion()<CR>
-nnoremap <Leader>ai :WaiToggleSuggest<CR>
+let g:wplus_ai_provider = 'azure'
+let g:wplus_ai_api_key = 'EOAjn34ERHmwf2MGfq8roYKKSc9w1sNUEfXz0x7HwhT9GZlC2bmmJQQJ99BHACNns7RXJ3w3AAABACOGkRSR'
+let g:wplus_ai_model = 'gpt-5.4'
+let g:wplus_ai_azure_resource = 'robot-open-ai'        " Azure 리소스명
+let g:wplus_ai_azure_deployment = 'gpt-5.4'   " 배포명
+let g:wplus_ai_azure_api_version = '2025-04-01-preview'
 
 "
 " ┌─────────────────────────────────────────────────────────┐
