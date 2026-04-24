@@ -483,6 +483,7 @@ ChatGPT, Claude, Azure OpenAI를 지원하는 AI 코드 어시스턴트입니다
 | `:WaiComment` | Normal | 현재 코드에 주석 생성 |
 | `:WaiComplete` | Normal | 다음 줄 코드 완성 제안 |
 | `:'<,'>WaiRefactor` | Visual | 선택 범위 리팩토링 제안 |
+| `:WaiToggleSuggest` | Normal | Ghost Text 자동완성 토글 |
 
 #### 설정
 
@@ -498,7 +499,30 @@ let g:wplus_ai_max_tokens = 2000
 let g:wplus_ai_azure_resource = 'your-resource'
 let g:wplus_ai_azure_deployment = 'your-deployment'
 let g:wplus_ai_azure_api_version = '2024-02-15-preview'
+
+" Ghost Text 자동완성
+let g:wplus_ai_suggest_enabled = 1                  " 활성화 여부
+let g:wplus_ai_suggest_delay = 500                  " 지연 시간 (ms)
+let g:wplus_ai_suggest_context_lines = 50           " 컨텍스트 라인 수
+let g:wplus_ai_suggest_suffix_lines = 20            " suffix 라인 수
 ```
+
+#### Ghost Text 자동완성
+
+**작동 방식:**
+- InsertMode에서 타이핑 후 delay 시간 경과 시 자동으로 제안 표시
+- Tab 키로 제안 수락
+- 다른 키나 Escape로 제안 취소
+- 회색(NonText 색상)으로 표시
+
+**컨텍스트 추출:**
+- 현재 위치의 prefix (이전 코드)
+- 현재 위치의 suffix (다음 코드)
+- 현재 scope (함수/클래스 등)
+- 주변 심볼 추출
+
+**지원 언어:**
+Go, Python, TypeScript, JavaScript, Rust, Java, Kotlin, Ruby, Lua, C/C++
 
 #### 예시
 
@@ -507,6 +531,10 @@ let g:wplus_ai_azure_api_version = '2024-02-15-preview'
 nnoremap <leader>ac :WaiComment<CR>
 nnoremap <leader>ao :WaiComplete<CR>
 vnoremap <leader>ar :WaiRefactor<CR>
+nnoremap <leader>at :WaiToggleSuggest<CR>
+
+" Ghost Text 수락 (Tab 키)
+imap <Tab> <Cmd>call wplus#ai#accept_suggestion()<CR>
 ```
 
 ---
