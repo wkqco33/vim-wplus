@@ -1,7 +1,7 @@
 # vim-wplus
 
 외부 의존성 없는 Vim 올인원 플러그인.  
-자주 쓰이는 플러그인 18개의 기능을 순수 VimScript로 직접 구현합니다.
+31개 모듈로 구성된 완전한 Vim IDE (AI 어시스턴트, 스니펫, Git 충돌 해결 포함).
 
 **요구사항**: Vim 9.1+ (`+job +channel +popupwin +signs +textprop`)
 
@@ -10,6 +10,7 @@
 ## 목차
 
 - [설치](#설치)
+- [주요 기능](#주요-기능)
 - [대체 플러그인 목록](#대체-플러그인-목록)
 - [모듈 가이드](#모듈-가이드)
   - [commentary — 주석 토글](#commentary--주석-토글)
@@ -36,6 +37,12 @@
   - [lsp — 경량 LSP 연동](#lsp--경량-lsp-연동)
   - [altfile — 헤더↔소스 전환](#altfile--헤더소스-전환)
   - [repeat — . 반복 지원](#repeat---반복-지원)
+  - [ai — AI 어시스턴트](#ai--ai-어시스턴트-openai--claude--azure)
+  - [snippet — 스니펫 엔진](#snippet--스니펫-엔진)
+  - [conflict — Git 충돌 해결](#conflict--git-충돌-해결)
+  - [todo — TODO 관리](#todo--todo-관리)
+  - [colorscheme — 배경색 자동 감지](#colorscheme--배경색-자동-감지)
+- [설정 가이드](#설정-가이드)
 - [모듈 비활성화](#모듈-비활성화)
 - [전체 설정 레퍼런스](#전체-설정-레퍼런스)
 
@@ -465,6 +472,157 @@ call wplus#repeat#set("\<Plug>MyAction", v:count)
 
 ---
 
+### ai — AI 어시스턴트 (OpenAI, Claude, Azure)
+
+ChatGPT, Claude, Azure OpenAI를 지원하는 AI 코드 어시스턴트입니다.
+
+#### 명령어
+
+| 명령 | 모드 | 동작 |
+|------|------|------|
+| `:WaiComment` | Normal | 현재 코드에 주석 생성 |
+| `:WaiComplete` | Normal | 다음 줄 코드 완성 제안 |
+| `:'<,'>WaiRefactor` | Visual | 선택 범위 리팩토링 제안 |
+
+#### 설정
+
+```vim
+" 공급자 선택: 'openai' | 'claude' | 'azure'
+let g:wplus_ai_provider = 'openai'
+let g:wplus_ai_api_key = 'sk-...'                    " 필수
+let g:wplus_ai_model = 'gpt-3.5-turbo'
+let g:wplus_ai_temperature = 0.7                     " 0.0~1.0
+let g:wplus_ai_max_tokens = 2000
+
+" Azure OpenAI (provider='azure'일 때만)
+let g:wplus_ai_azure_resource = 'your-resource'
+let g:wplus_ai_azure_deployment = 'your-deployment'
+let g:wplus_ai_azure_api_version = '2024-02-15-preview'
+```
+
+#### 예시
+
+```vimscript
+" 키 매핑
+nnoremap <leader>ac :WaiComment<CR>
+nnoremap <leader>ao :WaiComplete<CR>
+vnoremap <leader>ar :WaiRefactor<CR>
+```
+
+---
+
+### snippet — 스니펫 엔진
+
+코드 템플릿을 빠르게 확장하는 스니펫 엔진입니다.
+
+#### 플레이스홀더 문법
+
+```
+${1:default}  - 선택 가능한 필드
+${2:second}   - 두 번째 필드
+${0:end}      - 스니펫 종료 지점
+```
+
+#### 기본 스니펫
+
+```python
+# Python
+def[Tab]    -> def function_name(${1:args}):
+class[Tab]  -> class ClassName${1:(BaseClass)}:
+if[Tab]     -> if ${1:condition}:
+for[Tab]    -> for ${1:item} in ${2:iterable}:
+```
+
+```go
+// Go
+func[Tab]   -> func ${1:function_name}(${2:params}) ${3:return_type} {
+if[Tab]     -> if ${1:condition} {
+for[Tab]    -> for ${1:i} := ${2:0}; ${1:i} < ${3:n}; ${1:i}++ {
+```
+
+#### 설정
+
+```vim
+let g:wplus_snippet_enabled = 1
+let g:wplus_snippet_jump_key = '<Tab>'
+let g:wplus_snippet_jump_back_key = '<S-Tab>'
+```
+
+---
+
+### conflict — Git 충돌 해결
+
+Git merge 충돌을 시각적으로 감지하고 해결합니다.
+
+#### 명령어
+
+| 명령 | 동작 |
+|------|------|
+| `:WconflictNext` | 다음 충돌로 이동 |
+| `:WconflictPrev` | 이전 충돌로 이동 |
+| `:WconflictOurs` | ours 버전 선택 |
+| `:WconflictTheirs` | theirs 버전 선택 |
+| `:WconflictBoth` | 둘 다 선택 (ours + theirs) |
+
+#### 설정
+
+```vim
+let g:wplus_conflict_enabled = 1
+let g:wplus_conflict_auto_highlight = 1
+```
+
+---
+
+### todo — TODO 관리
+
+코드 내 TODO/FIXME/HACK 주석을 자동으로 수집하여 Quickfix에 표시합니다.
+
+#### 명령어
+
+| 명령 | 동작 |
+|------|------|
+| `:WtodoQuickfix` | TODO 목록을 Quickfix에 표시 |
+
+#### 검색 대상
+
+```vim
+let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
+```
+
+#### 설정
+
+```vim
+let g:wplus_todo_enabled = 1
+let g:wplus_todo_grep_backend = 'rg'     " rg, git grep, grep
+```
+
+---
+
+### colorscheme — 배경색 자동 감지
+
+터미널의 밝기(dark/light)를 자동으로 감지하여 컬러스킴을 적응형으로 조정합니다.
+
+#### 설정
+
+```vim
+let g:wplus_colorscheme_auto_detect = 1
+```
+
+---
+
+## 설정 가이드
+
+상세한 설정 방법은 [SETUP.md](SETUP.md)를 참고하세요.
+
+주요 내용:
+- LSP 서버 설치 및 설정
+- AI 공급자 선택 및 API 키 설정
+- 성능 최적화 설정
+- 키 매핑 추천
+- 문제 해결
+
+---
+
 ## 모듈 비활성화
 
 `plug#begin()` 전(또는 `plugin/wplus.vim` 로드 전)에 선언합니다.
@@ -478,30 +636,47 @@ let g:wplus_yankhighlight_enabled = 0
 **전체 토글 변수 목록**:
 
 ```vim
+" 기본 편집 (7)
 g:wplus_commentary_enabled   " 주석 토글
 g:wplus_surround_enabled     " 괄호 조작
 g:wplus_pairs_enabled        " 자동 괄호
 g:wplus_textobj_enabled      " 텍스트 오브젝트
 g:wplus_format_enabled       " 스마트 포매터
+g:wplus_repeat_enabled       " . 반복 지원
+g:wplus_altfile_enabled      " 헤더↔소스 전환
+
+" VCS/Git (5)
 g:wplus_gitgutter_enabled    " Sign diff
 g:wplus_blame_enabled        " Git blame
+g:wplus_terminal_enabled     " 터미널 토글
+g:wplus_explorer_enabled     " 사이드바 탐색기
+g:wplus_session_enabled      " 세션 관리
+
+" UI (5)
 g:wplus_statusline_enabled   " 상태바
 g:wplus_tabline_enabled      " 탭라인
 g:wplus_indent_enabled       " 들여쓰기 가이드
-g:wplus_illuminate_enabled   " 심볼 하이라이트
-g:wplus_yankhighlight_enabled" 복사 피드백
 g:wplus_undotree_enabled     " Undo 사이드바
+g:wplus_quickfix_enabled     " Quickfix 강화
+
+" 검색/네비게이션 (5)
+g:wplus_finder_enabled       " 고속 퍼지 파인더
+g:wplus_grep_enabled         " 고속 검색
 g:wplus_whichkey_enabled     " 키 힌트 팝업
 g:wplus_bufdelete_enabled    " 버퍼 삭제
-g:wplus_quickfix_enabled     " Quickfix 강화
-g:wplus_finder_enabled       " 고속 퍼지 파인더
-g:wplus_explorer_enabled     " 사이드바 탐색기
-g:wplus_grep_enabled         " 고속 검색
 g:wplus_root_enabled         " 루트 자동 인식
-g:wplus_terminal_enabled     " 터미널 토글
+
+" 하이라이팅/시각화 (3)
+g:wplus_illuminate_enabled   " 심볼 하이라이트
+g:wplus_yankhighlight_enabled" 복사 피드백
 g:wplus_lsp_enabled          " 경량 LSP
-g:wplus_altfile_enabled      " 헤더↔소스 전환
-g:wplus_repeat_enabled       " . 반복 지원
+
+" 신규 기능 (5)
+g:wplus_ai_enabled           " AI 어시스턴트
+g:wplus_snippet_enabled      " 스니펫 엔진
+g:wplus_conflict_enabled     " Git 충돌 해결
+g:wplus_todo_enabled         " TODO 관리
+g:wplus_colorscheme_enabled  " 배경색 자동 감지
 ```
 
 ---
@@ -546,6 +721,33 @@ let g:wplus_session_max_files = 50          " 보관할 세션 파일 최대 개
 
 " ── undotree ─────────────────────────────────────────────────────────────
 let g:wplus_undotree_width    = 30           " 사이드바 너비 (컬럼)
+
+" ── ai ────────────────────────────────────────────────────────────────
+let g:wplus_ai_provider = 'openai'          " 'openai' | 'claude' | 'azure'
+let g:wplus_ai_api_key = ''                 " API 키 (필수)
+let g:wplus_ai_model = 'gpt-3.5-turbo'
+let g:wplus_ai_temperature = 0.7            " 0.0~1.0
+let g:wplus_ai_max_tokens = 2000
+
+" Azure OpenAI 전용 설정
+let g:wplus_ai_azure_resource = ''
+let g:wplus_ai_azure_deployment = ''
+let g:wplus_ai_azure_api_version = '2024-02-15-preview'
+
+" ── snippet ───────────────────────────────────────────────────────────
+let g:wplus_snippet_jump_key = '<Tab>'
+let g:wplus_snippet_jump_back_key = '<S-Tab>'
+let g:wplus_snippet_placeholder_marker = '${}'
+
+" ── conflict ──────────────────────────────────────────────────────────
+let g:wplus_conflict_auto_highlight = 1
+
+" ── todo ──────────────────────────────────────────────────────────────
+let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
+let g:wplus_todo_grep_backend = 'rg'        " 'rg' | 'git grep' | 'grep'
+
+" ── colorscheme ──────────────────────────────────────────────────────
+let g:wplus_colorscheme_auto_detect = 1
 ```
 
 ---
