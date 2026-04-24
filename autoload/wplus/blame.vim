@@ -157,6 +157,7 @@ function! wplus#blame#setup() abort
         autocmd!
         autocmd CursorHold  * call s:trigger()
         autocmd BufLeave    * call s:clear_all(bufnr('%'))
+        autocmd BufDelete   * call s:on_buf_delete()
         autocmd InsertEnter * call s:clear_all(bufnr('%'))
         autocmd ColorScheme * call s:init()
     augroup END
@@ -164,4 +165,13 @@ function! wplus#blame#setup() abort
     " :BlamerToggle compat alias + <leader>bl
     command! -bar BlamerToggle call wplus#blame#toggle()
     nnoremap <silent> <leader>bl :BlamerToggle<CR>
+endfunction
+
+function! s:on_buf_delete() abort
+    " Clean up any pending timer for this buffer
+    let l:buf = str2nr(expand('<abuf>'))
+    let l:blame_timer = getbufvar(l:buf, 'wplus_blame_timer', -1)
+    if l:blame_timer != -1
+        silent! timer_stop(l:blame_timer)
+    endif
 endfunction
