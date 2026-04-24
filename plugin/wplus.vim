@@ -4,6 +4,11 @@
 if exists('g:loaded_wplus') | finish | endif
 let g:loaded_wplus = 1
 
+" Register text property types
+if empty(prop_type_get('WplusAISuggest'))
+    call prop_type_add('WplusAISuggest', {'highlight': 'NonText'})
+endif
+
 function! s:validate_config() abort
     " Validate numeric settings
     if exists('g:wplus_explorer_max_entries')
@@ -64,13 +69,7 @@ function! s:validate_config() abort
     endif
 endfunction
 
-let s:modules = [
-    \ 'commentary', 'pairs', 'repeat', 'altfile', 'indent', 'statusline',
-    \ 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree',
-    \ 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix',
-    \ 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo',
-    \ 'colorscheme', 'snippet', 'conflict', 'ai',
-    \ ]
+let s:modules = ['commentary', 'pairs', 'repeat', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'colorscheme', 'snippet', 'conflict', 'ai']
 
 " Validate user configuration
 call s:validate_config()

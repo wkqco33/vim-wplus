@@ -158,6 +158,17 @@ let g:wplus_ai_max_tokens = 2000
 " let g:wplus_ai_azure_deployment = 'gpt-4-deployment'   " 배포명
 " let g:wplus_ai_azure_api_version = '2024-02-15-preview'
 
+" Ghost Text 자동완성 설정
+" InsertMode에서 자동으로 AI 제안을 Ghost Text로 표시
+let g:wplus_ai_suggest_enabled = 1               " 자동완성 활성화 여부
+let g:wplus_ai_suggest_delay = 500               " 제안까지의 대기 시간 (ms)
+let g:wplus_ai_suggest_context_lines = 50        " prefix 수집 라인 수
+let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
+
+" Ghost Text 키 매핑
+imap <Tab>       <Cmd>call wplus#ai#accept_suggestion()<CR>
+nnoremap <Leader>ai :WaiToggleSuggest<CR>
+
 "
 " ┌─────────────────────────────────────────────────────────┐
 " │ 2. Snippet Engine (스니펫 엔진)                         │
