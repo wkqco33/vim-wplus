@@ -9,7 +9,7 @@ let s:modules = [
     \ 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree',
     \ 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix',
     \ 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo',
-    \ 'colorscheme',
+    \ 'colorscheme', 'snippet', 'conflict', 'ai',
     \ ]
 
 " Validate user configuration
