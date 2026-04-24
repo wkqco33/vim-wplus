@@ -10,6 +10,7 @@ let g:wplus_gitgutter_sign_delete = get(g:, 'wplus_gitgutter_sign_delete', '▁'
 
 let s:sign_group = 'wplus_gitgutter'
 let s:pending    = {}   " bufnr → job handle
+let s:job_data   = {}   " job → {bufnr, lines}
 
 function! s:git_root(path) abort
     let l:dir = fnamemodify(a:path, ':p:h')
@@ -135,15 +136,26 @@ function! wplus#gitgutter#refresh(bufnr) abort
     endif
 
     let lines  = []
-    let Cb = function('s:on_diff_done', [bufnr, lines])
+    let Cb = function('s:on_diff_complete')
     let job = job_start(['git', '-C', root, 'diff', '--unified=0', 'HEAD', '--', relfile], {
         \ 'out_cb':  {_, l -> add(lines, l)},
         \ 'close_cb': Cb,
         \ 'err_cb':  {_ch, _msg -> 0},
         \ })
     let s:pending[bufnr] = job
+    " Store data for close_cb to access
+    let s:job_data[job_getchannel(job)] = {'bufnr': bufnr, 'lines': lines}
     " Also capture branch name while we're here
     call s:update_branch(bufnr, root)
+endfunction
+
+function! s:on_diff_complete(channel) abort
+    " Find job data for this channel
+    if has_key(s:job_data, a:channel)
+        let data = s:job_data[a:channel]
+        unlet s:job_data[a:channel]
+        call s:on_diff_done(data.bufnr, data.lines, a:channel)
+    endif
 endfunction
 
 function! s:on_diff_done(bufnr, lines, job) abort
