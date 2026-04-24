@@ -155,8 +155,19 @@ let g:wplus_ai_provider = 'azure'
 let g:wplus_ai_api_key = 'EOAjn34ERHmwf2MGfq8roYKKSc9w1sNUEfXz0x7HwhT9GZlC2bmmJQQJ99BHACNns7RXJ3w3AAABACOGkRSR'
 let g:wplus_ai_model = 'gpt-5.4'
 let g:wplus_ai_azure_resource = 'robot-open-ai'        " Azure 리소스명
-let g:wplus_ai_azure_deployment = 'gpt-5.4'   " 배포명
+let g:wplus_ai_azure_deployment = 'gpt-5.4-deployment'   " 배포명
 let g:wplus_ai_azure_api_version = '2025-04-01-preview'
+
+" Ghost Text 자동완성 설정
+" InsertMode에서 자동으로 AI 제안을 Ghost Text로 표시
+let g:wplus_ai_suggest_enabled = 1               " 자동완성 활성화 여부
+let g:wplus_ai_suggest_delay = 500               " 제안까지의 대기 시간 (ms)
+let g:wplus_ai_suggest_context_lines = 50        " prefix 수집 라인 수
+let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
+
+" Ghost Text 키 매핑
+imap <Tab>       <Cmd>call wplus#ai#accept_suggestion()<CR>
+nnoremap <Leader>ai :WaiToggleSuggest<CR>
 
 "
 " ┌─────────────────────────────────────────────────────────┐

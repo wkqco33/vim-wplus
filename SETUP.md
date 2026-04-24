@@ -2,17 +2,104 @@
 
 vim-wplus는 31개 모듈로 구성된 완전한 Vim IDE입니다. 이 가이드는 각 기능을 설정하는 방법을 설명합니다.
 
-## 빠른 시작
+## 설치
 
-1. `.vimrc.example`을 복사하여 `~/.vimrc`에 적용:
-```bash
-cp .vimrc.example ~/.vimrc
+### 1. vim-plug를 사용한 설치 (권장)
+
+**~/.vimrc**에 다음을 추가합니다:
+
+```vim
+call plug#begin()
+" vim-wplus를 로컬 경로에서 로드
+Plug '/path/to/vim-wplus'
+call plug#end()
 ```
 
-2. Vim을 시작하고 플러그인 설치:
+그 후 Vim에서 다음을 실행합니다:
 ```vim
 :PlugInstall
 ```
+
+### 2. 직접 설정 (vim-plug 없음)
+
+**~/.vimrc**에 다음을 추가합니다:
+
+```vim
+set runtimepath+=/path/to/vim-wplus
+set packpath+=/path/to/vim-wplus
+
+" 모듈 사용 전에 반드시 이 라인 추가
+if filereadable('/path/to/vim-wplus/plugin/wplus.vim')
+    source /path/to/vim-wplus/plugin/wplus.vim
+endif
+```
+
+### 3. 빠른 시작 (예시)
+
+```bash
+# vim-wplus를 ~/.vim/plugged에 설치
+git clone https://github.com/your-user/vim-wplus ~/.vim/plugged/vim-wplus
+
+# 또는 ~/.local/share/nvim/site/pack/user/start에 설치
+mkdir -p ~/.local/share/nvim/site/pack/user/start
+git clone https://github.com/your-user/vim-wplus ~/.local/share/nvim/site/pack/user/start/vim-wplus
+```
+
+**~/.vimrc**:
+```vim
+" 경로 설정
+set runtimepath+=~/.vim/plugged/vim-wplus
+
+" 플러그인 로드
+source ~/.vim/plugged/vim-wplus/plugin/wplus.vim
+```
+
+---
+
+## 문제 해결
+
+### E492: Not an editor command (예: WexplorerToggle)
+
+이 오류는 vim-wplus 플러그인이 제대로 로드되지 않았다는 뜻입니다.
+
+**해결 방법:**
+
+1. **runtimepath 확인**
+```vim
+:set runtimepath?
+" /path/to/vim-wplus가 포함되어 있는지 확인
+```
+
+2. **플러그인 로드 확인**
+```vim
+:echo exists('*wplus#explorer#toggle')
+" 1이 반환되어야 함 (0이면 로드되지 않은 것)
+```
+
+3. **수동 로드**
+```vim
+" .vimrc에 다음을 추가
+set runtimepath+=/path/to/vim-wplus
+source /path/to/vim-wplus/plugin/wplus.vim
+```
+
+4. **모듈 활성화 확인**
+```vim
+" .vimrc의 설정이 plugin/wplus.vim 보다 먼저 로드되어야 함
+let g:wplus_explorer_enabled = 1
+source /path/to/vim-wplus/plugin/wplus.vim
+```
+
+---
+
+## 빠른 시작 (설정)
+
+1. `.vimrc.example`을 복사하여 `~/.vimrc`에 적용:
+```bash
+cp /path/to/vim-wplus/.vimrc.example ~/.vimrc
+```
+
+2. Vim을 시작하고 필요한 설정을 추가합니다.
 
 3. 필요한 언어 서버 설치 (선택사항):
 ```bash

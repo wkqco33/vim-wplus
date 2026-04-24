@@ -50,17 +50,82 @@
 
 ## 설치
 
-### vim-plug (로컬 경로)
+### 필수 조건
+
+- Vim 9.1+ (또는 NeoVim 0.7+)
+- `+job +channel +popupwin +signs +textprop` 기능 지원 확인:
+  ```vim
+  :echo has('job') && has('popupwin') && has('signs') && has('textprop')
+  " 1이 출력되어야 함
+  ```
+
+### vim-plug를 사용한 설치 (권장)
+
+**~/.vimrc**에 다음을 추가:
 
 ```vim
-Plug '/path/to/vim-wplus'
+call plug#begin()
+Plug '/path/to/vim-wplus'  " 로컬 경로
+" 또는
+Plug 'your-user/vim-wplus'  " GitHub 리포지토리
+call plug#end()
 ```
 
-### vim-plug (GitHub)
+Vim에서 `:PlugInstall` 실행
+
+### 직접 설치 (vim-plug 없음)
+
+```bash
+# ~/.vim/pack/user/start 디렉토리에 설치
+mkdir -p ~/.vim/pack/user/start
+git clone <url> ~/.vim/pack/user/start/vim-wplus
+```
+
+**또는 ~/.vimrc에 수동으로 추가:**
 
 ```vim
-Plug 'your-user/vim-wplus'
+set runtimepath+=~/.vim/pack/user/start/vim-wplus
+source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 ```
+
+### 빠른 시작
+
+```bash
+# 1. vim-wplus 복제
+git clone <url> ~/.vim/pack/user/start/vim-wplus
+
+# 2. 설정 파일 준비 (~/.vimrc)
+cp ~/.vim/pack/user/start/vim-wplus/.vimrc.example ~/.vimrc
+
+# 3. Vim 시작
+vim
+
+# 4. `:WexplorerToggle` 명령어로 파일 탐색기 열기
+:WexplorerToggle
+```
+
+### 문제 해결
+
+**E492: Not an editor command 오류 발생 시:**
+
+1. runtimepath 확인:
+   ```vim
+   :set runtimepath?
+   ```
+   vim-wplus 경로가 포함되어 있는지 확인
+
+2. 플러그인 로드 확인:
+   ```vim
+   :echo exists('*wplus#explorer#toggle')
+   " 1이 반환되어야 함
+   ```
+
+3. 수동 로드:
+   ```vim
+   " ~/.vimrc에 추가
+   set runtimepath+=~/.vim/pack/user/start/vim-wplus
+   source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
+   ```
 
 ---
 
