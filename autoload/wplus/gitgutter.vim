@@ -200,7 +200,7 @@ endfunction
 
 function! s:update_branch(bufnr, root) abort
     let lines = []
-    call job_start(['git', '-C', a:root, 'rev-parse', '--abbrev-ref', 'HEAD'], {
+    let job = job_start(['git', '-C', a:root, 'rev-parse', '--abbrev-ref', 'HEAD'], {
         \ 'out_cb':  {_, l -> add(lines, l)},
         \ 'close_cb': {_ -> s:set_branch(a:bufnr, lines)},
         \ 'err_cb':  {_ch, _msg -> 0},
