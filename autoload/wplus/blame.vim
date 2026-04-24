@@ -143,7 +143,7 @@ function! s:on_blame_complete(channel) abort
     if empty(s:last_job_data)
         return
     endif
-    call s:on_blame(s:last_job_data.bufnr, s:last_job_data.lnum, s:last_job_data.lines)
+    call s:on_blame(s:last_job_data.bufnr, s:last_job_data.lnum, s:last_job_data.lines, a:channel)
     let s:last_job_data = {}
 endfunction
 
