@@ -7,11 +7,12 @@ let s:servers = {} " ft -> {job, channel, last_id, requests, buffer}
 let s:diag_timers = {} " uri -> timer_id
 let s:pending_actions = []
 let s:sig_winid = -1
-let s:def_cache = {} " uri:line:col -> definition result (cached)
-let s:ref_cache = {} " uri:line:col -> references result (cached)
+let s:def_cache = {} " uri:line:col -> {result, timestamp} (with TTL)
+let s:ref_cache = {} " uri:line:col -> {result, timestamp} (with TTL)
 let s:symbol_cache = {} " uri -> {line_count, timestamp, symbols} (symbol info cache)
 let g:wplus_lsp_log_enabled = get(g:, 'wplus_lsp_log_enabled', 0)
 let g:wplus_lsp_signcolumn = get(g:, 'wplus_lsp_signcolumn', 'yes')
+let g:wplus_lsp_cache_ttl = get(g:, 'wplus_lsp_cache_ttl', 300) " Cache TTL in seconds (default 5 min)
 
 function! s:log(ft, type, msg) abort
     if !g:wplus_lsp_log_enabled | return | endif
@@ -409,12 +410,24 @@ endfunction
 
 function! s:lookup_cache(cache, uri, lnum, col) abort
     let l:key = s:make_cache_key(a:uri, a:lnum, a:col)
-    return get(a:cache, l:key, v:null)
+    if !has_key(a:cache, l:key) | return v:null | endif
+    
+    let l:entry = a:cache[l:key]
+    let l:now = reltime()[0] " Current timestamp in seconds
+    let l:age = l:now - l:entry.timestamp
+    
+    " Check if cache expired
+    if l:age > g:wplus_lsp_cache_ttl
+        call remove(a:cache, l:key)
+        return v:null
+    endif
+    
+    return l:entry.result
 endfunction
 
 function! s:store_cache(cache, uri, lnum, col, result) abort
     let l:key = s:make_cache_key(a:uri, a:lnum, a:col)
-    let a:cache[l:key] = a:result
+    let a:cache[l:key] = {'result': a:result, 'timestamp': reltime()[0]}
 endfunction
 
 function! wplus#lsp#request(method) abort
