@@ -14,6 +14,7 @@ let g:wplus_blame_enabled_flag = get(g:, 'wplus_blame_enabled_flag', 1)  " runti
 let s:prop_type = 'WplusBlameProp'
 let s:timer     = -1
 let s:job       = v:null
+let s:last_job_data = {} " {bufnr, lnum, lines} for current job
 
 function! s:git_root(path) abort
     let l:dir = fnamemodify(a:path, ':p:h')
@@ -127,13 +128,23 @@ endfunction
 
 function! s:start_job(bufnr, lnum, root, file, lines) abort
     let s:timer = -1
+    " Store job data for close_cb to access
+    let s:last_job_data = {'bufnr': a:bufnr, 'lnum': a:lnum, 'lines': a:lines}
     let s:job = job_start(
                 \ ['git', '-C', a:root, 'blame', '--porcelain', '-L',
                 \   a:lnum . ',' . a:lnum, s:git_relpath(a:root, a:file)], {
                 \ 'out_cb':  {_, l -> add(a:lines, l)},
-                \ 'close_cb': function('s:on_blame', [a:bufnr, a:lnum, a:lines]),
+                \ 'close_cb': function('s:on_blame_complete'),
                 \ 'err_cb':  {_ch, _msg -> 0},
                 \ })
+endfunction
+
+function! s:on_blame_complete(channel) abort
+    if empty(s:last_job_data)
+        return
+    endif
+    call s:on_blame(s:last_job_data.bufnr, s:last_job_data.lnum, s:last_job_data.lines)
+    let s:last_job_data = {}
 endfunction
 
 " ── public toggle ─────────────────────────────────────────────────────────
