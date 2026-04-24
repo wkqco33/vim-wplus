@@ -195,10 +195,16 @@ function! s:send_request(bufnr, lnum, prompt) abort
     let l:payload = s:build_request_payload(a:prompt)
     let l:request_id = reltimestr(reltime()) " use timestamp as unique ID
     
-    let l:job = job_start(['curl', '-s', '-X', 'POST',
-        \ '-H', 'Content-Type: application/json',
-        \ '-d', l:payload,
-        \ l:endpoint], {
+    " Build curl command with all headers
+    let l:cmd = ['curl', '-s', '-X', 'POST', '-d', l:payload, l:endpoint]
+    
+    " Add each header at the beginning (after base options)
+    for l:header in l:headers
+        call insert(l:cmd, l:header, 2)
+        call insert(l:cmd, '-H', 2)
+    endfor
+    
+    let l:job = job_start(l:cmd, {
         \ 'out_cb': function('s:on_response'),
         \ 'close_cb': function('s:on_response_complete'),
         \ 'err_cb': function('s:on_error')
