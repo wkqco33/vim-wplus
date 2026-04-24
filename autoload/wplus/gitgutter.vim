@@ -157,13 +157,20 @@ function! s:on_diff_done(bufnr, lines, job) abort
     let info = getbufinfo(a:bufnr)
     if empty(info) | return | endif
     let buflen = info[0].linecount
+    
+    " Batch sign placement for better performance
+    let l:signs = []
     let id = 1000
     for h in hunks
         if h.lnum >= 1 && h.lnum <= buflen
-            silent! call sign_place(id, s:sign_group, h.type, a:bufnr, {'lnum': h.lnum})
+            call add(l:signs, {'id': id, 'group': s:sign_group, 'name': h.type, 'buffer': a:bufnr, 'lnum': h.lnum})
             let id += 1
         endif
     endfor
+    if !empty(l:signs)
+        call sign_placelist(l:signs)
+    endif
+    
     " Store hunk data for navigation/preview/staging
     call setbufvar(a:bufnr, 'wplus_gitgutter_hunks', s:parse_hunks(a:lines))
     " Store file header lines (before first @@) for patch construction
@@ -295,11 +302,34 @@ function! wplus#gitgutter#setup() abort
         autocmd!
         autocmd BufReadPost,BufWritePost,InsertLeave *
             \ call wplus#gitgutter#refresh(bufnr('%'))
+        autocmd BufDelete * call s:on_buf_delete()
         autocmd ColorScheme * call s:init_highlights()
+        autocmd VimLeavePre * call s:cleanup_jobs()
     augroup END
 
     nnoremap <silent> ]h :call wplus#gitgutter#next_hunk()<CR>
     nnoremap <silent> [h :call wplus#gitgutter#prev_hunk()<CR>
     nnoremap <silent> <leader>hp :call wplus#gitgutter#preview_hunk()<CR>
     nnoremap <silent> <leader>hs :call wplus#gitgutter#stage_hunk()<CR>
+endfunction
+
+function! s:on_buf_delete() abort
+    let l:bufnr = str2nr(expand('<abuf>'))
+    if has_key(s:pending, l:bufnr)
+        try
+            call job_stop(s:pending[l:bufnr])
+        catch
+        endtry
+        unlet s:pending[l:bufnr]
+    endif
+endfunction
+
+function! s:cleanup_jobs() abort
+    for l:bufnr in keys(s:pending)
+        try
+            call job_stop(s:pending[l:bufnr])
+        catch
+        endtry
+    endfor
+    let s:pending = {}
 endfunction

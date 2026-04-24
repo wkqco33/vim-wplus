@@ -32,7 +32,7 @@ let s:fmts = {
 
 function! wplus#format#run() abort
     if &buftype !=# '' || !&modifiable
-        echohl WarningMsg | echomsg '[wplus] current buffer is not formattable' | echohl None
+        call wplus#util#warn_msg('format', 'current buffer is not formattable')
         return
     endif
     if s:try_lsp()      | return | endif
@@ -70,7 +70,7 @@ function! s:try_lsp() abort
         return 0
     endif
     call CocAction('format')
-    echo '[wplus] formatted (coc/LSP)'
+    call wplus#util#info_msg('format', 'formatted (coc/LSP)')
     return 1
 endfunction
 
@@ -113,15 +113,16 @@ endfunction
 function! s:run_stdin_fmt(cmd, bin) abort
     let l:view = winsaveview()
     let l:orig = getline(1, '$')
-
+    
+    " Create undo point before formatting
+    call undofile(expand('%'))
+    
     silent execute '%!' . a:cmd
 
     if v:shell_error != 0
-        " Restore original content
+        " Restore original content via undo
         silent undo
-        echohl WarningMsg
-        echomsg '[wplus] formatter failed: ' . a:bin . ' (exit ' . v:shell_error . ')'
-        echohl None
+        call wplus#util#warn_msg('format', 'formatter failed: ' . a:bin . ' (exit ' . v:shell_error . ')')
         call winrestview(l:view)
         return 0
     endif
@@ -129,9 +130,7 @@ function! s:run_stdin_fmt(cmd, bin) abort
     " Guard against empty output (some tools output nothing on failure)
     if getline(1, '$') == ['']
         silent undo
-        echohl WarningMsg
-        echomsg '[wplus] formatter returned empty output: ' . a:bin
-        echohl None
+        call wplus#util#warn_msg('format', 'formatter returned empty output: ' . a:bin)
         call winrestview(l:view)
         return 0
     endif
@@ -139,13 +138,13 @@ function! s:run_stdin_fmt(cmd, bin) abort
     if getline(1, '$') ==# l:orig
         call winrestview(l:view)
         redraw!
-        echo '[wplus] already formatted (' . a:bin . ')'
+        call wplus#util#info_msg('format', 'already formatted (' . a:bin . ')')
         return 1
     endif
 
     call winrestview(l:view)
     redraw!
-    echo '[wplus] formatted (' . a:bin . ')'
+    call wplus#util#info_msg('format', 'formatted (' . a:bin . ')')
     return 1
 endfunction
 
@@ -160,9 +159,7 @@ function! s:run_tmpfile_fmt(cmd, bin) abort
 
     if v:shell_error != 0
         call delete(l:tmp)
-        echohl WarningMsg
-        echomsg '[wplus] formatter failed: ' . a:bin . ' (exit ' . v:shell_error . ')'
-        echohl None
+        call wplus#util#warn_msg('format', 'formatter failed: ' . a:bin . ' (exit ' . v:shell_error . ')')
         return 0
     endif
 
@@ -172,7 +169,7 @@ function! s:run_tmpfile_fmt(cmd, bin) abort
     if l:result ==# l:orig
         call winrestview(l:view)
         redraw
-        echo '[wplus] already formatted (' . a:bin . ')'
+        call wplus#util#info_msg('format', 'already formatted (' . a:bin . ')')
         return 1
     endif
 
@@ -180,7 +177,7 @@ function! s:run_tmpfile_fmt(cmd, bin) abort
     call setline(1, l:result)
     call winrestview(l:view)
     redraw
-    echo '[wplus] formatted (' . a:bin . ')'
+    call wplus#util#info_msg('format', 'formatted (' . a:bin . ')')
     return 1
 endfunction
 
@@ -189,7 +186,7 @@ function! s:try_ale() abort
         return 0
     endif
     ALEFix
-    echo '[wplus] formatted (ALE)'
+    call wplus#util#info_msg('format', 'formatted (ALE)')
     return 1
 endfunction
 
@@ -198,5 +195,5 @@ function! s:vim_indent() abort
     silent normal! gg=G
     call winrestview(l:view)
     redraw!
-    echo '[wplus] formatted (vim indent)'
+    call wplus#util#info_msg('format', 'formatted (vim indent)')
 endfunction

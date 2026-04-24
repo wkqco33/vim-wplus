@@ -11,6 +11,7 @@ let g:wplus_explorer_max_depth = get(g:, 'wplus_explorer_max_depth', 8)
 let s:truncated = 0
 let s:entry_count = 0
 let s:dir_cache = {}
+let s:visited_paths = {} " Track visited realpath to detect symlink loops
 
 function! s:normalize_dir(path) abort
     let l:path = simplify(fnamemodify(a:path, ':p'))
@@ -123,6 +124,7 @@ function! s:render(root) abort
     let s:tree_data = []
     let s:truncated = 0
     let s:entry_count = 0
+    let s:visited_paths = {}
     call s:build_tree(s:current_root, 0)
     
     let l:winw = winwidth(bufwinid(s:explorer_buf))
@@ -149,6 +151,13 @@ function! s:build_tree(path, level) abort
         let s:truncated = 1
         return
     endif
+
+    let l:realpath = resolve(a:path)
+    " Detect symlink loops
+    if has_key(s:visited_paths, l:realpath)
+        return
+    endif
+    let s:visited_paths[l:realpath] = 1
 
     let l:files = s:get_dir_entries(a:path)
     
