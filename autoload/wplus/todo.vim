@@ -16,8 +16,10 @@ function! wplus#todo#setup() abort
     augroup END
 
     " 3. Commands and mappings
-    command! WtodoFind call wplus#todo#find()
+    command! WtodoFind       call wplus#todo#find()
+    command! WtodoQuickfix   call wplus#todo#quickfix()
     nnoremap <silent> <leader>ft :WtodoFind<CR>
+    nnoremap <silent> <leader>tq :WtodoQuickfix<CR>
 endfunction
 
 function! s:clear_matches() abort
@@ -37,21 +39,55 @@ function! s:match_todos() abort
 endfunction
 
 function! wplus#todo#find() abort
-    " Integration with ripgrep and finder.vim
-    if !executable('rg')
-        echohl ErrorMsg | echo "Ripgrep (rg) is required for todo search" | echohl None
-        return
-    endif
-
-    let l:cmd = 'rg --vimgrep --smart-case "\b(TODO|FIXME|XXX|NOTE|BUG|HACK)\b"'
-    let l:items = systemlist(l:cmd)
-    
+    " Integration with finder.vim
+    let l:items = s:get_todos()
     if empty(l:items)
-        echo "No TODOs found!"
+        call wplus#util#warn_msg('todo', 'no TODOs found')
         return
     endif
 
     call wplus#finder#open(l:items, function('s:jump_to_todo'), 'Find TODOs')
+endfunction
+
+function! wplus#todo#quickfix() abort
+    " Fill quickfix list with TODOs
+    let l:items = s:get_todos()
+    if empty(l:items)
+        call wplus#util#warn_msg('todo', 'no TODOs found')
+        return
+    endif
+    
+    let l:qflist = []
+    for l:item in l:items
+        let l:match = matchlist(l:item, '^\(.*\):\(\d\+\):\(\d\+\):\(.*\)')
+        if len(l:match) >= 5
+            call add(l:qflist, {
+                \ 'filename': l:match[1],
+                \ 'lnum': str2nr(l:match[2]),
+                \ 'col': str2nr(l:match[3]),
+                \ 'text': trim(l:match[4]),
+                \ 'type': 'I'
+                \ })
+        endif
+    endfor
+    
+    call setqflist(l:qflist)
+    botright copen
+    call wplus#util#info_msg('todo', 'found ' . len(l:qflist) . ' TODO(s)')
+endfunction
+
+function! s:get_todos() abort
+    " Try ripgrep first, fallback to git grep, then plain grep
+    if executable('rg')
+        let l:cmd = 'rg --vimgrep --smart-case "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"'
+        let l:items = systemlist(l:cmd)
+    elseif executable('git') && isdirectory('.git')
+        let l:cmd = 'git grep -n "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"'
+        let l:items = systemlist(l:cmd)
+    else
+        let l:items = systemlist('grep -rn "TODO\|FIXME\|XXX\|NOTE\|BUG\|HACK\|WARN" .')
+    endif
+    return filter(l:items, '!empty(v:val)')
 endfunction
 
 function! s:jump_to_todo(item) abort
@@ -60,3 +96,4 @@ function! s:jump_to_todo(item) abort
         execute 'edit +' . l:match[2] . ' ' . fnameescape(l:match[1])
     endif
 endfunction
+
