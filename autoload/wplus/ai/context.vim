@@ -176,9 +176,9 @@ function! wplus#ai#context#get_scope() abort
 endfunction
 
 " Get prefix (code before cursor up to boundary)
-function! wplus#ai#context#get_prefix(line_nr, col) abort
+function! wplus#ai#context#get_prefix(line_nr, col, ...) abort
     let l:min_lines = 20
-    let l:max_lines = 80
+    let l:max_lines = a:0 >= 1 ? max([1, a:1]) : 80
     let l:ft = &filetype
     
     let l:boundary_patterns = {
@@ -213,8 +213,8 @@ function! wplus#ai#context#get_prefix(line_nr, col) abort
 endfunction
 
 " Get suffix (code after cursor)
-function! wplus#ai#context#get_suffix(line_nr, col) abort
-    let l:max_lines = 30
+function! wplus#ai#context#get_suffix(line_nr, col, ...) abort
+    let l:max_lines = a:0 >= 1 ? max([0, a:1]) : 30
     let l:last_line = line('$')
     let l:end_line = min([l:last_line, a:line_nr + l:max_lines])
     let l:current_line_after = getline(a:line_nr)[a:col - 1:]

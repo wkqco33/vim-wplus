@@ -50,7 +50,13 @@ endfunction
 function! wplus#explorer#toggle() abort
     let l:winid = bufwinid(s:explorer_buf)
     if l:winid != -1
-        execute l:winid . 'close'
+        let l:cur_win = win_getid()
+        if win_gotoid(l:winid)
+            close
+            if l:cur_win != l:winid
+                call win_gotoid(l:cur_win)
+            endif
+        endif
     else
         call s:open_explorer()
     endif

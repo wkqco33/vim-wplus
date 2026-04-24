@@ -19,9 +19,11 @@ let g:wplus_ai_suggest_enabled = get(g:, 'wplus_ai_suggest_enabled', 1)
 let g:wplus_ai_suggest_delay = get(g:, 'wplus_ai_suggest_delay', 500)
 let g:wplus_ai_suggest_context_lines = get(g:, 'wplus_ai_suggest_context_lines', 50)
 let g:wplus_ai_suggest_suffix_lines = get(g:, 'wplus_ai_suggest_suffix_lines', 20)
+let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
 
-let s:requests = {} " request_id -> {job, bufnr, lnum, response_buffer}
-let s:request_id = '' " current request_id
+let s:command_requests = {} " request_id -> {job, bufnr, lnum, response_buffer}
+let s:command_channels = {} " channel_key -> request_id
+let s:suggest_request = {} " {job, channel_key, bufnr, lnum, line, col, response_buffer}
 
 " Ghost Text state
 let s:suggest_content = '' " current suggestion content
@@ -29,6 +31,8 @@ let s:suggest_line = 0 " line where suggestion was requested
 let s:suggest_col = 0 " column where suggestion was requested
 let s:suggest_timer = v:null
 let s:suggest_keystroke_count = 0 " keystroke counter for adaptive delay
+let s:last_suggest_error = ''
+let s:last_suggest_error_at = 0
 
 
 function! s:get_api_endpoint() abort
@@ -66,6 +70,104 @@ function! s:get_request_headers() abort
     return l:headers
 endfunction
 
+function! s:channel_key(channel) abort
+    try
+        let l:info = ch_info(a:channel)
+        return string(get(l:info, 'id', a:channel))
+    catch
+        return string(a:channel)
+    endtry
+endfunction
+
+function! s:build_curl_command(payload, endpoint, headers) abort
+    let l:cmd = ['curl', '-s', '-X', 'POST', '-d', a:payload, a:endpoint]
+    for l:header in a:headers
+        call insert(l:cmd, l:header, 2)
+        call insert(l:cmd, '-H', 2)
+    endfor
+    return l:cmd
+endfunction
+
+function! s:extract_response_content(json) abort
+    if g:wplus_ai_provider ==# 'claude'
+        if has_key(a:json, 'content') && len(a:json.content) > 0
+            let l:parts = []
+            for l:item in a:json.content
+                if type(l:item) == v:t_dict && has_key(l:item, 'text')
+                    call add(l:parts, l:item.text)
+                endif
+            endfor
+            return join(l:parts, '')
+        endif
+    else
+        if has_key(a:json, 'choices') && len(a:json.choices) > 0
+            let l:choice = a:json.choices[0]
+            let l:message = get(l:choice, 'message', {})
+            let l:content = get(l:message, 'content', '')
+            if type(l:content) == v:t_string
+                return l:content
+            endif
+            if type(l:content) == v:t_list
+                let l:parts = []
+                for l:item in l:content
+                    if type(l:item) == v:t_dict
+                        if has_key(l:item, 'text')
+                            call add(l:parts, l:item.text)
+                        elseif get(l:item, 'type', '') ==# 'output_text' && has_key(l:item, 'text')
+                            call add(l:parts, l:item.text)
+                        endif
+                    endif
+                endfor
+                return join(l:parts, '')
+            endif
+            if has_key(l:choice, 'text')
+                return l:choice.text
+            endif
+        endif
+    endif
+    return ''
+endfunction
+
+function! s:extract_error_message(json) abort
+    if has_key(a:json, 'error')
+        let l:error = a:json.error
+        if type(l:error) == v:t_dict
+            return get(l:error, 'message', '')
+        endif
+        if type(l:error) == v:t_string
+            return l:error
+        endif
+    endif
+    if has_key(a:json, 'message') && type(a:json.message) == v:t_string
+        return a:json.message
+    endif
+    return ''
+endfunction
+
+function! s:uses_max_completion_tokens() abort
+    if g:wplus_ai_provider ==# 'claude'
+        return v:false
+    endif
+    let l:model = tolower(g:wplus_ai_model)
+    return l:model =~# '^gpt-5' || l:model =~# '^o[134]'
+endfunction
+
+function! s:suggest_debug(message) abort
+    if g:wplus_ai_suggest_debug
+        call wplus#util#info_msg('ai', '[suggest] ' . a:message)
+    endif
+endfunction
+
+function! s:report_suggest_error(message) abort
+    let l:now = localtime()
+    if a:message ==# s:last_suggest_error && (l:now - s:last_suggest_error_at) < 3
+        return
+    endif
+    let s:last_suggest_error = a:message
+    let s:last_suggest_error_at = l:now
+    call wplus#util#error_msg('ai', a:message)
+endfunction
+
 function! s:build_request_payload(prompt) abort
     let l:system_msg = 'You are a helpful code assistant. Provide concise, accurate responses.'
     
@@ -77,38 +179,48 @@ function! s:build_request_payload(prompt) abort
             \ 'messages': [{'role': 'user', 'content': a:prompt}],
             \ 'temperature': g:wplus_ai_temperature
             \ })
-    else
-        " Both OpenAI and Azure OpenAI use same request format (chat completions)
-        return json_encode({
-            \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo',
-            \ 'max_tokens': g:wplus_ai_max_tokens,
-            \ 'temperature': g:wplus_ai_temperature,
-            \ 'messages': [
-            \   {'role': 'system', 'content': l:system_msg},
-            \   {'role': 'user', 'content': a:prompt}
-            \ ]
-            \ })
     endif
+
+    let l:payload = {
+        \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo',
+        \ 'temperature': g:wplus_ai_temperature,
+        \ 'messages': [
+        \   {'role': 'system', 'content': l:system_msg},
+        \   {'role': 'user', 'content': a:prompt}
+        \ ]
+        \ }
+    if s:uses_max_completion_tokens()
+        let l:payload.max_completion_tokens = g:wplus_ai_max_tokens
+    else
+        let l:payload.max_tokens = g:wplus_ai_max_tokens
+    endif
+    return json_encode(l:payload)
 endfunction
 
 function! s:on_response(channel, msg) abort
-    if !empty(s:request_id) && has_key(s:requests, s:request_id)
-        let s:requests[s:request_id].response_buffer .= a:msg
+    let l:key = s:channel_key(a:channel)
+    if has_key(s:command_channels, l:key)
+        let l:request_id = s:command_channels[l:key]
+        if has_key(s:command_requests, l:request_id)
+            let s:command_requests[l:request_id].response_buffer .= a:msg
+        endif
     endif
 endfunction
 
 function! s:on_response_complete(channel) abort
-    if empty(s:request_id) || !has_key(s:requests, s:request_id)
+    let l:key = s:channel_key(a:channel)
+    if !has_key(s:command_channels, l:key)
         return
     endif
+    let l:request_id = remove(s:command_channels, l:key)
+    if !has_key(s:command_requests, l:request_id)
+        return
+    endif
+    let l:request = remove(s:command_requests, l:request_id)
     
-    " Parse response based on provider
-    let l:response = s:requests[s:request_id].response_buffer
-    let l:bufnr = s:requests[s:request_id].bufnr
-    let l:lnum = s:requests[s:request_id].lnum
-    
-    call remove(s:requests, s:request_id)
-    let s:request_id = ''
+    let l:response = l:request.response_buffer
+    let l:bufnr = l:request.bufnr
+    let l:lnum = l:request.lnum
     
     if empty(l:response)
         call wplus#util#error_msg('ai', 'empty response from API')
@@ -123,26 +235,21 @@ function! s:on_response_complete(channel) abort
     endtry
     
     " Extract content based on provider
-    let l:content = ''
-    if g:wplus_ai_provider ==# 'claude'
-        if has_key(l:json, 'content') && len(l:json.content) > 0
-            let l:content = l:json.content[0].text
-        endif
-    else
-        if has_key(l:json, 'choices') && len(l:json.choices) > 0
-            let l:content = l:json.choices[0].message.content
-        endif
-    endif
-    
+    let l:content = s:extract_response_content(l:json)
     if empty(l:content)
-        call wplus#util#error_msg('ai', 'no content in response')
+        let l:error_msg = s:extract_error_message(l:json)
+        if !empty(l:error_msg)
+            call wplus#util#error_msg('ai', l:error_msg)
+        else
+            call wplus#util#error_msg('ai', 'no content in response')
+        endif
         return
     endif
     
     " Insert response at current position
-    if bufloaded(a:bufnr)
+    if bufloaded(l:bufnr)
         let l:lines = split(l:content, "\n")
-        call append(a:start_lnum, l:lines)
+        call append(l:lnum, l:lines)
         call wplus#util#info_msg('ai', 'response inserted')
     endif
 endfunction
@@ -206,30 +313,26 @@ function! s:send_request(bufnr, lnum, prompt) abort
     if empty(l:headers) | return | endif
     
     let l:payload = s:build_request_payload(a:prompt)
-    let l:request_id = reltimestr(reltime()) " use timestamp as unique ID
-    
-    " Build curl command with all headers
-    let l:cmd = ['curl', '-s', '-X', 'POST', '-d', l:payload, l:endpoint]
-    
-    " Add each header at the beginning (after base options)
-    for l:header in l:headers
-        call insert(l:cmd, l:header, 2)
-        call insert(l:cmd, '-H', 2)
-    endfor
+    let l:request_id = reltimestr(reltime())
+    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers)
     
     let l:job = job_start(l:cmd, {
         \ 'out_cb': function('s:on_response'),
         \ 'close_cb': function('s:on_response_complete'),
         \ 'err_cb': function('s:on_error')
         \ })
+    if type(l:job) != v:t_job
+        call wplus#util#error_msg('ai', 'failed to start request')
+        return
+    endif
     
-    let s:request_id = l:request_id
-    let s:requests[l:request_id] = {
+    let s:command_requests[l:request_id] = {
         \ 'job': l:job,
         \ 'bufnr': a:bufnr,
         \ 'lnum': a:lnum,
         \ 'response_buffer': ''
         \ }
+    let s:command_channels[s:channel_key(job_getchannel(l:job))] = l:request_id
     call wplus#util#info_msg('ai', 'sending request...')
 endfunction
 
@@ -240,7 +343,8 @@ endfunction
 function! wplus#ai#setup() abort
     augroup WplusAI
         autocmd!
-        autocmd VimLeavePre * for req in values(s:requests) | silent! call job_stop(req.job) | endfor
+        autocmd VimLeavePre * for req in values(s:command_requests) | silent! call job_stop(req.job) | endfor
+        autocmd VimLeavePre * if !empty(s:suggest_request) | silent! call job_stop(s:suggest_request.job) | endif
     augroup END
     
     " Warn if not configured, but still register commands
@@ -273,7 +377,7 @@ function! wplus#ai#setup() abort
             autocmd!
             autocmd InsertEnter * call s:on_insert_enter()
             autocmd InsertLeave * call s:dismiss_suggestion()
-            autocmd InsertTextChangedI * call s:on_text_changed()
+            autocmd TextChangedI * call s:on_text_changed()
         augroup END
     endif
 endfunction
@@ -316,6 +420,7 @@ function! s:show_suggestion() abort
         
         redraw
     catch
+        call s:suggest_debug('failed to render ghost text: ' . v:exception)
         return
     endtry
 endfunction
@@ -325,7 +430,6 @@ function! s:dismiss_suggestion() abort
     let s:suggest_content = ''
     let s:suggest_line = 0
     let s:suggest_col = 0
-    let s:suggest_keystroke_count = 0
     
     if s:suggest_timer != v:null
         call timer_stop(s:suggest_timer)
@@ -341,33 +445,15 @@ function! wplus#ai#accept_suggestion() abort
         " No suggestion, insert normal tab
         return "\<Tab>"
     endif
-    
+
     let l:content = s:suggest_content
     call s:dismiss_suggestion()
-    
-    " Insert suggestion text at cursor position
     call wplus#util#info_msg('ai', 'suggestion accepted')
-    
-    " Simply append the suggestion to current line
-    let l:line = getline('.')
-    let l:col = col('.')
-    let l:new_line = l:line[:l:col - 2] . l:content . l:line[l:col - 1:]
-    
-    let l:lines = split(l:new_line, "\n")
-    if len(l:lines) > 1
-        " Multi-line suggestion
-        call setline('.', l:lines[0])
-        for l:i in range(1, len(l:lines) - 1)
-            call append(line('.'), l:lines[l:i])
-        endfor
-        call cursor(line('.') + len(l:lines) - 1, len(l:lines[-1]) + 1)
-    else
-        " Single-line suggestion
-        call setline('.', l:new_line)
-        call cursor(line('.'), l:col + len(l:content))
-    endif
-    
-    return ''
+    return l:content
+endfunction
+
+function! wplus#ai#has_suggestion() abort
+    return !empty(s:suggest_content)
 endfunction
 
 " Toggle suggestions on/off
@@ -379,7 +465,7 @@ function! wplus#ai#toggle_suggest() abort
             autocmd!
             autocmd InsertEnter * call s:on_insert_enter()
             autocmd InsertLeave * call s:dismiss_suggestion()
-            autocmd InsertTextChangedI * call s:on_text_changed()
+            autocmd TextChangedI * call s:on_text_changed()
         augroup END
     else
         call wplus#util#info_msg('ai', 'Ghost Text suggestions disabled')
@@ -402,11 +488,12 @@ function! s:on_suggest_timer(timer) abort
         return
     endif
     
-    let l:prefix = wplus#ai#context#get_prefix(s:suggest_line, s:suggest_col)
-    let l:suffix = wplus#ai#context#get_suffix(s:suggest_line, s:suggest_col)
+    let l:prefix = wplus#ai#context#get_prefix(s:suggest_line, s:suggest_col, g:wplus_ai_suggest_context_lines)
+    let l:suffix = wplus#ai#context#get_suffix(s:suggest_line, s:suggest_col, g:wplus_ai_suggest_suffix_lines)
     
     " Don't suggest if prefix is empty or only whitespace
     if empty(trim(l:prefix)) && empty(trim(l:suffix))
+        call s:suggest_debug('skipped empty context')
         return
     endif
     
@@ -427,6 +514,8 @@ function! s:on_text_changed() abort
     
     let s:suggest_keystroke_count += 1
     call s:dismiss_suggestion()
+    let s:suggest_line = line('.')
+    let s:suggest_col = col('.')
     
     let l:delay = g:wplus_ai_suggest_delay
     if s:suggest_keystroke_count > 5
@@ -454,58 +543,64 @@ function! s:build_suggest_payload(prefix, suffix) abort
             \ 'messages': [{'role': 'user', 'content': l:prompt}],
             \ 'temperature': 0.5
             \ })
-    else
-        return json_encode({
-            \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo',
-            \ 'max_tokens': 500,
-            \ 'temperature': 0.5,
-            \ 'messages': [
-            \   {'role': 'system', 'content': l:system_msg},
-            \   {'role': 'user', 'content': l:prompt}
-            \ ]
-            \ })
     endif
+
+    let l:payload = {
+        \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo',
+        \ 'temperature': 0.5,
+        \ 'messages': [
+        \   {'role': 'system', 'content': l:system_msg},
+        \   {'role': 'user', 'content': l:prompt}
+        \ ]
+        \ }
+    if s:uses_max_completion_tokens()
+        let l:payload.max_completion_tokens = 500
+    else
+        let l:payload.max_tokens = 500
+    endif
+    return json_encode(l:payload)
 endfunction
 
 " Response handler for suggestions
 function! s:on_suggest_response(channel, msg) abort
-    if !empty(s:request_id) && has_key(s:requests, s:request_id)
-        let s:requests[s:request_id].response_buffer .= a:msg
+    let l:key = s:channel_key(a:channel)
+    if !empty(s:suggest_request) && get(s:suggest_request, 'channel_key', '') ==# l:key
+        let s:suggest_request.response_buffer .= a:msg
     endif
 endfunction
 
 " Complete response handler for suggestions
 function! s:on_suggest_response_complete(channel) abort
-    if empty(s:request_id) || !has_key(s:requests, s:request_id)
+    let l:key = s:channel_key(a:channel)
+    if empty(s:suggest_request) || get(s:suggest_request, 'channel_key', '') !=# l:key
         return
     endif
+    let l:request = s:suggest_request
+    let s:suggest_request = {}
     
-    let l:response = s:requests[s:request_id].response_buffer
-    call remove(s:requests, s:request_id)
-    let s:request_id = ''
+    let l:response = l:request.response_buffer
     
     if empty(l:response)
+        call s:suggest_debug('empty suggestion response')
         return
     endif
     
     try
         let l:json = json_decode(l:response)
     catch
+        call s:suggest_debug('failed to parse suggestion response')
         return
     endtry
     
-    let l:content = ''
-    if g:wplus_ai_provider ==# 'claude'
-        if has_key(l:json, 'content') && len(l:json.content) > 0
-            let l:content = l:json.content[0].text
-        endif
-    else
-        if has_key(l:json, 'choices') && len(l:json.choices) > 0
-            let l:content = l:json.choices[0].message.content
-        endif
-    endif
-    
+    let l:content = s:extract_response_content(l:json)
     if empty(l:content)
+        let l:error_msg = s:extract_error_message(l:json)
+        if !empty(l:error_msg)
+            call s:suggest_debug('api error: ' . l:error_msg)
+            call s:report_suggest_error(l:error_msg)
+        else
+            call s:suggest_debug('no suggestion content in response')
+        endif
         return
     endif
     
@@ -515,45 +610,56 @@ function! s:on_suggest_response_complete(channel) abort
     let l:content = trim(l:content)
     
     " Only update if cursor is still at request position
-    if line('.') == s:suggest_line && col('.') == s:suggest_col
+    if line('.') == l:request.line && col('.') == l:request.col && bufnr('%') == l:request.bufnr
         let s:suggest_content = l:content
+        let s:suggest_line = l:request.line
+        let s:suggest_col = l:request.col
         call s:show_suggestion()
+    else
+        call s:suggest_debug('dropped stale suggestion response')
     endif
 endfunction
 
 " Send suggestion request to AI
 function! s:send_suggest_request(prefix, suffix, prompt) abort
     if empty(g:wplus_ai_api_key) || empty(g:wplus_ai_model)
+        call s:suggest_debug('missing API key or model')
         return
     endif
     
     let l:endpoint = s:get_api_endpoint()
+    if empty(l:endpoint)
+        call s:suggest_debug('empty API endpoint')
+        return
+    endif
     let l:headers = s:get_request_headers()
     if empty(l:headers) | return | endif
     
     let l:payload = s:build_suggest_payload(a:prefix, a:suffix)
-    let l:request_id = reltimestr(reltime())
-    
-    let l:cmd = ['curl', '-s', '-X', 'POST', '-d', l:payload, l:endpoint]
-    
-    " Add headers
-    for l:header in l:headers
-        call insert(l:cmd, l:header, 2)
-        call insert(l:cmd, '-H', 2)
-    endfor
+    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers)
+
+    if !empty(s:suggest_request)
+        silent! call job_stop(s:suggest_request.job)
+        let s:suggest_request = {}
+    endif
     
     let l:job = job_start(l:cmd, {
         \ 'out_cb': function('s:on_suggest_response'),
         \ 'close_cb': function('s:on_suggest_response_complete'),
         \ })
-    
-    let s:request_id = l:request_id
-    let s:suggest_line = line('.')
-    let s:suggest_col = col('.')
-    let s:requests[l:request_id] = {
+    if type(l:job) != v:t_job
+        call wplus#util#error_msg('ai', 'failed to start suggestion request')
+        return
+    endif
+
+    let s:suggest_request = {
         \ 'job': l:job,
+        \ 'channel_key': s:channel_key(job_getchannel(l:job)),
         \ 'bufnr': bufnr('%'),
         \ 'lnum': line('.'),
+        \ 'line': s:suggest_line,
+        \ 'col': s:suggest_col,
         \ 'response_buffer': ''
         \ }
+    call s:suggest_debug('sent suggestion request')
 endfunction

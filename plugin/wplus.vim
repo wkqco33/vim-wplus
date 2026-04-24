@@ -5,8 +5,15 @@ if exists('g:loaded_wplus') | finish | endif
 let g:loaded_wplus = 1
 
 " Register text property types
+if !hlexists('WplusAISuggest')
+    if hlexists('Comment')
+        highlight default link WplusAISuggest Comment
+    else
+        highlight default WplusAISuggest ctermfg=244 guifg=#7c6f64
+    endif
+endif
 if empty(prop_type_get('WplusAISuggest'))
-    call prop_type_add('WplusAISuggest', {'highlight': 'NonText'})
+    call prop_type_add('WplusAISuggest', {'highlight': 'WplusAISuggest'})
 endif
 
 function! s:validate_config() abort
@@ -82,7 +89,7 @@ for s:module in s:modules
         try
             execute 'call wplus#' . s:module . '#setup()'
         catch
-            " Module setup failed, continue loading other modules
+            echomsg '[wplus] Failed to load module ' . s:module . ': ' . v:exception
         endtry
     endif
 endfor

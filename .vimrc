@@ -166,7 +166,7 @@ let g:wplus_ai_suggest_context_lines = 50        " prefix 수집 라인 수
 let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
 
 " Ghost Text 키 매핑
-imap <Tab>       <Cmd>call wplus#ai#accept_suggestion()<CR>
+inoremap <expr> <Tab> wplus#ai#accept_suggestion()
 nnoremap <Leader>ai :WaiToggleSuggest<CR>
 
 "

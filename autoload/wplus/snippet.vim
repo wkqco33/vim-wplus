@@ -7,14 +7,43 @@ let s:snippets = {} " ft -> [{trigger, body, expand_fn}...]
 let s:active_snippet = {} " {bufnr, start_lnum, end_lnum, placeholders [...]}
 let g:wplus_snippet_enabled = get(g:, 'wplus_snippet_enabled', 1)
 
+function! s:collect_placeholders(lines, start_lnum) abort
+    let l:placeholders = []
+    let l:pattern = '\${\([0-9]\+\):\([^}]*\)}'
+
+    for l:idx in range(len(a:lines))
+        let l:line = a:lines[l:idx]
+        let l:start = 0
+        while 1
+            let l:match = matchlist(l:line, l:pattern, l:start)
+            if empty(l:match)
+                break
+            endif
+            call add(l:placeholders, {
+                \ 'num': str2nr(l:match[1]),
+                \ 'lnum': a:start_lnum + l:idx,
+                \ 'default': l:match[2],
+                \ 'col': match(l:line, l:pattern, l:start) + 1
+                \ })
+            let l:start = matchend(l:line, l:pattern, l:start)
+            if l:start < 0
+                break
+            endif
+        endwhile
+    endfor
+
+    return l:placeholders
+endfunction
+
 function! s:register_snippet(ft, trigger, body) abort
     if !has_key(s:snippets, a:ft)
         let s:snippets[a:ft] = []
     endif
+    let l:body_lines = split(a:body, "\n")
     call add(s:snippets[a:ft], {
         \ 'trigger': a:trigger,
         \ 'body': a:body,
-        \ 'placeholder_count': len(matchlist(a:body, '\${[0-9]\+[^}]*}', 0, 'g'))
+        \ 'placeholder_count': len(s:collect_placeholders(l:body_lines, 1))
         \ })
 endfunction
 
@@ -26,7 +55,6 @@ function! s:expand_snippet(trigger, body) abort
     let l:col = col('.')
     
     " Remove trigger text
-    let l:trigger_len = len(a:trigger)
     call deletebufline(l:bufnr, l:lnum, l:lnum)
     call append(l:lnum - 1, split(a:body, "\n"))
     
@@ -41,21 +69,7 @@ function! s:expand_snippet(trigger, body) abort
     
     " Extract and highlight placeholders
     let l:body_lines = split(a:body, "\n")
-    for l:idx in range(len(l:body_lines))
-        let l:line = l:body_lines[l:idx]
-        let l:matches = matchlist(l:line, '\${[0-9]\+:\([^}]*\)}', 0, 'g')
-        for l:match in l:matches
-            if !empty(l:match)
-                let l:placeholder_num = str2nr(l:match[1])
-                call add(s:active_snippet.placeholders, {
-                    \ 'num': l:placeholder_num,
-                    \ 'lnum': l:lnum + l:idx,
-                    \ 'default': l:match[2],
-                    \ 'col': stridx(l:line, l:match[0]) + 1
-                    \ })
-            endif
-        endfor
-    endfor
+    let s:active_snippet.placeholders = s:collect_placeholders(l:body_lines, l:lnum)
     
     " Sort by placeholder number
     call sort(s:active_snippet.placeholders, {a, b -> a.num - b.num})

@@ -570,6 +570,7 @@ let g:wplus_ai_suggest_enabled = 1                  " 활성화 여부
 let g:wplus_ai_suggest_delay = 500                  " 지연 시간 (ms)
 let g:wplus_ai_suggest_context_lines = 50           " 컨텍스트 라인 수
 let g:wplus_ai_suggest_suffix_lines = 20            " suffix 라인 수
+" let g:wplus_ai_suggest_debug = 1                  " 디버그 로그 출력
 ```
 
 #### Ghost Text 자동완성
@@ -578,7 +579,7 @@ let g:wplus_ai_suggest_suffix_lines = 20            " suffix 라인 수
 - InsertMode에서 타이핑 후 delay 시간 경과 시 자동으로 제안 표시
 - Tab 키로 제안 수락
 - 다른 키나 Escape로 제안 취소
-- 회색(NonText 색상)으로 표시
+- 회색(NonText highlight)으로 표시
 
 **컨텍스트 추출:**
 - 현재 위치의 prefix (이전 코드)
@@ -599,8 +600,10 @@ vnoremap <leader>ar :WaiRefactor<CR>
 nnoremap <leader>at :WaiToggleSuggest<CR>
 
 " Ghost Text 수락 (Tab 키)
-imap <Tab> <Cmd>call wplus#ai#accept_suggestion()<CR>
+inoremap <expr> <Tab> wplus#ai#accept_suggestion()
 ```
+
+`<Tab>`을 이미 LSP completion이나 snippet jump에 쓰고 있다면, Ghost Text 수락 키는 별도로 잡는 편이 안전합니다.
 
 ---
 
