@@ -36,6 +36,9 @@ function! wplus#lsp#setup() abort
     nnoremap <silent> <Plug>WplusLspReferences  :call wplus#lsp#request('textDocument/references')<CR>
     nnoremap <silent> <Plug>WplusLspRename      :call wplus#lsp#rename()<CR>
     nnoremap <silent> <Plug>WplusLspCodeAction  :call wplus#lsp#code_action()<CR>
+    nnoremap <silent> ]e :call wplus#lsp#next_diag()<CR>
+    nnoremap <silent> [e :call wplus#lsp#prev_diag()<CR>
+    nnoremap <silent> <leader>E :call wplus#lsp#diag_popup()<CR>
 endfunction
 
 function! s:on_filetype_changed() abort
@@ -377,7 +380,7 @@ function! s:do_update_diagnostics(ft, params) abort
         let l:counts[l:style.key] += 1
 
         call add(l:signs, {'id': 0, 'group': 'WplusLspGroup', 'name': l:style.sign, 'buffer': l:bufnr, 'lnum': l:lnum, 'priority': 20})
-        if l:has_textprop
+        if l:has_textprop && get(g:, 'wplus_lsp_inline_diags', 1)
             let l:msg = '  // ' . split(l:diag.message, "\n")[0]
             silent! call prop_add(l:lnum, 0, {'bufnr': l:bufnr, 'type': l:style.type, 'text': l:msg, 'text_align': 'after'})
         endif
@@ -403,6 +406,58 @@ function! s:echo_diag() abort
         echo l:info.msg
         echohl None
     endif
+endfunction
+
+function! wplus#lsp#next_diag() abort
+    let l:diags = get(b:, 'wplus_lsp_diags', {})
+    if empty(l:diags) | echo '[wplus] No diagnostics' | return | endif
+    let l:lines = sort(map(keys(l:diags), 'str2nr(v:val)'), 'n')
+    let l:cur = line('.')
+    for l:ln in l:lines
+        if l:ln > l:cur
+            call cursor(l:ln, 1)
+            call s:echo_diag()
+            return
+        endif
+    endfor
+    call cursor(l:lines[0], 1)
+    call s:echo_diag()
+endfunction
+
+function! wplus#lsp#prev_diag() abort
+    let l:diags = get(b:, 'wplus_lsp_diags', {})
+    if empty(l:diags) | echo '[wplus] No diagnostics' | return | endif
+    let l:lines = sort(map(keys(l:diags), 'str2nr(v:val)'), 'n')
+    let l:cur = line('.')
+    let l:prev = l:lines[-1]
+    for l:ln in l:lines
+        if l:ln >= l:cur | break | endif
+        let l:prev = l:ln
+    endfor
+    call cursor(l:prev, 1)
+    call s:echo_diag()
+endfunction
+
+function! wplus#lsp#diag_popup() abort
+    let l:diags = get(b:, 'wplus_lsp_diags', {})
+    let l:lnum = line('.')
+    if !has_key(l:diags, l:lnum)
+        echo '[wplus] No diagnostic on this line'
+        return
+    endif
+    let l:info = l:diags[l:lnum]
+    let l:style = s:diag_style(l:info.sev)
+    let l:lines = split(l:info.msg, "\n")
+    call popup_create(l:lines, {
+        \ 'line':     'cursor+1',
+        \ 'col':      'cursor',
+        \ 'moved':    'any',
+        \ 'border':   [1, 1, 1, 1],
+        \ 'borderhighlight': [l:style.hl],
+        \ 'padding':  [0, 1, 0, 1],
+        \ 'wrap':     1,
+        \ 'maxwidth': 80,
+        \ })
 endfunction
 
 function! s:make_cache_key(uri, lnum, col) abort
