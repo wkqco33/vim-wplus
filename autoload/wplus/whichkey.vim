@@ -133,6 +133,10 @@ function! wplus#whichkey#setup() abort
     call wplus#whichkey#register('<leader>cf', 'Format code')
     call wplus#whichkey#register('<leader>bl', 'Git blame toggle')
     call wplus#whichkey#register('<leader>mc', 'Multi-cursor select all')
+    call wplus#whichkey#register('<leader>o',  'Outline toggle')
+    call wplus#whichkey#register('<leader>E',  'Diagnostic popup')
+    call wplus#whichkey#register('<leader>gd', 'Git diff (current file)')
+    call wplus#whichkey#register('<leader>gD', 'Git diff (all files)')
 
     " Hook leader key to show popup after timeout
     nnoremap <expr> <leader> wplus#whichkey#leader_pressed() .. "\<leader>"
