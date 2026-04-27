@@ -11,6 +11,7 @@ let g:wplus_illuminate_ft_block = get(g:, 'wplus_illuminate_ft_block',
 let s:match_ids = {}  " winid → [match_id, ...]
 let s:timer     = -1
 let s:last_word = ''
+let s:paused    = 0
 
 " ── highlight group ───────────────────────────────────────────────────────
 
@@ -41,7 +42,15 @@ endfunction
 
 " ── debounced trigger ─────────────────────────────────────────────────────
 
+function! wplus#illuminate#set_paused(val) abort
+    let s:paused = a:val
+    if a:val
+        call s:clear()
+    endif
+endfunction
+
 function! s:trigger() abort
+    if s:paused | return | endif
     if index(g:wplus_illuminate_ft_block, &filetype) >= 0
         call s:clear()
         return

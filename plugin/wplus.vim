@@ -76,7 +76,7 @@ function! s:validate_config() abort
     endif
 endfunction
 
-let s:modules = ['commentary', 'pairs', 'repeat', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'colorscheme', 'snippet', 'conflict', 'ai']
+let s:modules = ['commentary', 'pairs', 'repeat', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'colorscheme', 'snippet', 'conflict', 'ai', 'multicursor']
 
 " Validate user configuration
 call s:validate_config()
