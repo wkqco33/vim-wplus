@@ -49,7 +49,6 @@ function! s:on_filetype_changed() abort
         autocmd! * <buffer>
         autocmd BufWritePost <buffer> call s:did_save(&filetype)
         autocmd TextChanged,TextChangedI <buffer> call s:on_change(&filetype)
-        autocmd CursorHold <buffer> call s:echo_diag()
         autocmd InsertCharPre <buffer>
             \ if v:char ==# '(' || v:char ==# ','
             \   | call s:throttle_signature_help()
@@ -380,7 +379,7 @@ function! s:do_update_diagnostics(ft, params) abort
         let l:counts[l:style.key] += 1
 
         call add(l:signs, {'id': 0, 'group': 'WplusLspGroup', 'name': l:style.sign, 'buffer': l:bufnr, 'lnum': l:lnum, 'priority': 20})
-        if l:has_textprop && get(g:, 'wplus_lsp_inline_diags', 1)
+        if l:has_textprop && get(g:, 'wplus_lsp_inline_diags', 0)
             let l:msg = '  // ' . split(l:diag.message, "\n")[0]
             silent! call prop_add(l:lnum, 0, {'bufnr': l:bufnr, 'type': l:style.type, 'text': l:msg, 'text_align': 'after'})
         endif
@@ -393,7 +392,6 @@ function! s:do_update_diagnostics(ft, params) abort
     call setbufvar(l:bufnr, 'wplus_lsp_diags', l:diags)
     call setbufvar(l:bufnr, 'wplus_lsp_diag_counts', l:counts)
     redrawstatus
-    if bufnr('%') == l:bufnr | redraw | call s:echo_diag() | endif
 endfunction
 
 function! s:echo_diag() abort
