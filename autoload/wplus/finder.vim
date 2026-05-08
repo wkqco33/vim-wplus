@@ -3,6 +3,10 @@
 if exists('g:autoloaded_wplus_finder') | finish | endif
 let g:autoloaded_wplus_finder = 1
 
+let g:wplus_finder_width_ratio  = get(g:, 'wplus_finder_width_ratio',  0.7)
+let g:wplus_finder_height_ratio = get(g:, 'wplus_finder_height_ratio', 0.4)
+let g:wplus_finder_fuzzy_limit  = get(g:, 'wplus_finder_fuzzy_limit', 10000)
+
 let s:prompt = '> '
 let s:state = {
     \ 'winid': -1,
@@ -23,8 +27,8 @@ function! wplus#finder#open(items, callback, title) abort
     let s:state.callback = a:callback
     let s:state.selected = 0
 
-    let l:width = float2nr(&columns * 0.7)
-    let l:height = float2nr(&lines * 0.4)
+    let l:width = float2nr(&columns * g:wplus_finder_width_ratio)
+    let l:height = float2nr(&lines * g:wplus_finder_height_ratio)
     let s:state.width = l:width
     let s:state.height = l:height
     
@@ -96,7 +100,7 @@ function! s:filter_items() abort
         let s:state.filtered = copy(s:state.items)
     else
         " Use matchfuzzy with limit for large result sets
-        let s:state.filtered = matchfuzzy(s:state.items, s:state.query, {'limit': 10000})
+        let s:state.filtered = matchfuzzy(s:state.items, s:state.query, {'limit': g:wplus_finder_fuzzy_limit})
     endif
     let s:state.selected = 0
 endfunction
@@ -139,8 +143,14 @@ endfunction
 " ── Sources ────────────────────────────────────────────────────────────────
 
 function! wplus#finder#files() abort
-    let l:cmd = executable('rg') ? 'rg --files' : (executable('git') ? 'git ls-files' : 'find . -type f')
-    let l:items = systemlist(l:cmd)
+    if executable('rg')
+        let l:items = systemlist('rg --files')
+    elseif executable('git')
+        let l:items = systemlist('git ls-files')
+    else
+        let l:items = glob('**/*', 0, 1)
+        call filter(l:items, '!isdirectory(v:val)')
+    endif
     call wplus#finder#open(l:items, 'edit', 'Find Files')
 endfunction
 

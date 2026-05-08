@@ -54,7 +54,19 @@ function! s:validate_config() abort
             echomsg '[wplus] Warning: wplus_yank_duration must be a non-negative number, reset to 250'
         endif
     endif
-    
+    if exists('g:wplus_finder_fuzzy_limit')
+        if type(g:wplus_finder_fuzzy_limit) != v:t_number || g:wplus_finder_fuzzy_limit < 1
+            let g:wplus_finder_fuzzy_limit = 10000
+            echomsg '[wplus] Warning: wplus_finder_fuzzy_limit must be a positive number, reset to 10000'
+        endif
+    endif
+    if exists('g:wplus_completion_max_items')
+        if type(g:wplus_completion_max_items) != v:t_number || g:wplus_completion_max_items < 1
+            let g:wplus_completion_max_items = 200
+            echomsg '[wplus] Warning: wplus_completion_max_items must be a positive number, reset to 200'
+        endif
+    endif
+
     " Validate string settings
     if exists('g:wplus_indent_char')
         if type(g:wplus_indent_char) != v:t_string || len(g:wplus_indent_char) == 0

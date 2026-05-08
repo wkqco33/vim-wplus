@@ -1,5 +1,5 @@
 " ============================================================
-" vim-wplus 설정 가이드 (31개 모듈, Azure OpenAI 지원)
+" vim-wplus 설정 가이드 (31개 모듈, OpenAI/Claude/Azure/Ollama 지원)
 " 완전한 Vim IDE 구성 예시
 " ============================================================
 
@@ -131,10 +131,10 @@ let g:wplus_session_auto_save = 1
 " ─────────────────────────────────────────────────────────
 
 " ┌─────────────────────────────────────────────────────────┐
-" │ 1. AI Assistant (ChatGPT, Claude, Azure OpenAI)        │
+" │ 1. AI Assistant (ChatGPT, Claude, Azure OpenAI, Ollama)│
 " └─────────────────────────────────────────────────────────┘
-" 
-" 제공자 선택: 'openai' | 'claude' | 'azure'
+"
+" 제공자 선택: 'openai' | 'claude' | 'azure' | 'ollama'
 " 명령어: :WaiComment, :WaiComplete, :WaiRefactor
 "
 
@@ -157,6 +157,12 @@ let g:wplus_ai_max_tokens = 2000
 " let g:wplus_ai_azure_resource = 'my-company-ai'        " Azure 리소스명
 " let g:wplus_ai_azure_deployment = 'gpt-4-deployment'   " 배포명
 " let g:wplus_ai_azure_api_version = '2024-02-15-preview'
+
+" Ollama 설정 (provider='ollama'일 때) — API 키 불필요
+" Ollama 설치 후 `ollama pull <model>` 로 모델을 받아두어야 함
+" let g:wplus_ai_provider = 'ollama'
+" let g:wplus_ai_model = 'llama3'           " llama3, codellama, mistral 등
+" let g:wplus_ai_ollama_host = 'http://localhost:11434'  " 기본값
 
 " Ghost Text 자동완성 설정
 " InsertMode에서 자동으로 AI 제안을 Ghost Text로 표시

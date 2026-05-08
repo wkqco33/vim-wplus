@@ -10,9 +10,13 @@ let s:sig_winid = -1
 let s:def_cache = {} " uri:line:col -> {result, timestamp} (with TTL)
 let s:ref_cache = {} " uri:line:col -> {result, timestamp} (with TTL)
 let s:symbol_cache = {} " uri -> {line_count, timestamp, symbols} (symbol info cache)
-let g:wplus_lsp_log_enabled = get(g:, 'wplus_lsp_log_enabled', 0)
-let g:wplus_lsp_signcolumn = get(g:, 'wplus_lsp_signcolumn', 'yes')
-let g:wplus_lsp_cache_ttl = get(g:, 'wplus_lsp_cache_ttl', 300) " Cache TTL in seconds (default 5 min)
+let g:wplus_lsp_log_enabled  = get(g:, 'wplus_lsp_log_enabled',  0)
+let g:wplus_lsp_signcolumn   = get(g:, 'wplus_lsp_signcolumn',   'yes')
+let g:wplus_lsp_cache_ttl    = get(g:, 'wplus_lsp_cache_ttl',    300)
+let g:wplus_lsp_sig_delay    = get(g:, 'wplus_lsp_sig_delay',    100)
+let g:wplus_lsp_change_delay = get(g:, 'wplus_lsp_change_delay', 800)
+let g:wplus_lsp_diag_delay   = get(g:, 'wplus_lsp_diag_delay',   300)
+let s:CONTENT_LENGTH_PREFIX  = 'Content-Length: '
 
 function! s:log(ft, type, msg) abort
     if !g:wplus_lsp_log_enabled | return | endif
@@ -73,7 +77,7 @@ function! s:throttle_signature_help() abort
     if l:sig_timer != -1
         return
     endif
-    let l:timer = timer_start(100, {-> s:do_signature_help(l:buf)})
+    let l:timer = timer_start(g:wplus_lsp_sig_delay, {-> s:do_signature_help(l:buf)})
     call setbufvar(l:buf, 'wplus_lsp_sig_timer', l:timer)
 endfunction
 
@@ -102,7 +106,14 @@ endfunction
 
 function! s:get_uri(path) abort
     let l:p = fnamemodify(a:path, ':p')
-    let l:p = substitute(l:p, '[^A-Za-z0-9._~/-]', '\=printf("%%%02X", char2nr(submatch(0)))', 'g')
+    if has('win32')
+        let l:p = substitute(l:p, '\\', '/', 'g')
+        let l:p = substitute(l:p, '[^A-Za-z0-9._~/:@!$&''()*+,;=]',
+            \ '\=printf("%%%02X", char2nr(submatch(0)))', 'g')
+        return 'file:///' . l:p
+    endif
+    let l:p = substitute(l:p, '[^A-Za-z0-9._~/-]',
+        \ '\=printf("%%%02X", char2nr(submatch(0)))', 'g')
     return 'file://' . (l:p[0] ==# '/' ? '' : '/') . l:p
 endfunction
 
@@ -114,6 +125,9 @@ endfunction
 function! s:decode_uri_path(uri) abort
     let l:path = substitute(a:uri, '\v^file:/*(localhost)?', '', '')
     let l:path = substitute(l:path, '%\(\x\x\)', '\=nr2char("0x".submatch(1))', 'g')
+    if l:path =~# '^[A-Za-z]:[\\/]'
+        return l:path
+    endif
     return l:path[0] ==# '/' ? l:path : '/' . l:path
 endfunction
 
@@ -160,7 +174,7 @@ function! s:on_change(ft) abort
     if l:timer_id != -1
         silent! timer_stop(l:timer_id)
     endif
-    let l:timer = timer_start(800, {-> s:send_change(l:buf, a:ft)})
+    let l:timer = timer_start(g:wplus_lsp_change_delay, {-> s:send_change(l:buf, a:ft)})
     call setbufvar(l:buf, 'wplus_lsp_timer', l:timer)
 endfunction
 
@@ -236,7 +250,7 @@ function! s:on_stdout(ft, channel, msg) abort
         if l:idx > 0 | let l:s.buffer = l:s.buffer[l:idx :] | let l:idx = 0 | endif
         let l:end = stridx(l:s.buffer, "\r\n\r\n")
         if l:end == -1 | break | endif
-        let l:len = str2nr(l:s.buffer[16 : l:end])
+        let l:len = str2nr(l:s.buffer[len(s:CONTENT_LENGTH_PREFIX) : l:end])
         if strlen(l:s.buffer) < l:end + 4 + l:len | break | endif
         let l:body = l:s.buffer[l:end + 4 : l:end + 3 + l:len]
         let l:s.buffer = l:s.buffer[l:end + 4 + l:len :]
@@ -339,7 +353,7 @@ endfunction
 function! s:update_diagnostics(ft, params) abort
     let l:uri = get(a:params, 'uri', '')
     silent! call timer_stop(get(s:diag_timers, l:uri, -1))
-    let s:diag_timers[l:uri] = timer_start(300, {-> s:diag_timer_fire(l:uri, a:ft, a:params)})
+    let s:diag_timers[l:uri] = timer_start(g:wplus_lsp_diag_delay, {-> s:diag_timer_fire(l:uri, a:ft, a:params)})
 endfunction
 
 function! s:diag_timer_fire(uri, ft, params) abort
@@ -408,7 +422,7 @@ endfunction
 
 function! wplus#lsp#next_diag() abort
     let l:diags = get(b:, 'wplus_lsp_diags', {})
-    if empty(l:diags) | echo '[wplus] No diagnostics' | return | endif
+    if empty(l:diags) | call wplus#util#info_msg('lsp', 'No diagnostics') | return | endif
     let l:lines = sort(map(keys(l:diags), 'str2nr(v:val)'), 'n')
     let l:cur = line('.')
     for l:ln in l:lines
@@ -424,7 +438,7 @@ endfunction
 
 function! wplus#lsp#prev_diag() abort
     let l:diags = get(b:, 'wplus_lsp_diags', {})
-    if empty(l:diags) | echo '[wplus] No diagnostics' | return | endif
+    if empty(l:diags) | call wplus#util#info_msg('lsp', 'No diagnostics') | return | endif
     let l:lines = sort(map(keys(l:diags), 'str2nr(v:val)'), 'n')
     let l:cur = line('.')
     let l:prev = l:lines[-1]
@@ -440,7 +454,7 @@ function! wplus#lsp#diag_popup() abort
     let l:diags = get(b:, 'wplus_lsp_diags', {})
     let l:lnum = line('.')
     if !has_key(l:diags, l:lnum)
-        echo '[wplus] No diagnostic on this line'
+        call wplus#util#info_msg('lsp', 'No diagnostic on this line')
         return
     endif
     let l:info = l:diags[l:lnum]
@@ -653,7 +667,7 @@ endfunction
 
 function! s:show_code_actions(result) abort
     if empty(a:result)
-        echohl WarningMsg | echo 'No code actions available' | echohl None
+        call wplus#util#warn_msg('lsp', 'No code actions available')
         return
     endif
     let s:pending_actions = a:result

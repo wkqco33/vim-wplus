@@ -12,21 +12,6 @@ let s:sign_group = 'wplus_gitgutter'
 let s:pending    = {}   " bufnr → job handle
 let s:job_data   = {}   " job → {bufnr, lines}
 
-function! s:git_root(path) abort
-    let l:dir = fnamemodify(a:path, ':p:h')
-    while !empty(l:dir) && l:dir !=# '/'
-        if isdirectory(l:dir . '/.git')
-            return l:dir
-        endif
-        let l:parent = fnamemodify(l:dir, ':h')
-        if l:parent ==# l:dir
-            break
-        endif
-        let l:dir = l:parent
-    endwhile
-    return ''
-endfunction
-
 function! s:git_relpath(root, file) abort
     return a:file[: len(a:root)] ==# a:root . '/' ? a:file[len(a:root) + 1 :] : a:file
 endfunction
@@ -121,7 +106,10 @@ function! wplus#gitgutter#refresh(bufnr) abort
     let bufnr = a:bufnr == 0 ? bufnr('%') : a:bufnr
     let file  = bufname(bufnr)
     if empty(file) || !filereadable(file) | return | endif
-    let root = s:git_root(file)
+    if get(g:, 'wplus_gitgutter_disable_on_large_files', 1)
+        if getfsize(file) > get(g:, 'wplus_gitgutter_file_size_limit', 500000) | return | endif
+    endif
+    let root = wplus#util#find_git_root(fnamemodify(file, ':p:h'))
     if empty(root)
         silent! call sign_unplace(s:sign_group, {'buffer': bufnr})
         call setbufvar(bufnr, 'wplus_git_branch', '')
@@ -237,7 +225,7 @@ function! wplus#gitgutter#next_hunk() abort
             return
         endif
     endfor
-    echohl WarningMsg | echo 'No more hunks' | echohl None
+    call wplus#util#warn_msg('gitgutter', 'No more hunks')
 endfunction
 
 function! wplus#gitgutter#prev_hunk() abort
@@ -252,14 +240,14 @@ function! wplus#gitgutter#prev_hunk() abort
     if !empty(l:found)
         execute l:found.new_start
     else
-        echohl WarningMsg | echo 'No previous hunks' | echohl None
+        call wplus#util#warn_msg('gitgutter', 'No previous hunks')
     endif
 endfunction
 
 function! wplus#gitgutter#preview_hunk() abort
     let l:h = s:find_hunk_at(line('.'))
     if empty(l:h)
-        echohl WarningMsg | echo 'No hunk at cursor' | echohl None
+        call wplus#util#warn_msg('gitgutter', 'No hunk at cursor')
         return
     endif
     call popup_atcursor(l:h.lines, {
@@ -278,18 +266,18 @@ function! wplus#gitgutter#stage_hunk() abort
     let l:bufnr = bufnr('%')
     let l:h = s:find_hunk_at(line('.'))
     if empty(l:h)
-        echohl WarningMsg | echo 'No hunk at cursor' | echohl None
+        call wplus#util#warn_msg('gitgutter', 'No hunk at cursor')
         return
     endif
     let l:file = fnamemodify(bufname(l:bufnr), ':p')
-    let l:root = s:git_root(l:file)
+    let l:root = wplus#util#find_git_root(fnamemodify(l:file, ':h'))
     if empty(l:root)
-        echohl ErrorMsg | echo 'Not in a git repository' | echohl None
+        call wplus#util#error_msg('gitgutter', 'Not in a git repository')
         return
     endif
     let l:header = getbufvar(l:bufnr, 'wplus_gitgutter_diff_header', [])
     if empty(l:header)
-        echohl ErrorMsg | echo 'No diff header available — save the file first' | echohl None
+        call wplus#util#error_msg('gitgutter', 'No diff header available — save the file first')
         return
     endif
     let l:tmp = tempname()
@@ -297,9 +285,9 @@ function! wplus#gitgutter#stage_hunk() abort
     let l:out = system('git -C ' . shellescape(l:root) . ' apply --cached ' . shellescape(l:tmp))
     call delete(l:tmp)
     if v:shell_error != 0
-        echohl ErrorMsg | echo 'Stage failed: ' . trim(l:out) | echohl None
+        call wplus#util#error_msg('gitgutter', 'Stage failed: ' . trim(l:out))
     else
-        echo 'Hunk staged'
+        call wplus#util#info_msg('gitgutter', 'Hunk staged')
         call wplus#gitgutter#refresh(l:bufnr)
     endif
 endfunction
