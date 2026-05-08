@@ -3,7 +3,7 @@
 if exists('g:autoloaded_wplus_ai') | finish | endif
 let g:autoloaded_wplus_ai = 1
 
-let g:wplus_ai_provider = get(g:, 'wplus_ai_provider', 'openai') " 'openai', 'claude', or 'azure'
+let g:wplus_ai_provider = get(g:, 'wplus_ai_provider', 'openai') " 'openai', 'claude', 'azure', or 'ollama'
 let g:wplus_ai_model = get(g:, 'wplus_ai_model', '')
 let g:wplus_ai_api_key = get(g:, 'wplus_ai_api_key', '')
 let g:wplus_ai_temperature = get(g:, 'wplus_ai_temperature', 0.7)
@@ -13,6 +13,9 @@ let g:wplus_ai_max_tokens = get(g:, 'wplus_ai_max_tokens', 2000)
 let g:wplus_ai_azure_resource = get(g:, 'wplus_ai_azure_resource', '')  " e.g., 'my-resource'
 let g:wplus_ai_azure_deployment = get(g:, 'wplus_ai_azure_deployment', '')  " e.g., 'gpt-4'
 let g:wplus_ai_azure_api_version = get(g:, 'wplus_ai_azure_api_version', '2024-02-15-preview')
+
+" Ollama-specific settings
+let g:wplus_ai_ollama_host = get(g:, 'wplus_ai_ollama_host', 'http://localhost:11434')
 
 " Ghost Text auto-suggestion settings
 let g:wplus_ai_suggest_enabled = get(g:, 'wplus_ai_suggest_enabled', 1)
@@ -29,6 +32,7 @@ let s:suggest_request = {} " {job, channel_key, bufnr, lnum, line, col, response
 let s:suggest_content = '' " current suggestion content
 let s:suggest_line = 0 " line where suggestion was requested
 let s:suggest_col = 0 " column where suggestion was requested
+let s:suggest_bufnr = 0 " buffer where suggestion was requested
 let s:suggest_timer = v:null
 let s:suggest_keystroke_count = 0 " keystroke counter for adaptive delay
 let s:last_suggest_error = ''
@@ -43,9 +47,11 @@ function! s:get_api_endpoint() abort
             call wplus#util#error_msg('ai', 'Azure: resource and deployment must be configured')
             return ''
         endif
-        return 'https://' . g:wplus_ai_azure_resource . '.openai.azure.com/openai/deployments/' 
+        return 'https://' . g:wplus_ai_azure_resource . '.openai.azure.com/openai/deployments/'
                     \ . g:wplus_ai_azure_deployment . '/chat/completions'
                     \ . '?api-version=' . g:wplus_ai_azure_api_version
+    elseif g:wplus_ai_provider ==# 'ollama'
+        return g:wplus_ai_ollama_host . '/v1/chat/completions'
     else
         return 'https://api.openai.com/v1/chat/completions'
     endif
@@ -53,11 +59,15 @@ endfunction
 
 function! s:get_request_headers() abort
     let l:headers = ['Content-Type: application/json']
+    if g:wplus_ai_provider ==# 'ollama'
+        " Ollama does not require an API key
+        call add(l:headers, 'Authorization: Bearer ollama')
+        return l:headers
+    endif
     if empty(g:wplus_ai_api_key)
         call wplus#util#error_msg('ai', 'API key not configured')
         return []
     endif
-    
     if g:wplus_ai_provider ==# 'claude'
         call add(l:headers, 'x-api-key: ' . g:wplus_ai_api_key)
         call add(l:headers, 'anthropic-version: 2023-06-01')
@@ -66,7 +76,6 @@ function! s:get_request_headers() abort
     else
         call add(l:headers, 'Authorization: Bearer ' . g:wplus_ai_api_key)
     endif
-    
     return l:headers
 endfunction
 
@@ -298,13 +307,13 @@ function! wplus#ai#refactor() abort
 endfunction
 
 function! s:send_request(bufnr, lnum, prompt) abort
-    if empty(g:wplus_ai_api_key)
+    if g:wplus_ai_provider !=# 'ollama' && empty(g:wplus_ai_api_key)
         call wplus#util#error_msg('ai', 'API key not configured (g:wplus_ai_api_key)')
         return
     endif
-    
+
     if empty(g:wplus_ai_model)
-        call wplus#util#error_msg('ai', 'model not configured (g:wplus_ai_ai_model)')
+        call wplus#util#error_msg('ai', 'model not configured (g:wplus_ai_model)')
         return
     endif
     
@@ -348,8 +357,10 @@ function! wplus#ai#setup() abort
     augroup END
     
     " Warn if not configured, but still register commands
-    if empty(g:wplus_ai_api_key) || empty(g:wplus_ai_model)
-        if g:wplus_ai_provider ==# 'azure'
+    if empty(g:wplus_ai_model)
+        if g:wplus_ai_provider ==# 'ollama'
+            call wplus#util#warn_msg('ai', 'Ollama: Set g:wplus_ai_model and optionally g:wplus_ai_ollama_host')
+        elseif g:wplus_ai_provider ==# 'azure'
             call wplus#util#warn_msg('ai', 'Azure: Set g:wplus_ai_api_key, g:wplus_ai_azure_resource, g:wplus_ai_azure_deployment')
         elseif g:wplus_ai_provider ==# 'claude'
             call wplus#util#warn_msg('ai', 'Claude: Set g:wplus_ai_api_key, g:wplus_ai_model')
@@ -372,6 +383,10 @@ function! wplus#ai#setup() abort
     nnoremap <silent> <Plug>WaiToggleSuggest :WaiToggleSuggest<CR>
     
     " Ghost Text auto-suggest
+    if has('textprop')
+        silent! call prop_type_add('WplusAISuggest', {'highlight': 'Comment'})
+    endif
+
     if g:wplus_ai_suggest_enabled
         augroup WplusAISuggest
             autocmd!
@@ -386,24 +401,27 @@ endfunction
 
 " Show Ghost Text suggestion with textprop
 function! s:show_suggestion() abort
-    call prop_remove({'type': 'WplusAISuggest', 'all': 1})
-    
+    let l:bufnr = s:suggest_bufnr
+    call prop_remove({'type': 'WplusAISuggest', 'all': 1, 'bufnr': l:bufnr})
+
     if empty(s:suggest_content) | return | endif
-    
+    if !bufloaded(l:bufnr) | return | endif
+
     let l:lines = split(s:suggest_content, "\n", 1)
-    let l:line = line('.')
-    let l:col = col('.')
-    
+    let l:line = s:suggest_line
+    let l:col  = s:suggest_col
+
     try
         " First line appended to current line
         if !empty(l:lines[0])
             call prop_add(l:line, l:col, {
                 \ 'type': 'WplusAISuggest',
+                \ 'bufnr': l:bufnr,
                 \ 'text': l:lines[0],
                 \ 'id': 1,
                 \ })
         endif
-        
+
         " Remaining lines as virtual lines below
         let l:i = 1
         while l:i < len(l:lines)
@@ -411,32 +429,36 @@ function! s:show_suggestion() abort
             if empty(l:text) | let l:text = ' ' | endif
             call prop_add(l:line, 0, {
                 \ 'type': 'WplusAISuggest',
+                \ 'bufnr': l:bufnr,
                 \ 'text': l:text,
                 \ 'text_align': 'below',
                 \ 'id': 1 + l:i,
                 \ })
             let l:i += 1
         endwhile
-        
+
         redraw
     catch
         call s:suggest_debug('failed to render ghost text: ' . v:exception)
-        return
     endtry
 endfunction
 
 " Dismiss current suggestion
 function! s:dismiss_suggestion() abort
+    let l:bufnr = s:suggest_bufnr
     let s:suggest_content = ''
     let s:suggest_line = 0
     let s:suggest_col = 0
-    
+    let s:suggest_bufnr = 0
+
     if s:suggest_timer != v:null
         call timer_stop(s:suggest_timer)
         let s:suggest_timer = v:null
     endif
-    
-    call prop_remove({'type': 'WplusAISuggest', 'all': 1})
+
+    if l:bufnr > 0 && bufloaded(l:bufnr)
+        call prop_remove({'type': 'WplusAISuggest', 'all': 1, 'bufnr': l:bufnr})
+    endif
 endfunction
 
 " Accept current suggestion
@@ -511,11 +533,12 @@ function! s:on_text_changed() abort
     if !g:wplus_ai_suggest_enabled
         return
     endif
-    
+
     let s:suggest_keystroke_count += 1
     call s:dismiss_suggestion()
     let s:suggest_line = line('.')
     let s:suggest_col = col('.')
+    let s:suggest_bufnr = bufnr('%')
     
     let l:delay = g:wplus_ai_suggest_delay
     if s:suggest_keystroke_count > 5
@@ -614,6 +637,7 @@ function! s:on_suggest_response_complete(channel) abort
         let s:suggest_content = l:content
         let s:suggest_line = l:request.line
         let s:suggest_col = l:request.col
+        let s:suggest_bufnr = l:request.bufnr
         call s:show_suggestion()
     else
         call s:suggest_debug('dropped stale suggestion response')
@@ -622,7 +646,7 @@ endfunction
 
 " Send suggestion request to AI
 function! s:send_suggest_request(prefix, suffix, prompt) abort
-    if empty(g:wplus_ai_api_key) || empty(g:wplus_ai_model)
+    if (g:wplus_ai_provider !=# 'ollama' && empty(g:wplus_ai_api_key)) || empty(g:wplus_ai_model)
         call s:suggest_debug('missing API key or model')
         return
     endif

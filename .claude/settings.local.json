@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl --version)",
+      "Bash(curl -fLo __TRACKED_VAR__/vimfiles/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\wkqco\\\\Workspace\\\\utils\\\\vim-wplus\" -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(awk '/^function! s:/{if \\(NR-start>50 && prev_fn\\) print prev_fn\": \"NR-start\" lines\"; start=NR; prev_fn=$0}' ai.vim)",
+      "Bash(xargs -I {} basename {} .vim)",
+      "Bash(grep -v \"^ai$\")",
+      "Bash(awk '/^function!/{f=$0; ln=NR; next} /^endfunction/{print ln\"-\"NR\": \"f; print NR-ln\" lines\"}' ai.vim)",
+      "Bash(sort -t: -k2 -nr)",
+      "Bash(findstr /s \"root_cache\" autoload\\\\wplus\\\\lsp.vim autoload\\\\wplus\\\\gitgutter.vim autoload\\\\wplus\\\\blame.vim autoload\\\\wplus\\\\statusline.vim)"
+    ]
+  }
+}

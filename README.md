@@ -1,7 +1,7 @@
 # vim-wplus
 
 외부 의존성 없는 Vim 올인원 플러그인.  
-31개 모듈로 구성된 완전한 Vim IDE (AI 어시스턴트, 스니펫, Git 충돌 해결 포함).
+35개 모듈로 구성된 완전한 Vim IDE (AI 어시스턴트, 스니펫, Git 충돌 해결 포함).
 
 **요구사항**: Vim 9.1+ (`+job +channel +popupwin +signs +textprop`)
 
@@ -42,6 +42,11 @@
   - [conflict — Git 충돌 해결](#conflict--git-충돌-해결)
   - [todo — TODO 관리](#todo--todo-관리)
   - [colorscheme — 배경색 자동 감지](#colorscheme--배경색-자동-감지)
+  - [multicursor — 다중 커서](#multicursor--다중-커서)
+  - [register — 레지스터 미리보기](#register--레지스터-미리보기)
+  - [diffview — Git Diff 뷰어](#diffview--git-diff-뷰어)
+  - [outline — 코드 아웃라인](#outline--코드-아웃라인)
+  - [completion — 버퍼 단어 완성](#completion--버퍼-단어-완성)
 - [설정 가이드](#설정-가이드)
 - [모듈 비활성화](#모듈-비활성화)
 - [전체 설정 레퍼런스](#전체-설정-레퍼런스)
@@ -85,7 +90,16 @@ git clone <url> ~/.vim/pack/user/start/vim-wplus
 
 ```vim
 set runtimepath+=~/.vim/pack/user/start/vim-wplus
+set packpath+=~/.vim/pack/user/start/vim-wplus
 source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
+```
+
+**Windows에서는 경로를 슬래시(`/`)로 쓰는 것이 가장 안전합니다:**
+
+```vim
+set runtimepath+=C:/Users/wkqco/Workspace/utils/vim-wplus
+set packpath+=C:/Users/wkqco/Workspace/utils/vim-wplus
+source C:/Users/wkqco/Workspace/utils/vim-wplus/plugin/wplus.vim
 ```
 
 ### 빠른 시작
@@ -116,6 +130,9 @@ vim
 
 2. 플러그인 로드 확인:
    ```vim
+   :echo exists(':WexplorerToggle')
+   " 2가 반환되어야 함
+
    :echo exists('*wplus#explorer#toggle')
    " 1이 반환되어야 함
    ```
@@ -702,6 +719,93 @@ let g:wplus_todo_grep_backend = 'rg'     " rg, git grep, grep
 
 ```vim
 let g:wplus_colorscheme_auto_detect = 1
+```
+
+---
+
+### multicursor — 다중 커서
+
+단어 하이라이트 위에 다중 커서를 추가하여 동시에 편집합니다.
+
+#### 단축키
+
+| 키 | 기능 |
+|----|------|
+| `<C-n>` | 커서 아래 단어의 다음 등장 위치에 커서 추가 |
+| `<C-x>` | 현재 위치를 건너뛰고 다음으로 이동 |
+| `<C-a>` | 버퍼 내 모든 등장 위치에 커서 추가 |
+| `c` | 선택된 모든 위치에서 단어 변경 |
+| `d` | 선택된 모든 위치에서 단어 삭제 |
+| `<Esc>` | 다중 커서 모드 종료 |
+
+---
+
+### register — 레지스터 미리보기
+
+`"` 또는 `@` 를 누르면 팝업으로 레지스터 내용을 미리 보여줍니다 (vim-peekaboo 대체).
+
+#### 단축키
+
+| 키 | 기능 |
+|----|------|
+| `"` | 레지스터 팝업 열기 (붙여넣기/연산자용) |
+| `@` | 레지스터 팝업 열기 (매크로 실행용) |
+
+---
+
+### diffview — Git Diff 뷰어
+
+현재 파일 또는 전체 저장소의 `git diff HEAD` 결과를 우측 분할 창에 표시합니다.
+
+#### 단축키
+
+| 키 | 기능 |
+|----|------|
+| `<leader>gd` | 현재 파일의 diff 열기 |
+| `<leader>gD` | 전체 저장소 diff 열기 |
+| `]h` | 다음 hunk로 이동 |
+| `[h` | 이전 hunk로 이동 |
+| `q` | diff 창 닫기 |
+
+---
+
+### outline — 코드 아웃라인
+
+ctags를 이용해 현재 파일의 함수·클래스·심볼 목록을 좌측 사이드바에 표시합니다.
+
+**요구사항**: `universal-ctags` 또는 `exuberant-ctags`
+
+#### 단축키
+
+| 키 | 기능 |
+|----|------|
+| `<leader>o` | 아웃라인 사이드바 토글 |
+| `<CR>` (사이드바 내) | 심볼 위치로 점프 |
+| `R` (사이드바 내) | 새로고침 |
+| `q` (사이드바 내) | 사이드바 닫기 |
+
+#### 커맨드
+
+```vim
+:WoutlineToggle
+```
+
+---
+
+### completion — 버퍼 단어 완성
+
+열려있는 모든 버퍼의 단어와 파일 경로를 `<C-Space>` 로 완성합니다. LSP 완성 팝업이 이미 열려있으면 `<C-n>`으로 동작합니다.
+
+#### 단축키
+
+| 키 | 기능 |
+|----|------|
+| `<C-Space>` (입력 모드) | 버퍼 단어 / 경로 완성 트리거 |
+
+#### 설정
+
+```vim
+let g:wplus_completion_max_items = 200  " 완성 목록 최대 항목 수
 ```
 
 ---

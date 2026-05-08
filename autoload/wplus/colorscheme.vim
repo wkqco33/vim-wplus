@@ -3,7 +3,7 @@
 if exists('g:autoloaded_wplus_colorscheme') | finish | endif
 let g:autoloaded_wplus_colorscheme = 1
 
-let g:wplus_colorscheme_auto = get(g:, 'wplus_colorscheme_auto', 1)
+let g:wplus_colorscheme_auto = get(g:, 'wplus_colorscheme_auto', get(g:, 'wplus_colorscheme_auto_detect', 1))
 
 function! wplus#colorscheme#setup() abort
     if !g:wplus_colorscheme_auto | return | endif

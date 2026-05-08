@@ -34,6 +34,17 @@ if filereadable('/path/to/vim-wplus/plugin/wplus.vim')
 endif
 ```
 
+**Windows 예시**:
+
+```vim
+set runtimepath+=C:/Users/wkqco/Workspace/utils/vim-wplus
+set packpath+=C:/Users/wkqco/Workspace/utils/vim-wplus
+
+if filereadable('C:/Users/wkqco/Workspace/utils/vim-wplus/plugin/wplus.vim')
+    source C:/Users/wkqco/Workspace/utils/vim-wplus/plugin/wplus.vim
+endif
+```
+
 ### 3. 빠른 시작 (예시)
 
 ```bash
@@ -72,6 +83,9 @@ source ~/.vim/plugged/vim-wplus/plugin/wplus.vim
 
 2. **플러그인 로드 확인**
 ```vim
+:echo exists(':WexplorerToggle')
+" 2가 반환되어야 함
+
 :echo exists('*wplus#explorer#toggle')
 " 1이 반환되어야 함 (0이면 로드되지 않은 것)
 ```

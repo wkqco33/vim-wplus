@@ -5,9 +5,12 @@
 if exists('g:autoloaded_wplus_completion') | finish | endif
 let g:autoloaded_wplus_completion = 1
 
+let g:wplus_completion_max_items = get(g:, 'wplus_completion_max_items', 200)
+
 " ── word helpers ──────────────────────────────────────────────────────────
 
 function! s:get_prefix() abort
+    if col('.') <= 1 | return '' | endif
     let l:line = getline('.')[:col('.') - 2]
     let l:m = matchstr(l:line, '\k\+$')
     return l:m
@@ -32,7 +35,7 @@ function! s:collect_words(prefix) abort
             endwhile
         endfor
     endfor
-    return l:words[:199]  " cap at 200 to keep it fast
+    return l:words[:g:wplus_completion_max_items - 1]
 endfunction
 
 " ── path helpers ──────────────────────────────────────────────────────────

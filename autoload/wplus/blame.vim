@@ -16,21 +16,6 @@ let s:timer     = -1
 let s:job       = v:null
 let s:last_job_data = {} " {bufnr, lnum, lines} for current job
 
-function! s:git_root(path) abort
-    let l:dir = fnamemodify(a:path, ':p:h')
-    while !empty(l:dir) && l:dir !=# '/'
-        if isdirectory(l:dir . '/.git')
-            return l:dir
-        endif
-        let l:parent = fnamemodify(l:dir, ':h')
-        if l:parent ==# l:dir
-            break
-        endif
-        let l:dir = l:parent
-    endwhile
-    return ''
-endfunction
-
 function! s:git_relpath(root, file) abort
     return a:file[: len(a:root)] ==# a:root . '/' ? a:file[len(a:root) + 1 :] : a:file
 endfunction
@@ -106,7 +91,7 @@ function! s:trigger() abort
     let lnum  = line('.')
     let file  = expand('%:p')
     if empty(file) | return | endif
-    let root = s:git_root(file)
+    let root = wplus#util#find_git_root(fnamemodify(file, ':p:h'))
     if empty(root)
         call s:clear_all(bufnr)
         return
