@@ -16,13 +16,14 @@ let s:job      = v:null
 
 function! s:git_root(file) abort
     let l:dir = fnamemodify(a:file, ':h')
-    let l:out = systemlist('git -C ' . shellescape(l:dir) . ' rev-parse --show-toplevel 2>/dev/null')
+    let l:out = systemlist('git -C ' . shellescape(l:dir) .
+        \ ' rev-parse --show-toplevel ' . wplus#util#null_redirect())
     return v:shell_error == 0 && !empty(l:out) ? trim(l:out[0]) : ''
 endfunction
 
 function! s:git_relpath(root, file) abort
     let l:rel = substitute(a:file, '^' . escape(a:root, '/\'), '', '')
-    return substitute(l:rel, '^/', '', '')
+    return substitute(l:rel, '^[/\\]', '', '')
 endfunction
 
 " ── diff buffer rendering ─────────────────────────────────────────────────
@@ -57,10 +58,10 @@ endfunction
 
 function! wplus#diffview#open(...) abort
     let l:file = expand('%:p')
-    if empty(l:file) | echo '[wplus] No file' | return | endif
+    if empty(l:file) | call wplus#util#warn_msg('diffview', 'No file') | return | endif
 
     let l:root = s:git_root(l:file)
-    if empty(l:root) | echo '[wplus] Not a git repository' | return | endif
+    if empty(l:root) | call wplus#util#warn_msg('diffview', 'Not a git repository') | return | endif
 
     let l:rel  = s:git_relpath(l:root, l:file)
     let l:args = get(a:, 1, '') ==# 'all'
@@ -105,7 +106,7 @@ function! wplus#diffview#next_hunk() abort
         let l:targets = s:hunk_lines('prev') + s:hunk_lines('next')
     endif
     if empty(l:targets)
-        echo '[wplus] No hunks in this buffer'
+        call wplus#util#warn_msg('diffview', 'No hunks in this buffer')
         return
     endif
     call cursor(l:targets[0], 1)
@@ -119,7 +120,7 @@ function! wplus#diffview#prev_hunk() abort
         let l:targets = empty(l:all) ? [] : [l:all[-1]]
     endif
     if empty(l:targets)
-        echo '[wplus] No hunks in this buffer'
+        call wplus#util#warn_msg('diffview', 'No hunks in this buffer')
         return
     endif
     call cursor(l:targets[0], 1)

@@ -28,7 +28,7 @@ let s:kind_icon = {
 function! s:get_symbols(file) abort
     if !executable('ctags') | return [] | endif
     let l:raw = systemlist(
-        \ 'ctags -f - --sort=no --fields=+nK ' . shellescape(a:file) . ' 2>/dev/null')
+        \ 'ctags -f - --sort=no --fields=+nK ' . shellescape(a:file) . ' ' . wplus#util#null_redirect())
     let l:syms = []
     for l:line in l:raw
         if l:line[0] ==# '!' | continue | endif

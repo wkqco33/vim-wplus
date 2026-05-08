@@ -55,11 +55,10 @@ function! s:git_branch() abort
         return ' ' . b:wplus_git_branch
     endif
     " Fast fallback: read .git/HEAD
-    let root = get(b:, 'wplus_git_root', '')
-    if empty(root)
-        let root = s:find_git_root(expand('%:p:h'))
-        let b:wplus_git_root = root
+    if !has_key(b:, 'wplus_git_root')
+        let b:wplus_git_root = wplus#util#find_git_root(expand('%:p:h'))
     endif
+    let root = b:wplus_git_root
     if empty(root) | return '' | endif
     let head = root . '/.git/HEAD'
     if !filereadable(head) | return '' | endif
@@ -69,15 +68,6 @@ function! s:git_branch() abort
     let branch = line =~# '^ref: ' ? substitute(line, 'ref: refs/heads/', '', '') : line[:6]
     let b:wplus_git_branch = branch
     return ' ' . branch
-endfunction
-
-function! s:find_git_root(dir) abort
-    let dir = a:dir
-    while dir !=# '/' && dir !=# ''
-        if isdirectory(dir . '/.git') | return dir | endif
-        let dir = fnamemodify(dir, ':h')
-    endwhile
-    return ''
 endfunction
 
 function! s:diagnostics() abort

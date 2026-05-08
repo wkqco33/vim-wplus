@@ -33,3 +33,26 @@ endfunction
 function! wplus#util#info_msg(module, message) abort
     call wplus#util#info('[wplus-' . a:module . '] ' . a:message)
 endfunction
+
+function! wplus#util#null_redirect() abort
+    return has('win32') ? '2>nul' : '2>/dev/null'
+endfunction
+
+let s:git_root_cache = {}
+
+function! wplus#util#find_git_root(dir) abort
+    if a:dir =~# '^\\\\' || a:dir =~# '^//' | return '' | endif
+    if has_key(s:git_root_cache, a:dir) | return s:git_root_cache[a:dir] | endif
+    let l:curr = a:dir
+    let l:prev = ''
+    while l:curr !=# l:prev
+        if isdirectory(l:curr . '/.git')
+            let s:git_root_cache[a:dir] = l:curr
+            return l:curr
+        endif
+        let l:prev = l:curr
+        let l:curr = fnamemodify(l:curr, ':h')
+    endwhile
+    let s:git_root_cache[a:dir] = ''
+    return ''
+endfunction
