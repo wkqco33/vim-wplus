@@ -174,6 +174,12 @@ vim
 | `lsp` | yegappan/lsp (Vim 9용 LSP) |
 | `altfile` | vim-scripts/a.vim |
 | `repeat` | tpope/vim-repeat |
+| `multicursor` | mg979/vim-visual-multi |
+| `outline` | preservim/tagbar |
+| `diffview` | sindrets/diffview.nvim |
+| `register` | junegunn/vim-peekaboo |
+| `completion` | ajh17/VimCompletesMe |
+| `session` | tpope/vim-obsession |
 
 ---
 
@@ -723,89 +729,84 @@ let g:wplus_colorscheme_auto_detect = 1
 
 ---
 
-### multicursor — 다중 커서
+### multicursor — 멀티커서
 
-단어 하이라이트 위에 다중 커서를 추가하여 동시에 편집합니다.
+여러 개의 텍스트 일치 항목을 한 번에 선택하여 동시에 치환하거나 삭제합니다.
 
-#### 단축키
-
-| 키 | 기능 |
-|----|------|
-| `<C-n>` | 커서 아래 단어의 다음 등장 위치에 커서 추가 |
-| `<C-x>` | 현재 위치를 건너뛰고 다음으로 이동 |
-| `<C-a>` | 버퍼 내 모든 등장 위치에 커서 추가 |
-| `c` | 선택된 모든 위치에서 단어 변경 |
-| `d` | 선택된 모든 위치에서 단어 삭제 |
-| `<Esc>` | 다중 커서 모드 종료 |
-
----
-
-### register — 레지스터 미리보기
-
-`"` 또는 `@` 를 누르면 팝업으로 레지스터 내용을 미리 보여줍니다 (vim-peekaboo 대체).
-
-#### 단축키
-
-| 키 | 기능 |
-|----|------|
-| `"` | 레지스터 팝업 열기 (붙여넣기/연산자용) |
-| `@` | 레지스터 팝업 열기 (매크로 실행용) |
-
----
-
-### diffview — Git Diff 뷰어
-
-현재 파일 또는 전체 저장소의 `git diff HEAD` 결과를 우측 분할 창에 표시합니다.
-
-#### 단축키
-
-| 키 | 기능 |
-|----|------|
-| `<leader>gd` | 현재 파일의 diff 열기 |
-| `<leader>gD` | 전체 저장소 diff 열기 |
-| `]h` | 다음 hunk로 이동 |
-| `[h` | 이전 hunk로 이동 |
-| `q` | diff 창 닫기 |
+| 키 | 모드 | 동작 |
+|----|------|------|
+| `<C-n>` | Normal | 커서 아래 단어의 다음 일치 항목을 다중 선택에 추가 |
+| `<C-x>` | Normal | 현재 다중 선택 항목 중 가장 최근 것을 취소하고 다음 항목 선택 |
+| `<C-a>` | Normal | 현재 버퍼 내 모든 동일 단어 한 번에 다중 선택 |
+| `c` | Normal | 선택된 모든 항목 치환 (입력 프롬프트 팝업) |
+| `d` | Normal | 선택된 모든 항목 삭제 |
+| `<Esc>` | Normal | 멀티커서 모드 종료 및 다중 선택 해제 |
 
 ---
 
 ### outline — 코드 아웃라인
 
-ctags를 이용해 현재 파일의 함수·클래스·심볼 목록을 좌측 사이드바에 표시합니다.
+ctags를 사용하여 현재 파일 내의 클래스, 함수, 구조체, 메서드 등의 정의 목록을 사이드바에 표시합니다. (ctags 설치 필요)
 
-**요구사항**: `universal-ctags` 또는 `exuberant-ctags`
-
-#### 단축키
-
-| 키 | 기능 |
-|----|------|
-| `<leader>o` | 아웃라인 사이드바 토글 |
-| `<CR>` (사이드바 내) | 심볼 위치로 점프 |
-| `R` (사이드바 내) | 새로고침 |
-| `q` (사이드바 내) | 사이드바 닫기 |
-
-#### 커맨드
-
-```vim
-:WoutlineToggle
-```
+| 키 / 명령 | 모드 | 동작 |
+|-----------|------|------|
+| `<leader>o` / `:WoutlineToggle` | Normal | 아웃라인 사이드바 토글 |
+| `<CR>` | Normal (사이드바) | 현재 선택된 심볼 정의 위치로 이동 |
+| `R` | Normal (사이드바) | 아웃라인 수동 새로고침 |
+| `q` | Normal (사이드바) | 아웃라인 창 닫기 |
 
 ---
 
-### completion — 버퍼 단어 완성
+### diffview — Git diff 뷰어
 
-열려있는 모든 버퍼의 단어와 파일 경로를 `<C-Space>` 로 완성합니다. LSP 완성 팝업이 이미 열려있으면 `<C-n>`으로 동작합니다.
+현재 파일 또는 리포지토리 전체의 Git 변경사항을 시각적으로 확인하고, hunk 단위로 빠르게 이동합니다.
 
-#### 단축키
+| 키 / 명령 | 모드 | 동작 |
+|-----------|------|------|
+| `<leader>gd` | Normal | 현재 파일의 Git Diff 열기 (head 기준) |
+| `<leader>gD` | Normal | 리포지토리 전체의 Git Diff 열기 |
+| `]h` | Normal | 다음 변경점(hunk)으로 이동 (gitgutter 연동) |
+| `[h` | Normal | 이전 변경점(hunk)으로 이동 |
+| `q` | Normal (Diff 창) | Diff 뷰어 창 닫기 |
 
-| 키 | 기능 |
-|----|------|
-| `<C-Space>` (입력 모드) | 버퍼 단어 / 경로 완성 트리거 |
+---
 
-#### 설정
+### register — 레지스터 팝업
 
+Vim 레지스터의 내용을 사용하기 전에 팝업 윈도우로 실시간 미리보기합니다.
+
+| 키 | 모드 | 동작 |
+|----|------|------|
+| `"` | Normal | 레지스터 선택용 팝업 표시 (이후 레지스터 키 입력 시 붙여넣기/복사 등 원래 동작 수행) |
+| `@` | Normal | 매크로 실행용 레지스터 팝업 표시 |
+
+---
+
+### completion — 경량 자동완성
+
+별도의 복잡한 플러그인 없이 파일 경로, 현재 열린 버퍼의 단어 목록, 그리고 LSP(활성화 시) 완성 목록을 팝업으로 제공합니다.
+
+| 키 | 모드 | 동작 |
+|----|------|------|
+| `<C-Space>` | Insert | 자동완성 팝업 트리거 (LSP가 준비된 경우 LSP 완성 목록 표시, 미준비 시 버퍼 단어/경로 컴플리션) |
+
+---
+
+### session — 세션 관리
+
+프로젝트 루트 디렉토리 단위로 편집 세션을 저장하고 Vim 시작 시 자동으로 복원합니다.
+
+| 명령 | 동작 |
+|------|------|
+| `:WsessionSave` | 현재 세션 수동 저장 |
+| `:WsessionLoad` | 현재 세션 수동 로드 |
+| `:WsessionDelete` | 현재 프로젝트의 세션 파일 삭제 |
+
+**설정**:
 ```vim
-let g:wplus_completion_max_items = 200  " 완성 목록 최대 항목 수
+let g:wplus_session_autoload = 1             " 시작 시 세션 자동 복원
+let g:wplus_session_autosave = 1             " 종료 시 세션 자동 저장
+let g:wplus_session_max_files = 50           " 저장할 최대 세션 개수
 ```
 
 ---
@@ -836,7 +837,7 @@ let g:wplus_yankhighlight_enabled = 0
 **전체 토글 변수 목록**:
 
 ```vim
-" 기본 편집 (7)
+" 기본 편집 (9)
 g:wplus_commentary_enabled   " 주석 토글
 g:wplus_surround_enabled     " 괄호 조작
 g:wplus_pairs_enabled        " 자동 괄호
@@ -844,27 +845,32 @@ g:wplus_textobj_enabled      " 텍스트 오브젝트
 g:wplus_format_enabled       " 스마트 포매터
 g:wplus_repeat_enabled       " . 반복 지원
 g:wplus_altfile_enabled      " 헤더↔소스 전환
+g:wplus_multicursor_enabled  " 멀티커서
+g:wplus_register_enabled     " 레지스터 팝업
 
-" VCS/Git (5)
+" VCS/Git (6)
 g:wplus_gitgutter_enabled    " Sign diff
 g:wplus_blame_enabled        " Git blame
 g:wplus_terminal_enabled     " 터미널 토글
 g:wplus_explorer_enabled     " 사이드바 탐색기
 g:wplus_session_enabled      " 세션 관리
+g:wplus_diffview_enabled     " Git diff 뷰어
 
-" UI (5)
+" UI (6)
 g:wplus_statusline_enabled   " 상태바
 g:wplus_tabline_enabled      " 탭라인
 g:wplus_indent_enabled       " 들여쓰기 가이드
 g:wplus_undotree_enabled     " Undo 사이드바
 g:wplus_quickfix_enabled     " Quickfix 강화
+g:wplus_outline_enabled      " 코드 아웃라인
 
-" 검색/네비게이션 (5)
+" 검색/네비게이션 (6)
 g:wplus_finder_enabled       " 고속 퍼지 파인더
 g:wplus_grep_enabled         " 고속 검색
 g:wplus_whichkey_enabled     " 키 힌트 팝업
 g:wplus_bufdelete_enabled    " 버퍼 삭제
 g:wplus_root_enabled         " 루트 자동 인식
+g:wplus_completion_enabled   " 경량 자동완성
 
 " 하이라이팅/시각화 (3)
 g:wplus_illuminate_enabled   " 심볼 하이라이트
