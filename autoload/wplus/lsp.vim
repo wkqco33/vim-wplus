@@ -760,3 +760,7 @@ function! s:cleanup_all() abort
     endfor
     let s:servers = {}
 endfunction
+
+function! wplus#lsp#is_ready(ft) abort
+    return has_key(s:servers, a:ft) && job_status(s:servers[a:ft].job) ==# 'run'
+endfunction

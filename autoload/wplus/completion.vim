@@ -61,6 +61,12 @@ function! wplus#completion#trigger() abort
     " If popup menu already visible (LSP/etc), cycle through it
     if pumvisible() | return "\<C-n>" | endif
 
+    let l:ft = &filetype
+    if get(g:, 'wplus_lsp_enabled', 1) && exists('*wplus#lsp#is_ready') && wplus#lsp#is_ready(l:ft)
+        call wplus#lsp#request('textDocument/completion')
+        return ''
+    endif
+
     let l:prefix = s:get_prefix()
     if empty(l:prefix) | return '' | endif
 
