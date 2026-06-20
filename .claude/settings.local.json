@@ -10,7 +10,11 @@
       "Bash(grep -v \"^ai$\")",
       "Bash(awk '/^function!/{f=$0; ln=NR; next} /^endfunction/{print ln\"-\"NR\": \"f; print NR-ln\" lines\"}' ai.vim)",
       "Bash(sort -t: -k2 -nr)",
-      "Bash(findstr /s \"root_cache\" autoload\\\\wplus\\\\lsp.vim autoload\\\\wplus\\\\gitgutter.vim autoload\\\\wplus\\\\blame.vim autoload\\\\wplus\\\\statusline.vim)"
+      "Bash(findstr /s \"root_cache\" autoload\\\\wplus\\\\lsp.vim autoload\\\\wplus\\\\gitgutter.vim autoload\\\\wplus\\\\blame.vim autoload\\\\wplus\\\\statusline.vim)",
+      "Bash(curl -s http://localhost:11434/api/tags)",
+      "Bash(curl -s http://localhost:11434/api/version)",
+      "Bash(curl -s -X POST http://localhost:11434/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"kimi-k2.7-code:cloud\",\"temperature\":0.5,\"reasoning_effort\":\"none\",\"max_tokens\":500,\"messages\":[{\"role\":\"user\",\"content\":\"Complete this code:\\\\n\\\\nPrefix:\\\\ndef add\\(a, b\\):\\\\n return\\\\n\\\\nSuffix:\\\\n\"}]}')",
+      "Bash(vim -es -u NONE -N -c 'source autoload/wplus/ai.vim' -c 'echo \"OK: sourced\"' -c 'qa!')"
     ]
   }
 }

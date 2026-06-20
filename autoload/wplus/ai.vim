@@ -16,12 +16,16 @@ let g:wplus_ai_azure_api_version = get(g:, 'wplus_ai_azure_api_version', '2024-0
 
 " Ollama-specific settings
 let g:wplus_ai_ollama_host = get(g:, 'wplus_ai_ollama_host', 'http://localhost:11434')
+" Thinking 모델(reasoning)을 사용할지 여부. 기본 0(끔): 추론 모델이 content를
+" 비우고 reasoning으로 응답을 보내거나 max_tokens를 추론에 소진하는 문제를 방지한다.
+let g:wplus_ai_ollama_think = get(g:, 'wplus_ai_ollama_think', 0)
 
 " Ghost Text auto-suggestion settings
 let g:wplus_ai_suggest_enabled = get(g:, 'wplus_ai_suggest_enabled', 1)
 let g:wplus_ai_suggest_delay = get(g:, 'wplus_ai_suggest_delay', 500)
 let g:wplus_ai_suggest_context_lines = get(g:, 'wplus_ai_suggest_context_lines', 50)
 let g:wplus_ai_suggest_suffix_lines = get(g:, 'wplus_ai_suggest_suffix_lines', 20)
+let g:wplus_ai_suggest_max_tokens = get(g:, 'wplus_ai_suggest_max_tokens', 500)
 let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
 
 let s:command_requests = {} " request_id -> {job, bufnr, lnum, response_buffer}
@@ -153,6 +157,15 @@ function! s:extract_error_message(json) abort
     return ''
 endfunction
 
+" Ollama 전용 payload 옵션을 추가한다. thinking 모델일 때 추론을 꺼서
+" content가 비거나 max_tokens가 추론에 소진되는 문제를 방지한다.
+function! s:apply_ollama_options(payload) abort
+    if g:wplus_ai_provider ==# 'ollama' && !g:wplus_ai_ollama_think
+        let a:payload.reasoning_effort = 'none'
+    endif
+    return a:payload
+endfunction
+
 function! s:uses_max_completion_tokens() abort
     if g:wplus_ai_provider ==# 'claude'
         return v:false
@@ -203,6 +216,7 @@ function! s:build_request_payload(prompt) abort
     else
         let l:payload.max_tokens = g:wplus_ai_max_tokens
     endif
+    call s:apply_ollama_options(l:payload)
     return json_encode(l:payload)
 endfunction
 
@@ -577,10 +591,11 @@ function! s:build_suggest_payload(prefix, suffix) abort
         \ ]
         \ }
     if s:uses_max_completion_tokens()
-        let l:payload.max_completion_tokens = 500
+        let l:payload.max_completion_tokens = g:wplus_ai_suggest_max_tokens
     else
-        let l:payload.max_tokens = 500
+        let l:payload.max_tokens = g:wplus_ai_suggest_max_tokens
     endif
+    call s:apply_ollama_options(l:payload)
     return json_encode(l:payload)
 endfunction
 
