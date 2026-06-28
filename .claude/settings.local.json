@@ -14,7 +14,10 @@
       "Bash(curl -s http://localhost:11434/api/tags)",
       "Bash(curl -s http://localhost:11434/api/version)",
       "Bash(curl -s -X POST http://localhost:11434/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\":\"kimi-k2.7-code:cloud\",\"temperature\":0.5,\"reasoning_effort\":\"none\",\"max_tokens\":500,\"messages\":[{\"role\":\"user\",\"content\":\"Complete this code:\\\\n\\\\nPrefix:\\\\ndef add\\(a, b\\):\\\\n return\\\\n\\\\nSuffix:\\\\n\"}]}')",
-      "Bash(vim -es -u NONE -N -c 'source autoload/wplus/ai.vim' -c 'echo \"OK: sourced\"' -c 'qa!')"
+      "Bash(vim -es -u NONE -N -c 'source autoload/wplus/ai.vim' -c 'echo \"OK: sourced\"' -c 'qa!')",
+      "Bash(vim -u NONE -N -es -c 'source autoload/wplus/ai.vim' -c 'call writefile\\([\"ok think=\".string\\(g:wplus_ai_ollama_think\\)], \"/tmp/vc.txt\"\\)' -c 'qa!')",
+      "Read(//tmp/**)",
+      "Bash(git stash *)"
     ]
   }
 }
