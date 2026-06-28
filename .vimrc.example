@@ -169,6 +169,15 @@ let g:wplus_ai_max_tokens = 2000
 " 모델을 메모리에 유지하는 시간. 큰 모델은 재로딩이 느리므로 길게 둔다.
 " '-1'=무한 유지, '0'=즉시 해제, '30m'=30분(기본)
 " let g:wplus_ai_ollama_keep_alive = '30m'
+"
+" ── 자동완성 품질 강화 ──
+" 1) 코드 전용 모델 권장(가장 큰 차이): qwen2.5-coder 는 FIM 을 지원해
+"    prefix/suffix 사이를 정확히 채운다. `ollama pull qwen2.5-coder:7b`
+" let g:wplus_ai_model = 'qwen2.5-coder:7b'
+" let g:wplus_ai_ollama_fim = 1             " FIM 사용(미지원 모델은 자동 폴백)
+" 2) 샘플링 튜닝: 코드 완성은 낮은 온도가 더 정확하다(기본 0.2)
+" let g:wplus_ai_suggest_temperature = 0.2
+" let g:wplus_ai_ollama_options = {'repeat_penalty': 1.1, 'top_p': 0.9}
 
 " Ghost Text 자동완성 설정
 " InsertMode에서 자동으로 AI 제안을 Ghost Text로 표시
