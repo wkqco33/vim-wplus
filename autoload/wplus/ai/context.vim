@@ -3,6 +3,39 @@
 if exists('g:autoloaded_wplus_ai_context') | finish | endif
 let g:autoloaded_wplus_ai_context = 1
 
+" ── Context cache ─────────────────────────────────────────────────────────────
+" symbols/scope extraction scans ~200 lines per call. Cache by buffer with a
+" short TTL so rapid TextChangedI timer callbacks reuse the same snapshot.
+let s:cache = {}  " bufnr -> {'symbols': [...], 'scope': str, 'ft': str, 'ts': localtime()}
+let s:cache_ttl = 5  " seconds
+
+" Invalidate cache for a buffer (or all when bufnr <= 0).
+function! wplus#ai#context#invalidate(...) abort
+    if a:0 >= 1 && a:1 > 0
+        if has_key(s:cache, a:1)
+            call remove(s:cache, a:1)
+        endif
+        return
+    endif
+    let s:cache = {}
+endfunction
+
+function! s:cache_fresh(bufnr, ft) abort
+    if !has_key(s:cache, a:bufnr) | return 0 | endif
+    let l:entry = s:cache[a:bufnr]
+    if l:entry.ft !=# a:ft | return 0 | endif
+    return (localtime() - l:entry.ts) < s:cache_ttl
+endfunction
+
+function! s:cache_store(bufnr, ft, symbols, scope) abort
+    let s:cache[a:bufnr] = {
+        \ 'symbols': a:symbols,
+        \ 'scope': a:scope,
+        \ 'ft': a:ft,
+        \ 'ts': localtime(),
+        \ }
+endfunction
+
 " ── Helper patterns for language-specific symbol extraction ──────────────────
 
 function! s:match_any(text, patterns) abort
@@ -19,6 +52,11 @@ endfunction
 
 " Extract symbols from current buffer context
 function! wplus#ai#context#extract_symbols() abort
+    let l:buf = bufnr('%')
+    let l:ft = &filetype
+    if s:cache_fresh(l:buf, l:ft)
+        return s:cache[l:buf].symbols
+    endif
     let l:symbols = []
     let l:lines = getline(max([1, line('.') - 100]), min([line('$'), line('.') + 100]))
     let l:ft = &filetype
@@ -31,7 +69,13 @@ function! wplus#ai#context#extract_symbols() abort
         elseif l:ft == 'python'
             let l:name = matchstr(l:line, '\v^\s*%(def|class)\s+\zs\w+')
         elseif l:ft =~# '\v^(c|cpp)$'
-            let l:name = matchstr(l:line, '\v^\s*\w+(\s+\w+)*\s+\zs\w+\ze\s*\(')
+            " C/C++: 함수/클래스 정의만 잡는다. 제어문(if/for/switch/while/return)과
+            " 일반 호출을 배제하기 위해 라인 시작 키워드 목록으로 거른다.
+            let l:name = s:match_any(l:line, [
+                \ '\v^\s*%(class|struct|enum\s+class|enum)\s+\zs\w+',
+                \ '\v^\s*%(namespace)\s+\zs\w+',
+                \ '\v^\s*%(\w+%(::\w+)*\s+)+\zs\w+\ze\s*\%(\n|\([^)]*\)\s*\%(\{\|;\|const\|noexcept\|\)\s*$)',
+                \ ])
         elseif l:ft =~# '\v^(typescript|javascript)$'
             let l:name = s:match_any(l:line, [
                 \ '\v^\s*%(export\s+)?%(async\s+)?function\s+\zs\w+',
@@ -62,10 +106,19 @@ function! wplus#ai#context#extract_symbols() abort
     endfor
     
     " Filter out keywords and duplicates, preserve order
-    let l:keywords = {'if': 1, 'for': 1, 'switch': 1, 'func': 1, 'def': 1,
+    let l:keywords = {'if': 1, 'for': 1, 'switch': 1, 'while': 1, 'do': 1,
+          \ 'else': 1, 'return': 1, 'case': 1, 'goto': 1, 'break': 1,
+          \ 'continue': 1, 'throw': 1, 'sizeof': 1, 'typeof': 1, 'alignof': 1,
+          \ 'static_cast': 1, 'dynamic_cast': 1, 'reinterpret_cast': 1,
+          \ 'const_cast': 1, 'new': 1, 'delete': 1,
+          \ 'func': 1, 'def': 1,
           \ 'class': 1, 'fn': 1, 'const': 1, 'let': 1, 'var': 1,
           \ 'function': 1, 'struct': 1, 'impl': 1, 'trait': 1, 'enum': 1,
-          \ 'module': 1, 'pub': 1, 'fun': 1, 'object': 1, 'interface': 1}
+          \ 'module': 1, 'pub': 1, 'fun': 1, 'object': 1, 'interface': 1,
+          \ 'namespace': 1, 'typename': 1, 'template': 1, 'using': 1,
+          \ 'operator': 1, 'virtual': 1, 'override': 1, 'final': 1,
+          \ 'explicit': 1, 'inline': 1, 'constexpr': 1, 'static': 1,
+          \ 'extern': 1, 'friend': 1, 'typedef': 1, 'auto': 1}
     let l:seen = {}
     let l:ordered = []
     for l:symbol in l:symbols
@@ -75,12 +128,29 @@ function! wplus#ai#context#extract_symbols() abort
         let l:seen[l:symbol] = 1
         call add(l:ordered, l:symbol)
     endfor
-    
+
+    " Pre-compute scope too so get_scope() can hit the same cache entry.
+    let l:scope = s:compute_scope()
+    call s:cache_store(l:buf, l:ft, l:ordered, l:scope)
     return l:ordered
 endfunction
 
 " Get current scope (function/class/etc.)
 function! wplus#ai#context#get_scope() abort
+    let l:buf = bufnr('%')
+    let l:ft = &filetype
+    if s:cache_fresh(l:buf, l:ft) && has_key(s:cache[l:buf], 'scope')
+        return s:cache[l:buf].scope
+    endif
+    let l:scope = s:compute_scope()
+    " Merge into cache (preserve symbols if already cached, else leave empty).
+    let l:symbols = has_key(s:cache, l:buf) ? s:cache[l:buf].symbols : []
+    call s:cache_store(l:buf, l:ft, l:symbols, l:scope)
+    return l:scope
+endfunction
+
+" Internal scope computation (originally inline in get_scope).
+function! s:compute_scope() abort
     let l:ft = &filetype
     let l:line_nr = line('.')
     let l:scan_start = max([1, l:line_nr - 200])
@@ -151,7 +221,10 @@ function! wplus#ai#context#get_scope() abort
                 break
             endif
         elseif l:ft =~# '\v^(c|cpp)$'
-            let l:name = matchstr(l:line_text, '\v^\s*\w+(\s+\w+)*\s+\zs\w+\ze\s*\(')
+            let l:name = s:match_any(l:line_text, [
+                \ '\v^\s*%(class|struct|enum\s+class|enum|namespace)\s+\zs\w+',
+                \ '\v^\s*%(\w+%(::\w+)*\s+)+\zs\w+\ze\s*\([^)]*\)\s*\%(\{\|;\|const\|noexcept\|\)\s*$',
+                \ ])
             if !empty(l:name)
                 let l:scope = l:name
                 break
@@ -191,6 +264,8 @@ function! wplus#ai#context#get_prefix(line_nr, col, ...) abort
           \ 'kotlin':     '\v^%(fun|class|object|interface)\s',
           \ 'ruby':       '\v^%(def|class|module)\s',
           \ 'lua':        '\v^%(function|local\s+function)\s',
+          \ 'c':          '\v^\s*%(class|struct|enum|namespace)\s|\v^\s*%(\w+%(::\w+)*\s+)+\w+\s*\(',
+          \ 'cpp':        '\v^\s*%(class|struct|enum\s+class|enum|namespace)\s|\v^\s*%(\w+%(::\w+)*\s+)+\w+\s*\(',
           \ }
     let l:pattern = get(l:boundary_patterns, l:ft, '')
     

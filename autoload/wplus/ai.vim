@@ -41,9 +41,20 @@ let g:wplus_ai_suggest_suffix_lines = get(g:, 'wplus_ai_suggest_suffix_lines', 2
 let g:wplus_ai_suggest_max_tokens = get(g:, 'wplus_ai_suggest_max_tokens', 500)
 let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
 
+" Network timeouts (seconds). Commands wait longer; suggestions abort faster.
+let g:wplus_ai_timeout = get(g:, 'wplus_ai_timeout', 30)
+let g:wplus_ai_suggest_timeout = get(g:, 'wplus_ai_suggest_timeout', 10)
+
+" Streaming responses: render suggestions incrementally as tokens arrive.
+" Disable for providers/proxies that buffer SSE.
+let g:wplus_ai_stream = get(g:, 'wplus_ai_stream', 1)
+" Minimum accumulated chars before first incremental ghost-text render.
+let g:wplus_ai_stream_min_chars = get(g:, 'wplus_ai_stream_min_chars', 20)
+
 let s:command_requests = {} " request_id -> {job, bufnr, lnum, response_buffer}
 let s:command_channels = {} " channel_key -> request_id
-let s:suggest_request = {} " {job, channel_key, bufnr, lnum, line, col, response_buffer}
+let s:suggest_request = {} " {request_id, job, channel_key, bufnr, lnum, line, col, fim, response_buffer}
+let s:suggest_request_id = 0  " monotonic id to defeat channel reuse races
 
 " Ghost Text state
 let s:suggest_content = '' " current suggestion content
@@ -107,8 +118,18 @@ function! s:channel_key(channel) abort
     endtry
 endfunction
 
-function! s:build_curl_command(payload, endpoint, headers) abort
-    let l:cmd = ['curl', '-s', '-X', 'POST', '-d', a:payload, a:endpoint]
+function! s:build_curl_command(payload, endpoint, headers, ...) abort
+    let l:timeout = a:0 >= 1 ? a:1 : g:wplus_ai_timeout
+    let l:stream = a:0 >= 2 ? a:2 : 0
+    " -N: disable output buffering so streaming chunks reach out_cb promptly.
+    "     Without it curl block-buffers piped output and out_cb sees nothing
+    "     until close_cb, breaking incremental ghost-text rendering.
+    let l:cmd = ['curl', '-s', '-S', '--max-time', string(l:timeout),
+                \ '-X', 'POST', '-d', a:payload]
+    if l:stream
+        call insert(l:cmd, '-N', 1)
+    endif
+    call add(l:cmd, a:endpoint)
     for l:header in a:headers
         call insert(l:cmd, l:header, 2)
         call insert(l:cmd, '-H', 2)
@@ -190,11 +211,12 @@ endfunction
 
 " native /api/chat 페이로드. stream:false 로 단일 JSON 응답을 받고,
 " think 로 추론을 토글, keep_alive 로 모델을 메모리에 유지해 재로딩 지연을 막는다.
-function! s:build_ollama_payload(messages, max_tokens, temperature) abort
+function! s:build_ollama_payload(messages, max_tokens, temperature, ...) abort
+    let l:stream = a:0 >= 1 ? a:1 : 0
     return json_encode({
         \ 'model': g:wplus_ai_model,
         \ 'think': g:wplus_ai_ollama_think ? v:true : v:false,
-        \ 'stream': v:false,
+        \ 'stream': l:stream ? v:true : v:false,
         \ 'keep_alive': g:wplus_ai_ollama_keep_alive,
         \ 'messages': a:messages,
         \ 'options': s:ollama_options(a:max_tokens, a:temperature),
@@ -202,11 +224,12 @@ function! s:build_ollama_payload(messages, max_tokens, temperature) abort
 endfunction
 
 " FIM(/api/generate) 페이로드. prefix=prompt, suffix=suffix 로 중간을 채운다.
-function! s:build_ollama_fim_payload(prefix, suffix, max_tokens, temperature) abort
+function! s:build_ollama_fim_payload(prefix, suffix, max_tokens, temperature, ...) abort
+    let l:stream = a:0 >= 1 ? a:1 : 0
     return json_encode({
         \ 'model': g:wplus_ai_model,
         \ 'think': g:wplus_ai_ollama_think ? v:true : v:false,
-        \ 'stream': v:false,
+        \ 'stream': l:stream ? v:true : v:false,
         \ 'keep_alive': g:wplus_ai_ollama_keep_alive,
         \ 'prompt': a:prefix,
         \ 'suffix': a:suffix,
@@ -396,7 +419,7 @@ function! s:send_request(bufnr, lnum, prompt) abort
     
     let l:payload = s:build_request_payload(a:prompt)
     let l:request_id = reltimestr(reltime())
-    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers)
+    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers, g:wplus_ai_timeout)
     
     let l:job = job_start(l:cmd, {
         \ 'out_cb': function('s:on_response'),
@@ -427,6 +450,8 @@ function! wplus#ai#setup() abort
         autocmd!
         autocmd VimLeavePre * for req in values(s:command_requests) | silent! call job_stop(req.job) | endfor
         autocmd VimLeavePre * if !empty(s:suggest_request) | silent! call job_stop(s:suggest_request.job) | endif
+        " Invalidate context cache on buffer changes so symbols/scope stay fresh.
+        autocmd BufEnter,FileType,BufWritePost * call wplus#ai#context#invalidate(bufnr('%'))
     augroup END
     
     " Warn if not configured, but still register commands
@@ -447,17 +472,30 @@ function! wplus#ai#setup() abort
     command! -nargs=? WaiComplete call wplus#ai#complete(<q-args> != '' ? <q-args> : 5)
     command! -range WaiRefactor  call wplus#ai#refactor()
     command! WaiToggleSuggest    call wplus#ai#toggle_suggest()
-    command! WaiAcceptSuggest    call wplus#ai#accept_suggestion()
-    
+    command! WaiAcceptSuggest    call wplus#ai#accept_suggestion_insert()
+    command! WaiDismissSuggest   call wplus#ai#dismiss_suggestion()
+    command! WaiAcceptWord       call wplus#ai#accept_suggestion_insert_word()
+
     " Mappings
     nnoremap <silent> <Plug>WaiComment   :WaiComment<CR>
     nnoremap <silent> <Plug>WaiComplete  :WaiComplete<CR>
     xnoremap <silent> <Plug>WaiRefactor  :WaiRefactor<CR>
     nnoremap <silent> <Plug>WaiToggleSuggest :WaiToggleSuggest<CR>
+    inoremap <silent> <Plug>WaiDismissSuggest <C-r>=wplus#ai#dismiss_suggestion()<CR>
+    inoremap <silent> <expr> <Plug>WaiAcceptWord wplus#ai#accept_word_suggestion()
     
-    " Ghost Text auto-suggest
-    if has('textprop')
-        silent! call prop_type_add('WplusAISuggest', {'highlight': 'Comment'})
+    " Ghost Text auto-suggest: register property type if missing.
+    " show_suggestion() also self-heals this, but registering here avoids the
+    " first-render E971 entirely.
+    if has('textprop') && empty(prop_type_get('WplusAISuggest'))
+        if !hlexists('WplusAISuggest')
+            if hlexists('Comment')
+                highlight default link WplusAISuggest Comment
+            else
+                highlight default WplusAISuggest ctermfg=244 guifg=#7c6f64
+            endif
+        endif
+        call prop_type_add('WplusAISuggest', {'highlight': 'WplusAISuggest'})
     endif
 
     if g:wplus_ai_suggest_enabled
@@ -475,7 +513,26 @@ endfunction
 " Show Ghost Text suggestion with textprop
 function! s:show_suggestion() abort
     let l:bufnr = s:suggest_bufnr
-    call prop_remove({'type': 'WplusAISuggest', 'all': 1, 'bufnr': l:bufnr})
+
+    " Ensure the text property type exists. It is normally registered in
+    " plugin/wplus.vim and re-registered in setup(), but some load orders
+    " (e.g. plugin sourced before highlight groups, or :source of autoload
+    " alone in tests) can leave it missing. prop_add/prop_remove would then
+    " throw E971 and silently swallow the suggestion.
+    if empty(prop_type_get('WplusAISuggest'))
+        if !hlexists('WplusAISuggest')
+            if hlexists('Comment')
+                highlight default link WplusAISuggest Comment
+            else
+                highlight default WplusAISuggest ctermfg=244 guifg=#7c6f64
+            endif
+        endif
+        call prop_type_add('WplusAISuggest', {'highlight': 'WplusAISuggest'})
+    endif
+
+    if bufloaded(l:bufnr)
+        silent! call prop_remove({'type': 'WplusAISuggest', 'all': 1, 'bufnr': l:bufnr})
+    endif
 
     if empty(s:suggest_content) | return | endif
     if !bufloaded(l:bufnr) | return | endif
@@ -534,7 +591,8 @@ function! s:dismiss_suggestion() abort
     endif
 endfunction
 
-" Accept current suggestion
+" Accept current suggestion. Returns a string suitable for <expr> mappings.
+" Multi-line suggestions are joined with \<CR>" so Vim inserts every line.
 function! wplus#ai#accept_suggestion() abort
     if empty(s:suggest_content)
         " No suggestion, insert normal tab
@@ -543,12 +601,73 @@ function! wplus#ai#accept_suggestion() abort
 
     let l:content = s:suggest_content
     call s:dismiss_suggestion()
-    call wplus#util#info_msg('ai', 'suggestion accepted')
-    return l:content
+    call s:suggest_debug('suggestion accepted')
+    " Convert raw newlines into key-notation CR so feed via <expr> works
+    return substitute(l:content, '\n', "\<CR>", 'g')
+endfunction
+
+" Command variant: insert the suggestion at cursor without returning a string.
+function! wplus#ai#accept_suggestion_insert() abort
+    if empty(s:suggest_content)
+        return
+    endif
+    let l:content = s:suggest_content
+    call s:dismiss_suggestion()
+    let l:lines = split(l:content, "\n", 1)
+    if mode() =~# 'i'
+        call feedkeys(join(l:lines, "\<CR>"), 'n')
+    else
+        " Best-effort in normal mode: append after cursor line
+        call append(line('.'), l:lines)
+    endif
+    call s:suggest_debug('suggestion accepted (insert)')
 endfunction
 
 function! wplus#ai#has_suggestion() abort
     return !empty(s:suggest_content)
+endfunction
+
+" Public dismiss for <Plug>WaiDismissSuggest mapping.
+function! wplus#ai#dismiss_suggestion() abort
+    call s:dismiss_suggestion()
+endfunction
+
+" Accept only the next word of the suggestion and keep the rest visible.
+" Returns a string suitable for <expr> mappings. If no suggestion, falls back
+" to a literal space so the cursor still advances when bound to a key.
+function! wplus#ai#accept_word_suggestion() abort
+    if empty(s:suggest_content)
+        return "\<Space>"
+    endif
+    let l:content = s:suggest_content
+    " First whitespace-separated token + the trailing whitespace (if any).
+    let l:match = matchlist(l:content, '^\(\s*\S\+\)\(\s\?\)\(.*\)$')
+    if empty(l:match)
+        call s:dismiss_suggestion()
+        return ''
+    endif
+    let l:word = l:match[1]
+    let l:rest = l:match[3]
+    if empty(l:rest)
+        call s:dismiss_suggestion()
+    else
+        " Update ghost text to the remaining suggestion.
+        let s:suggest_content = l:rest
+        call s:show_suggestion()
+    endif
+    call s:suggest_debug('accepted word: ' . l:word)
+    return substitute(l:word, '\n', "\<CR>", 'g')
+endfunction
+
+" Command variant of accept-word: inserts at cursor via feedkeys.
+function! wplus#ai#accept_suggestion_insert_word() abort
+    if empty(s:suggest_content)
+        return
+    endif
+    let l:word = wplus#ai#accept_word_suggestion()
+    if !empty(l:word) && mode() =~# 'i'
+        call feedkeys(l:word, 'n')
+    endif
 endfunction
 
 " Toggle suggestions on/off
@@ -645,7 +764,8 @@ function! s:suggest_context_hint() abort
 endfunction
 
 " Build suggestion prompt for all providers
-function! s:build_suggest_payload(prefix, suffix) abort
+function! s:build_suggest_payload(prefix, suffix, ...) abort
+    let l:stream = a:0 >= 1 ? a:1 : 0
     let l:system_msg = 'You are a code completion assistant. Complete the code based on context. Return only the completion without explanation or code blocks.'
     let l:prompt = s:suggest_context_hint() . "Complete this code:\n\nPrefix:\n" . a:prefix . "\n\nSuffix:\n" . a:suffix
 
@@ -653,7 +773,7 @@ function! s:build_suggest_payload(prefix, suffix) abort
         return s:build_ollama_payload([
             \   {'role': 'system', 'content': l:system_msg},
             \   {'role': 'user', 'content': l:prompt}
-            \ ], g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature)
+            \ ], g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature, l:stream)
     endif
 
     if g:wplus_ai_provider ==# 'claude'
@@ -662,13 +782,15 @@ function! s:build_suggest_payload(prefix, suffix) abort
             \ 'max_tokens': 500,
             \ 'system': l:system_msg,
             \ 'messages': [{'role': 'user', 'content': l:prompt}],
-            \ 'temperature': 0.5
+            \ 'temperature': 0.5,
+            \ 'stream': l:stream ? v:true : v:false,
             \ })
     endif
 
     let l:payload = {
         \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo',
         \ 'temperature': 0.5,
+        \ 'stream': l:stream ? v:true : v:false,
         \ 'messages': [
         \   {'role': 'system', 'content': l:system_msg},
         \   {'role': 'user', 'content': l:prompt}
@@ -682,37 +804,172 @@ function! s:build_suggest_payload(prefix, suffix) abort
     return json_encode(l:payload)
 endfunction
 
-" Response handler for suggestions
-function! s:on_suggest_response(channel, msg) abort
-    let l:key = s:channel_key(a:channel)
-    if !empty(s:suggest_request) && get(s:suggest_request, 'channel_key', '') ==# l:key
+" ── Streaming delta parsers ───────────────────────────────────────────────────
+" Extract text delta from one streamed chunk. Returns '' when no delta.
+"   - Ollama ndstream: {"message":{"content":"..."},...} or {"response":"..."} (FIM)
+"   - OpenAI/Azure SSE: data: {"choices":[{"delta":{"content":"..."}}]}
+"   - Claude SSE: data: {"type":"content_block_delta","delta":{"text":"..."}}
+function! s:parse_stream_delta(line, fim) abort
+    let l:raw = a:line
+    " SSE: strip leading "data:" + optional spaces; stop on [DONE].
+    " Lines without data: (event:, id:, comments, blanks) → empty.
+    if g:wplus_ai_provider !=# 'ollama'
+        if l:raw =~# '^data:'
+            let l:raw = substitute(l:raw, '^data:\s*', '', '')
+            if l:raw =~# '\[DONE\]'
+                return ''
+            endif
+        else
+            return ''
+        endif
+    endif
+    let l:raw = trim(l:raw)
+    if empty(l:raw) | return '' | endif
+    try
+        let l:json = json_decode(l:raw)
+    catch
+        return ''
+    endtry
+    if g:wplus_ai_provider ==# 'ollama'
+        if a:fim
+            return get(l:json, 'response', '')
+        endif
+        if has_key(l:json, 'message') && type(l:json.message) == v:t_dict
+            return get(l:json.message, 'content', '')
+        endif
+        return ''
+    endif
+    if g:wplus_ai_provider ==# 'claude'
+        if get(l:json, 'type', '') ==# 'content_block_delta'
+                    \ && has_key(l:json, 'delta')
+                    \ && get(l:json.delta, 'type', '') ==# 'text_delta'
+            return get(l:json.delta, 'text', '')
+        endif
+        return ''
+    endif
+    " OpenAI/Azure
+    if has_key(l:json, 'choices') && len(l:json.choices) > 0
+        let l:delta = get(l:json.choices[0], 'delta', {})
+        return get(l:delta, 'content', '')
+    endif
+    return ''
+endfunction
+
+" Render incremental ghost text from accumulated content.
+function! s:render_stream_increment(request) abort
+    let l:content = get(a:request, 'stream_content', '')
+    if empty(l:content) | return | endif
+    " Trim markdown fences on the fly for stable rendering
+    let l:clean = substitute(l:content, '```', '', 'g')
+    let l:clean = trim(l:clean)
+    if len(l:clean) < g:wplus_ai_stream_min_chars | return | endif
+    if line('.') != a:request.line || col('.') != a:request.col || bufnr('%') != a:request.bufnr
+        return
+    endif
+    let s:suggest_content = l:clean
+    let s:suggest_line = a:request.line
+    let s:suggest_col = a:request.col
+    let s:suggest_bufnr = a:request.bufnr
+    call s:show_suggestion()
+endfunction
+
+" Response handler for suggestions. request_id is bound via partial and thus
+" comes first in the argument list. Streaming: parse each chunk for deltas and
+" render incrementally. Non-streaming: buffer raw response for final decode.
+function! s:on_suggest_response(request_id, channel, msg) abort
+    if empty(s:suggest_request) || get(s:suggest_request, 'request_id', -1) != a:request_id
+        return
+    endif
+    if get(s:suggest_request, 'stream', 0)
+        " Vim job out_cb default out_mode is NL: it delivers one line per call
+        " with the trailing newline STRIPPED. So a:msg is usually a complete
+        " line already. Only when a line is very long or output is raw might a
+        " single msg contain multiple lines or a partial fragment.
+        " Strategy: append to buffer, split on \n; any complete line (i.e. the
+        " buffer has a \n, OR the buffer had no prior partial content and this
+        " msg has no \n) is parsed immediately.
+        let s:suggest_request.stream_buffer .= substitute(a:msg, "\r\n\=", "\n", 'g')
+        let l:has_nl = s:suggest_request.stream_buffer =~# "\n"
+        if l:has_nl
+            let l:parts = split(s:suggest_request.stream_buffer, "\n", 1)
+            " If buffer ends with \n, last element is empty → complete flush.
+            if s:suggest_request.stream_buffer =~# "\n$"
+                let s:suggest_request.stream_buffer = ''
+            else
+                let s:suggest_request.stream_buffer = remove(l:parts, -1)
+            endif
+        else
+            " No newline: a:msg is one complete line (NL mode strips \n).
+            " Parse it directly and reset buffer.
+            let l:parts = [s:suggest_request.stream_buffer]
+            let s:suggest_request.stream_buffer = ''
+        endif
+        for l:line in l:parts
+            if empty(l:line) | continue | endif
+            let l:delta = s:parse_stream_delta(l:line, get(s:suggest_request, 'fim', 0))
+            if !empty(l:delta)
+                let s:suggest_request.stream_content .= l:delta
+                call s:render_stream_increment(s:suggest_request)
+            endif
+        endfor
+    else
         let s:suggest_request.response_buffer .= a:msg
     endif
 endfunction
 
-" Complete response handler for suggestions
-function! s:on_suggest_response_complete(channel) abort
-    let l:key = s:channel_key(a:channel)
-    if empty(s:suggest_request) || get(s:suggest_request, 'channel_key', '') !=# l:key
+" Complete response handler for suggestions. request_id is bound via partial.
+function! s:on_suggest_response_complete(request_id, channel) abort
+    if empty(s:suggest_request) || get(s:suggest_request, 'request_id', -1) != a:request_id
         return
     endif
     let l:request = s:suggest_request
     let s:suggest_request = {}
-    
+
+    " ── Streaming path: finalize accumulated content ──
+    if get(l:request, 'stream', 0)
+        " Flush any remaining buffered partial line
+        if !empty(l:request.stream_buffer)
+            let l:delta = s:parse_stream_delta(l:request.stream_buffer, get(l:request, 'fim', 0))
+            if !empty(l:delta)
+                let l:request.stream_content .= l:delta
+            endif
+            let l:request.stream_buffer = ''
+        endif
+        let l:content = l:request.stream_content
+        if empty(l:content)
+            call s:suggest_debug('empty streaming suggestion response')
+            return
+        endif
+        let l:content = substitute(l:content, '```.*\n', '', 'g')
+        let l:content = substitute(l:content, '```', '', 'g')
+        let l:content = trim(l:content)
+        if line('.') == l:request.line && col('.') == l:request.col && bufnr('%') == l:request.bufnr
+            let s:suggest_content = l:content
+            let s:suggest_line = l:request.line
+            let s:suggest_col = l:request.col
+            let s:suggest_bufnr = l:request.bufnr
+            call s:show_suggestion()
+        else
+            call s:suggest_debug('dropped stale streaming suggestion')
+        endif
+        return
+    endif
+
+    " ── Non-streaming path ──
     let l:response = l:request.response_buffer
-    
+
     if empty(l:response)
         call s:suggest_debug('empty suggestion response')
         return
     endif
-    
+
     try
         let l:json = json_decode(l:response)
     catch
         call s:suggest_debug('failed to parse suggestion response')
         return
     endtry
-    
+
     " FIM(/api/generate)은 응답이 {"response": ...} 형식
     if get(l:request, 'fim', 0)
         let l:content = get(l:json, 'response', '')
@@ -721,10 +978,16 @@ function! s:on_suggest_response_complete(channel) abort
     endif
     if empty(l:content)
         let l:error_msg = s:extract_error_message(l:json)
-        " FIM 미지원 모델이면 chat 방식으로 자동 폴백
+        " FIM 미지원 모델이면 chat 방식으로 자동 폴백 후 재시도
         if l:error_msg =~? 'does not support insert'
             let g:wplus_ai_ollama_fim = 0
             call s:report_suggest_error('FIM 미지원 모델 → chat 방식으로 전환 (g:wplus_ai_ollama_fim=0)')
+            " 커서가 여전히 제안 위치에 있을 때만 즉시 재시도
+            if line('.') == l:request.line && col('.') == l:request.col && bufnr('%') == l:request.bufnr
+                let l:prefix = wplus#ai#context#get_prefix(l:request.line, l:request.col, g:wplus_ai_suggest_context_lines)
+                let l:suffix = wplus#ai#context#get_suffix(l:request.line, l:request.col, g:wplus_ai_suggest_suffix_lines)
+                call s:send_suggest_request(l:prefix, l:suffix, '')
+            endif
         elseif !empty(l:error_msg)
             call s:suggest_debug('api error: ' . l:error_msg)
             call s:report_suggest_error(l:error_msg)
@@ -733,12 +996,12 @@ function! s:on_suggest_response_complete(channel) abort
         endif
         return
     endif
-    
+
     " Clean up response (remove markdown code blocks if present)
     let l:content = substitute(l:content, '```.*\n', '', 'g')
     let l:content = substitute(l:content, '```', '', 'g')
     let l:content = trim(l:content)
-    
+
     " Only update if cursor is still at request position
     if line('.') == l:request.line && col('.') == l:request.col && bufnr('%') == l:request.bufnr
         let s:suggest_content = l:content
@@ -751,46 +1014,53 @@ function! s:on_suggest_response_complete(channel) abort
     endif
 endfunction
 
-" Send suggestion request to AI
+" Send suggestion request to AI. a:prompt is ignored when provider uses FIM
+" or builds its own prompt from prefix/suffix (ollama chat path falls back to
+" build_suggest_payload internally when fim is off).
 function! s:send_suggest_request(prefix, suffix, prompt) abort
     if (g:wplus_ai_provider !=# 'ollama' && empty(g:wplus_ai_api_key)) || empty(g:wplus_ai_model)
         call s:suggest_debug('missing API key or model')
         return
     endif
-    
+
     let l:is_fim = s:use_ollama_fim()
+    let l:stream = g:wplus_ai_stream ? 1 : 0
     if l:is_fim
         let l:endpoint = g:wplus_ai_ollama_host . '/api/generate'
         let l:payload = s:build_ollama_fim_payload(a:prefix, a:suffix,
-            \ g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature)
+            \ g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature, l:stream)
     else
         let l:endpoint = s:get_api_endpoint()
         if empty(l:endpoint)
             call s:suggest_debug('empty API endpoint')
             return
         endif
-        let l:payload = s:build_suggest_payload(a:prefix, a:suffix)
+        let l:payload = s:build_suggest_payload(a:prefix, a:suffix, l:stream)
     endif
     let l:headers = s:get_request_headers()
     if empty(l:headers) | return | endif
 
-    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers)
+    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers, g:wplus_ai_suggest_timeout, l:stream)
 
     if !empty(s:suggest_request)
         silent! call job_stop(s:suggest_request.job)
         let s:suggest_request = {}
     endif
-    
+
+    let s:suggest_request_id += 1
+    let l:rid = s:suggest_request_id
     let l:job = job_start(l:cmd, {
-        \ 'out_cb': function('s:on_suggest_response'),
-        \ 'close_cb': function('s:on_suggest_response_complete'),
+        \ 'out_cb': function('s:on_suggest_response', [l:rid]),
+        \ 'close_cb': function('s:on_suggest_response_complete', [l:rid]),
         \ })
     if type(l:job) != v:t_job
         call wplus#util#error_msg('ai', 'failed to start suggestion request')
+        let s:suggest_request = {}
         return
     endif
 
     let s:suggest_request = {
+        \ 'request_id': l:rid,
         \ 'job': l:job,
         \ 'channel_key': s:channel_key(job_getchannel(l:job)),
         \ 'bufnr': bufnr('%'),
@@ -798,7 +1068,10 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
         \ 'line': s:suggest_line,
         \ 'col': s:suggest_col,
         \ 'fim': l:is_fim,
+        \ 'stream': l:stream,
+        \ 'stream_content': '',
+        \ 'stream_buffer': '',
         \ 'response_buffer': ''
         \ }
-    call s:suggest_debug('sent suggestion request' . (l:is_fim ? ' (FIM)' : ''))
+    call s:suggest_debug('sent suggestion request' . (l:is_fim ? ' (FIM)' : '') . (l:stream ? ' (stream)' : ''))
 endfunction
