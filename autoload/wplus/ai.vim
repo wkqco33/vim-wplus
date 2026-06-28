@@ -19,6 +19,10 @@ let g:wplus_ai_ollama_host = get(g:, 'wplus_ai_ollama_host', 'http://localhost:1
 " Thinking 모델(reasoning)을 사용할지 여부. 기본 0(끔): 추론 모델이 content를
 " 비우고 reasoning으로 응답을 보내거나 max_tokens를 추론에 소진하는 문제를 방지한다.
 let g:wplus_ai_ollama_think = get(g:, 'wplus_ai_ollama_think', 0)
+" 모델을 메모리에 유지하는 시간. native /api/chat 에서만 적용된다.
+" 기본 '30m': 코드를 읽느라 잠깐 멈춰도 모델이 내려가지 않아 첫 응답 지연을
+" 막는다. 무한 유지는 '-1', 즉시 해제는 '0'.
+let g:wplus_ai_ollama_keep_alive = get(g:, 'wplus_ai_ollama_keep_alive', '30m')
 
 " Ghost Text auto-suggestion settings
 let g:wplus_ai_suggest_enabled = get(g:, 'wplus_ai_suggest_enabled', 1)
@@ -55,7 +59,9 @@ function! s:get_api_endpoint() abort
                     \ . g:wplus_ai_azure_deployment . '/chat/completions'
                     \ . '?api-version=' . g:wplus_ai_azure_api_version
     elseif g:wplus_ai_provider ==# 'ollama'
-        return g:wplus_ai_ollama_host . '/v1/chat/completions'
+        " native API: think/keep_alive/options 를 제어할 수 있다.
+        " (v1 호환 엔드포인트는 keep_alive 를 무시해 매번 모델을 재로딩한다)
+        return g:wplus_ai_ollama_host . '/api/chat'
     else
         return 'https://api.openai.com/v1/chat/completions'
     endif
@@ -102,6 +108,13 @@ function! s:build_curl_command(payload, endpoint, headers) abort
 endfunction
 
 function! s:extract_response_content(json) abort
+    if g:wplus_ai_provider ==# 'ollama'
+        " native /api/chat 응답: {"message": {"content": ...}}
+        if has_key(a:json, 'message') && type(a:json.message) == v:t_dict
+            return get(a:json.message, 'content', '')
+        endif
+        return ''
+    endif
     if g:wplus_ai_provider ==# 'claude'
         if has_key(a:json, 'content') && len(a:json.content) > 0
             let l:parts = []
@@ -157,13 +170,20 @@ function! s:extract_error_message(json) abort
     return ''
 endfunction
 
-" Ollama 전용 payload 옵션을 추가한다. thinking 모델일 때 추론을 꺼서
-" content가 비거나 max_tokens가 추론에 소진되는 문제를 방지한다.
-function! s:apply_ollama_options(payload) abort
-    if g:wplus_ai_provider ==# 'ollama' && !g:wplus_ai_ollama_think
-        let a:payload.reasoning_effort = 'none'
-    endif
-    return a:payload
+" native /api/chat 페이로드. stream:false 로 단일 JSON 응답을 받고,
+" think 로 추론을 토글, keep_alive 로 모델을 메모리에 유지해 재로딩 지연을 막는다.
+function! s:build_ollama_payload(messages, max_tokens, temperature) abort
+    return json_encode({
+        \ 'model': g:wplus_ai_model,
+        \ 'think': g:wplus_ai_ollama_think ? v:true : v:false,
+        \ 'stream': v:false,
+        \ 'keep_alive': g:wplus_ai_ollama_keep_alive,
+        \ 'messages': a:messages,
+        \ 'options': {
+        \   'temperature': a:temperature,
+        \   'num_predict': a:max_tokens,
+        \ }
+        \ })
 endfunction
 
 function! s:uses_max_completion_tokens() abort
@@ -192,7 +212,14 @@ endfunction
 
 function! s:build_request_payload(prompt) abort
     let l:system_msg = 'You are a helpful code assistant. Provide concise, accurate responses.'
-    
+
+    if g:wplus_ai_provider ==# 'ollama'
+        return s:build_ollama_payload([
+            \   {'role': 'system', 'content': l:system_msg},
+            \   {'role': 'user', 'content': a:prompt}
+            \ ], g:wplus_ai_max_tokens, g:wplus_ai_temperature)
+    endif
+
     if g:wplus_ai_provider ==# 'claude'
         return json_encode({
             \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'claude-3-sonnet-20240229',
@@ -216,7 +243,6 @@ function! s:build_request_payload(prompt) abort
     else
         let l:payload.max_tokens = g:wplus_ai_max_tokens
     endif
-    call s:apply_ollama_options(l:payload)
     return json_encode(l:payload)
 endfunction
 
@@ -571,7 +597,14 @@ endfunction
 function! s:build_suggest_payload(prefix, suffix) abort
     let l:system_msg = 'You are a code completion assistant. Complete the code based on context. Return only the completion without explanation or code blocks.'
     let l:prompt = "Complete this code:\n\nPrefix:\n" . a:prefix . "\n\nSuffix:\n" . a:suffix
-    
+
+    if g:wplus_ai_provider ==# 'ollama'
+        return s:build_ollama_payload([
+            \   {'role': 'system', 'content': l:system_msg},
+            \   {'role': 'user', 'content': l:prompt}
+            \ ], g:wplus_ai_suggest_max_tokens, 0.5)
+    endif
+
     if g:wplus_ai_provider ==# 'claude'
         return json_encode({
             \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'claude-3-sonnet-20240229',
@@ -595,7 +628,6 @@ function! s:build_suggest_payload(prefix, suffix) abort
     else
         let l:payload.max_tokens = g:wplus_ai_suggest_max_tokens
     endif
-    call s:apply_ollama_options(l:payload)
     return json_encode(l:payload)
 endfunction
 
