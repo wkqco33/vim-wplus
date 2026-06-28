@@ -47,6 +47,7 @@
   - [diffview — Git Diff 뷰어](#diffview--git-diff-뷰어)
   - [outline — 코드 아웃라인](#outline--코드-아웃라인)
   - [completion — 버퍼 단어 완성](#completion--버퍼-단어-완성)
+  - [session — 세션 관리](#session--세션-관리)
 - [설정 가이드](#설정-가이드)
 - [모듈 비활성화](#모듈-비활성화)
 - [전체 설정 레퍼런스](#전체-설정-레퍼런스)
