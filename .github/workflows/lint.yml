@@ -1,0 +1,40 @@
+name: lint
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  vint:
+    name: vint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install vint
+        run: pip install vim-vint
+      - name: Run vint
+        run: vint --style autoload plugin
+
+  source-check:
+    name: vim source check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install vim
+        run: sudo apt-get update && sudo apt-get install -y vim
+      - name: Source all modules
+        run: |
+          vim -u NONE -i NONE -n -es -c 'set rtp+='"$(pwd)" -c 'set cpo&vim' \
+            -c 'let s:errors = []' \
+            -c 'for s:f in glob("autoload/**/*.vim", 0, 1) + ["plugin/wplus.vim"] | try | execute "source" s:f | catch | call add(s:errors, s:f . ": " . v:exception) | endtry | endfor' \
+            -c 'call writefile(s:errors, "/tmp/source_errors.txt")' \
+            -c 'qa!' 2>&1 || true
+          if [ -s /tmp/source_errors.txt ]; then
+            echo "Source errors:"; cat /tmp/source_errors.txt
+            exit 1
+          fi
