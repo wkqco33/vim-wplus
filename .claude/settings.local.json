@@ -25,7 +25,13 @@
       "Bash(curl -s -X POST http://localhost:11434/v1/chat/completions -H 'Content-Type: application/json' -H 'Authorization: Bearer ollama' -d '{\"model\":\"qwen3.5:4b-mlx\",\"max_tokens\":8,\"reasoning_effort\":\"none\",\"keep_alive\":\"60m\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}')",
       "Bash(curl -s -X POST http://localhost:11434/api/chat -H 'Content-Type: application/json' -d '{\"model\":\"qwen3.5:4b-mlx\",\"think\":false,\"stream\":false,\"keep_alive\":\"60m\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}')",
       "Bash(vim -u NONE -N -es -c 'source autoload/wplus/ai.vim' -c 'call writefile\\([\"ok keep_alive=\".g:wplus_ai_ollama_keep_alive], \"/tmp/vc2.txt\"\\)' -c 'qa!')",
-      "Bash(python3 -c 'import sys,json;d=json.load\\(sys.stdin\\);print\\(\"expires:\",d[\"models\"][0][\"expires_at\"] if d[\"models\"] else \"none\"\\)')"
+      "Bash(python3 -c 'import sys,json;d=json.load\\(sys.stdin\\);print\\(\"expires:\",d[\"models\"][0][\"expires_at\"] if d[\"models\"] else \"none\"\\)')",
+      "Bash(curl -s -X POST http://localhost:11434/api/generate -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -X POST http://localhost:11434/api/show -H 'Content-Type: application/json' -d '{\"model\":\"qwen3.5:4b-mlx\"}')",
+      "Bash(python3 -c ' *)",
+      "Bash(vim -u NONE -N -es -c 'source autoload/wplus/ai.vim' -c 'call writefile\\([\"ok fim=\".g:wplus_ai_ollama_fim.\" stemp=\".string\\(g:wplus_ai_suggest_temperature\\)], \"/tmp/vc3.txt\"\\)' -c 'qa!')",
+      "Bash(vim -u /tmp/testvimrc_fim -es -S /tmp/driver_fim.vim)"
     ]
   }
 }

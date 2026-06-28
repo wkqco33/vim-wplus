@@ -23,6 +23,15 @@ let g:wplus_ai_ollama_think = get(g:, 'wplus_ai_ollama_think', 0)
 " 기본 '30m': 코드를 읽느라 잠깐 멈춰도 모델이 내려가지 않아 첫 응답 지연을
 " 막는다. 무한 유지는 '-1', 즉시 해제는 '0'.
 let g:wplus_ai_ollama_keep_alive = get(g:, 'wplus_ai_ollama_keep_alive', '30m')
+" FIM(Fill-In-the-Middle): 코드 전용 모델(qwen2.5-coder 등)에서 prefix/suffix
+" 사이를 정확히 채운다. 자동완성 품질이 크게 오르고 prefix 에코가 사라진다.
+" 모델이 insert 를 지원해야 한다(미지원 시 chat 방식으로 자동 폴백).
+let g:wplus_ai_ollama_fim = get(g:, 'wplus_ai_ollama_fim', 0)
+" 샘플링 옵션 오버라이드. 사용자가 지정한 키가 기본값 위에 병합된다.
+" 예: {'repeat_penalty': 1.1, 'top_p': 0.9, 'stop': ['\n\n']}
+let g:wplus_ai_ollama_options = get(g:, 'wplus_ai_ollama_options', {})
+" 자동완성 샘플링 온도. 코드 완성은 낮을수록 정확/일관적이다.
+let g:wplus_ai_suggest_temperature = get(g:, 'wplus_ai_suggest_temperature', 0.2)
 
 " Ghost Text auto-suggestion settings
 let g:wplus_ai_suggest_enabled = get(g:, 'wplus_ai_suggest_enabled', 1)
@@ -170,6 +179,15 @@ function! s:extract_error_message(json) abort
     return ''
 endfunction
 
+" 기본 옵션에 사용자 오버라이드(g:wplus_ai_ollama_options)를 병합한다.
+function! s:ollama_options(max_tokens, temperature) abort
+    let l:opts = {'temperature': a:temperature, 'num_predict': a:max_tokens}
+    if type(g:wplus_ai_ollama_options) == v:t_dict
+        call extend(l:opts, g:wplus_ai_ollama_options)
+    endif
+    return l:opts
+endfunction
+
 " native /api/chat 페이로드. stream:false 로 단일 JSON 응답을 받고,
 " think 로 추론을 토글, keep_alive 로 모델을 메모리에 유지해 재로딩 지연을 막는다.
 function! s:build_ollama_payload(messages, max_tokens, temperature) abort
@@ -179,11 +197,26 @@ function! s:build_ollama_payload(messages, max_tokens, temperature) abort
         \ 'stream': v:false,
         \ 'keep_alive': g:wplus_ai_ollama_keep_alive,
         \ 'messages': a:messages,
-        \ 'options': {
-        \   'temperature': a:temperature,
-        \   'num_predict': a:max_tokens,
-        \ }
+        \ 'options': s:ollama_options(a:max_tokens, a:temperature),
         \ })
+endfunction
+
+" FIM(/api/generate) 페이로드. prefix=prompt, suffix=suffix 로 중간을 채운다.
+function! s:build_ollama_fim_payload(prefix, suffix, max_tokens, temperature) abort
+    return json_encode({
+        \ 'model': g:wplus_ai_model,
+        \ 'think': g:wplus_ai_ollama_think ? v:true : v:false,
+        \ 'stream': v:false,
+        \ 'keep_alive': g:wplus_ai_ollama_keep_alive,
+        \ 'prompt': a:prefix,
+        \ 'suffix': a:suffix,
+        \ 'options': s:ollama_options(a:max_tokens, a:temperature),
+        \ })
+endfunction
+
+" FIM 사용 여부. provider 가 ollama 이고 사용자가 켰을 때만.
+function! s:use_ollama_fim() abort
+    return g:wplus_ai_provider ==# 'ollama' && g:wplus_ai_ollama_fim
 endfunction
 
 function! s:uses_max_completion_tokens() abort
@@ -593,16 +626,34 @@ function! s:on_insert_enter() abort
     let s:suggest_keystroke_count = 0
 endfunction
 
+" 작은 모델 정확도를 위해 언어/스코프/주변 심볼을 프롬프트 머리에 붙인다.
+function! s:suggest_context_hint() abort
+    let l:parts = []
+    if !empty(&filetype)
+        call add(l:parts, 'Language: ' . &filetype)
+    endif
+    let l:scope = wplus#ai#context#get_scope()
+    if !empty(l:scope)
+        call add(l:parts, 'Enclosing scope: ' . l:scope)
+    endif
+    let l:syms = wplus#ai#context#extract_symbols()
+    if !empty(l:syms)
+        call add(l:parts, 'Known symbols: ' . join(l:syms[0:19], ', '))
+    endif
+    if empty(l:parts) | return '' | endif
+    return join(l:parts, "\n") . "\n\n"
+endfunction
+
 " Build suggestion prompt for all providers
 function! s:build_suggest_payload(prefix, suffix) abort
     let l:system_msg = 'You are a code completion assistant. Complete the code based on context. Return only the completion without explanation or code blocks.'
-    let l:prompt = "Complete this code:\n\nPrefix:\n" . a:prefix . "\n\nSuffix:\n" . a:suffix
+    let l:prompt = s:suggest_context_hint() . "Complete this code:\n\nPrefix:\n" . a:prefix . "\n\nSuffix:\n" . a:suffix
 
     if g:wplus_ai_provider ==# 'ollama'
         return s:build_ollama_payload([
             \   {'role': 'system', 'content': l:system_msg},
             \   {'role': 'user', 'content': l:prompt}
-            \ ], g:wplus_ai_suggest_max_tokens, 0.5)
+            \ ], g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature)
     endif
 
     if g:wplus_ai_provider ==# 'claude'
@@ -662,10 +713,19 @@ function! s:on_suggest_response_complete(channel) abort
         return
     endtry
     
-    let l:content = s:extract_response_content(l:json)
+    " FIM(/api/generate)은 응답이 {"response": ...} 형식
+    if get(l:request, 'fim', 0)
+        let l:content = get(l:json, 'response', '')
+    else
+        let l:content = s:extract_response_content(l:json)
+    endif
     if empty(l:content)
         let l:error_msg = s:extract_error_message(l:json)
-        if !empty(l:error_msg)
+        " FIM 미지원 모델이면 chat 방식으로 자동 폴백
+        if l:error_msg =~? 'does not support insert'
+            let g:wplus_ai_ollama_fim = 0
+            call s:report_suggest_error('FIM 미지원 모델 → chat 방식으로 전환 (g:wplus_ai_ollama_fim=0)')
+        elseif !empty(l:error_msg)
             call s:suggest_debug('api error: ' . l:error_msg)
             call s:report_suggest_error(l:error_msg)
         else
@@ -698,15 +758,22 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
         return
     endif
     
-    let l:endpoint = s:get_api_endpoint()
-    if empty(l:endpoint)
-        call s:suggest_debug('empty API endpoint')
-        return
+    let l:is_fim = s:use_ollama_fim()
+    if l:is_fim
+        let l:endpoint = g:wplus_ai_ollama_host . '/api/generate'
+        let l:payload = s:build_ollama_fim_payload(a:prefix, a:suffix,
+            \ g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature)
+    else
+        let l:endpoint = s:get_api_endpoint()
+        if empty(l:endpoint)
+            call s:suggest_debug('empty API endpoint')
+            return
+        endif
+        let l:payload = s:build_suggest_payload(a:prefix, a:suffix)
     endif
     let l:headers = s:get_request_headers()
     if empty(l:headers) | return | endif
-    
-    let l:payload = s:build_suggest_payload(a:prefix, a:suffix)
+
     let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers)
 
     if !empty(s:suggest_request)
@@ -730,7 +797,8 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
         \ 'lnum': line('.'),
         \ 'line': s:suggest_line,
         \ 'col': s:suggest_col,
+        \ 'fim': l:is_fim,
         \ 'response_buffer': ''
         \ }
-    call s:suggest_debug('sent suggestion request')
+    call s:suggest_debug('sent suggestion request' . (l:is_fim ? ' (FIM)' : ''))
 endfunction
