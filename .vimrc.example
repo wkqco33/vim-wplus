@@ -185,6 +185,7 @@ let g:wplus_ai_suggest_enabled = 1               " 자동완성 활성화 여부
 let g:wplus_ai_suggest_delay = 500               " 제안까지의 대기 시간 (ms)
 let g:wplus_ai_suggest_context_lines = 50        " prefix 수집 라인 수
 let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
+let g:wplus_ai_suggest_max_lines = 3             " 제안 표시할 최대 줄 수 (장황한 스트리밍 방지)
 " let g:wplus_ai_suggest_debug = 1               " 표시 실패 원인 로그 확인
 
 " Ghost Text 키 매핑

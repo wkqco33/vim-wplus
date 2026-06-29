@@ -594,6 +594,7 @@ let g:wplus_ai_suggest_enabled = 1                  " 활성화 여부
 let g:wplus_ai_suggest_delay = 500                  " 지연 시간 (ms)
 let g:wplus_ai_suggest_context_lines = 50           " 컨텍스트 라인 수
 let g:wplus_ai_suggest_suffix_lines = 20            " suffix 라인 수
+let g:wplus_ai_suggest_max_lines = 3                " 제안 표시할 최대 줄 수 (장황한 스트리밍 방지)
 " let g:wplus_ai_suggest_debug = 1                  " 디버그 로그 출력
 ```
 
