@@ -39,6 +39,7 @@ let g:wplus_ai_suggest_delay = get(g:, 'wplus_ai_suggest_delay', 500)
 let g:wplus_ai_suggest_context_lines = get(g:, 'wplus_ai_suggest_context_lines', 50)
 let g:wplus_ai_suggest_suffix_lines = get(g:, 'wplus_ai_suggest_suffix_lines', 20)
 let g:wplus_ai_suggest_max_tokens = get(g:, 'wplus_ai_suggest_max_tokens', 500)
+let g:wplus_ai_suggest_max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
 let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
 
 " Network timeouts (seconds). Commands wait longer; suggestions abort faster.
@@ -182,6 +183,19 @@ function! s:extract_response_content(json) abort
         endif
     endif
     return ''
+endfunction
+
+" Clean suggest response content by removing think/thought tags and markdown code blocks
+function! s:clean_suggest_content(content) abort
+    let l:txt = a:content
+    " Remove completed <think>...</think> and <thought>...</thought> tags
+    let l:txt = substitute(l:txt, '<\%(think\|thought\)\_.\{-}</\%(think\|thought\)>', '', 'g')
+    " Remove unclosed <think> or <thought> tags to the end
+    let l:txt = substitute(l:txt, '<\%(think\|thought\)\_.*$', '', 'g')
+    " Remove markdown code blocks
+    let l:txt = substitute(l:txt, '```.*\n', '', 'g')
+    let l:txt = substitute(l:txt, '```', '', 'g')
+    return trim(l:txt)
 endfunction
 
 function! s:extract_error_message(json) abort
@@ -712,7 +726,8 @@ function! s:on_suggest_timer(timer) abort
     endif
     
     " Build suggestion request
-    let l:prompt = "Complete the following code. Return only the completion without explanation or markdown:\n\n"
+    let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
+    let l:prompt = "Complete the following code. Return only the completion without explanation or markdown. Keep your suggestion short (maximum " . l:max_lines . " lines):\n\n"
           \ . "Prefix:\n" . l:prefix . "\n\n"
           \ . "Suffix:\n" . l:suffix . "\n\n"
           \ . "Completion:"
@@ -766,7 +781,8 @@ endfunction
 " Build suggestion prompt for all providers
 function! s:build_suggest_payload(prefix, suffix, ...) abort
     let l:stream = a:0 >= 1 ? a:1 : 0
-    let l:system_msg = 'You are a code completion assistant. Complete the code based on context. Return only the completion without explanation or code blocks.'
+    let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
+    let l:system_msg = 'You are a code completion assistant. Complete the code based on context. Return only the completion without explanation or code blocks. Keep your suggestion short (maximum ' . l:max_lines . ' lines).'
     let l:prompt = s:suggest_context_hint() . "Complete this code:\n\nPrefix:\n" . a:prefix . "\n\nSuffix:\n" . a:suffix
 
     if g:wplus_ai_provider ==# 'ollama'
@@ -859,18 +875,34 @@ endfunction
 function! s:render_stream_increment(request) abort
     let l:content = get(a:request, 'stream_content', '')
     if empty(l:content) | return | endif
-    " Trim markdown fences on the fly for stable rendering
-    let l:clean = substitute(l:content, '```', '', 'g')
-    let l:clean = trim(l:clean)
+    let l:clean = s:clean_suggest_content(l:content)
     if len(l:clean) < g:wplus_ai_stream_min_chars | return | endif
     if line('.') != a:request.line || col('.') != a:request.col || bufnr('%') != a:request.bufnr
         return
     endif
+
+    let l:lines = split(l:clean, "\n", 1)
+    let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
+    let l:should_stop = 0
+
+    if len(l:lines) > l:max_lines
+        let l:clean = join(l:lines[:l:max_lines - 1], "\n")
+        let l:should_stop = 1
+    endif
+
     let s:suggest_content = l:clean
     let s:suggest_line = a:request.line
     let s:suggest_col = a:request.col
     let s:suggest_bufnr = a:request.bufnr
     call s:show_suggestion()
+
+    if l:should_stop
+        call s:suggest_debug('reached max lines, stopping job')
+        if has_key(a:request, 'job') && type(a:request.job) == v:t_job
+            silent! call job_stop(a:request.job)
+        endif
+        let s:suggest_request = {}
+    endif
 endfunction
 
 " Response handler for suggestions. request_id is bound via partial and thus
@@ -940,9 +972,13 @@ function! s:on_suggest_response_complete(request_id, channel) abort
             call s:suggest_debug('empty streaming suggestion response')
             return
         endif
-        let l:content = substitute(l:content, '```.*\n', '', 'g')
-        let l:content = substitute(l:content, '```', '', 'g')
-        let l:content = trim(l:content)
+        let l:content = s:clean_suggest_content(l:content)
+
+        let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
+        let l:lines = split(l:content, "\n", 1)
+        if len(l:lines) > l:max_lines
+            let l:content = join(l:lines[:l:max_lines - 1], "\n")
+        endif
         if line('.') == l:request.line && col('.') == l:request.col && bufnr('%') == l:request.bufnr
             let s:suggest_content = l:content
             let s:suggest_line = l:request.line
@@ -997,10 +1033,13 @@ function! s:on_suggest_response_complete(request_id, channel) abort
         return
     endif
 
-    " Clean up response (remove markdown code blocks if present)
-    let l:content = substitute(l:content, '```.*\n', '', 'g')
-    let l:content = substitute(l:content, '```', '', 'g')
-    let l:content = trim(l:content)
+    let l:content = s:clean_suggest_content(l:content)
+
+    let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
+    let l:lines = split(l:content, "\n", 1)
+    if len(l:lines) > l:max_lines
+        let l:content = join(l:lines[:l:max_lines - 1], "\n")
+    endif
 
     " Only update if cursor is still at request position
     if line('.') == l:request.line && col('.') == l:request.col && bufnr('%') == l:request.bufnr

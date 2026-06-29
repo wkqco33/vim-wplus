@@ -193,6 +193,7 @@ let g:wplus_ai_suggest_enabled = 1               " 활성화 여부 (기본값: 
 let g:wplus_ai_suggest_delay = 500               " 제안 지연 시간 (ms)
 let g:wplus_ai_suggest_context_lines = 50        " 컨텍스트 수집 라인 수
 let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
+let g:wplus_ai_suggest_max_lines = 3             " 제안 표시할 최대 줄 수 (장황한 스트리밍 방지)
 " let g:wplus_ai_suggest_debug = 1               " 디버그 로그 출력
 ```
 
@@ -204,6 +205,7 @@ let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
   - 5회 타이핑 후 delay 자동 2배 증가 (빠른 입력 시 불필요한 요청 감소)
 - `context_lines`: 제안 컨텍스트로 포함할 이전 라인 수
 - `suffix_lines`: 제안 컨텍스트로 포함할 이후 라인 수
+- `suggest_max_lines`: 제안 표시할 최대 줄 수 (장황한 스트리밍 및 표시 방지)
 
 **언어별 Context 추출:**
 - Go: `func` 함수명 추출, 함수 경계 인식
