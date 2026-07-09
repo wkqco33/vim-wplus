@@ -69,9 +69,9 @@ function! s:delete_surround(char) abort
     let [ol, oc, cl, cc] = pos
     " Delete close first (so positions don't shift)
     let cline = getline(cl)
-    call setline(cl, cline[:cc - 2] . cline[cc:])
+    call setline(cl, cline[: cc - 2] . cline[cc :])
     let oline = getline(ol)
-    call setline(ol, oline[:oc - 2] . oline[oc:])
+    call setline(ol, oline[: oc - 2] . oline[oc :])
 endfunction
 
 function! s:change_surround(old, new) abort
@@ -91,9 +91,9 @@ function! s:surround_range(sl, sc, el, ec, char) abort
     " Insert close then open so line numbers don't shift when on same line.
     let [open, close] = s:get_pair(a:char)
     let eline = getline(a:el)
-    call setline(a:el, eline[:a:ec - 1] . close . eline[a:ec:])
+    call setline(a:el, eline[: a:ec - 1] . close . eline[a:ec :])
     let sline = getline(a:sl)
-    call setline(a:sl, sline[:a:sc - 2] . open . sline[a:sc - 1:])
+    call setline(a:sl, sline[: a:sc - 2] . open . sline[a:sc - 1:])
 endfunction
 
 " ── operator (for ys) ─────────────────────────────────────────────────────

@@ -1,0 +1,21 @@
+cmdargs:
+  severity: warning
+  env:
+    neovim: false
+  filetypes: vim
+policies:
+  # 프로젝트는 Vim 9.1+ 전용. vim9script가 아닌 레거시 스크립트를 사용한다.
+  ProhibitImplicitScoping:
+    enabled: false
+  # 문자열에 single quote 대신 double quote를 허용한다.
+  ProhibitUnnecessaryDoubleQuote:
+    enabled: false
+  # echo/echomsg 허용 (유틸 메시지 함수가 사용).
+  ProhibitCommandRelyOnUser:
+    enabled: false
+  # 한글 주석 등 멀티바이트 문자가 있어도 scriptencoding 선언 강제하지 않음
+  ProhibitMissingScriptEncoding:
+    enabled: false
+  # == 대신 ==#를 사용하도록 하는 스타일 가이드 규칙 비활성화 (기존 코드 호환성)
+  ProhibitEqualTildeOperator:
+    enabled: false

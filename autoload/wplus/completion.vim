@@ -18,7 +18,8 @@ endfunction
 
 function! s:collect_words(prefix) abort
     let l:pat    = '\<' . escape(a:prefix, '\/.*$^~[]') . '\k\+'
-    let l:seen   = {a:prefix: 1}
+    let l:seen   = {}
+    let l:seen[a:prefix] = 1
     let l:words  = []
     for l:bufnr in range(1, bufnr('$'))
         if !buflisted(l:bufnr) | continue | endif

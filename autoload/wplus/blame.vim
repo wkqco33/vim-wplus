@@ -168,6 +168,6 @@ function! s:on_buf_delete() abort
     let l:buf = str2nr(expand('<abuf>'))
     let l:blame_timer = getbufvar(l:buf, 'wplus_blame_timer', -1)
     if l:blame_timer != -1
-        silent! timer_stop(l:blame_timer)
+        silent! call timer_stop(l:blame_timer)
     endif
 endfunction
