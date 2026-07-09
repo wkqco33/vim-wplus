@@ -733,14 +733,14 @@ function! s:on_buf_delete() abort
     let l:buf = bufnr('%')
     let l:timer_id = getbufvar(l:buf, 'wplus_lsp_timer', -1)
     if l:timer_id != -1
-        silent! timer_stop(l:timer_id)
+        silent! call timer_stop(l:timer_id)
     endif
 endfunction
 
 function! s:cleanup_all() abort
     " Stop all pending timers
     for l:uri in keys(s:diag_timers)
-        silent! timer_stop(s:diag_timers[l:uri])
+        silent! call timer_stop(s:diag_timers[l:uri])
     endfor
     let s:diag_timers = {}
     let s:pending_actions = []
