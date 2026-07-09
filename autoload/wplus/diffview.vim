@@ -78,7 +78,7 @@ function! wplus#diffview#open(...) abort
     let s:job = job_start(l:args, {
         \ 'out_cb':   {_, l -> add(l:lines, l)},
         \ 'close_cb': {_ -> s:fill_buf(l:lines)},
-        \ 'err_cb':   {_, _ -> 0},
+        \ 'err_cb':   {_ch, _msg -> 0},
         \ })
 endfunction
 

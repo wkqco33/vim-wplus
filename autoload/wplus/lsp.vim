@@ -172,7 +172,7 @@ function! s:on_change(ft) abort
     " Cancel previous timer to prevent duplicate timers
     let l:timer_id = getbufvar(l:buf, 'wplus_lsp_timer', -1)
     if l:timer_id != -1
-        silent! timer_stop(l:timer_id)
+        silent! call timer_stop(l:timer_id)
     endif
     let l:timer = timer_start(g:wplus_lsp_change_delay, {-> s:send_change(l:buf, a:ft)})
     call setbufvar(l:buf, 'wplus_lsp_timer', l:timer)
