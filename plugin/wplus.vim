@@ -12,7 +12,7 @@ if !hlexists('WplusAISuggest')
         highlight default WplusAISuggest ctermfg=244 guifg=#7c6f64
     endif
 endif
-if empty(prop_type_get('WplusAISuggest'))
+if has('textprop') && empty(prop_type_get('WplusAISuggest'))
     call prop_type_add('WplusAISuggest', {'highlight': 'WplusAISuggest'})
 endif
 

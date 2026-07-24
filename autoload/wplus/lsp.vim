@@ -104,17 +104,29 @@ function! s:check_backspace() abort
     return !col || getline('.')[col - 1] =~# '\s'
 endfunction
 
+function! s:url_encode(str) abort
+    let l:res = ''
+    let l:len = strlen(a:str)
+    let l:i = 0
+    while l:i < l:len
+        let l:ch = strpart(a:str, l:i, 1, 1)
+        if l:ch =~# '[A-Za-z0-9._~/-]'
+            let l:res .= l:ch
+        else
+            let l:res .= printf('%%%02X', char2nr(l:ch))
+        endif
+        let l:i += 1
+    endwhile
+    return l:res
+endfunction
+
 function! s:get_uri(path) abort
     let l:p = fnamemodify(a:path, ':p')
     if has('win32')
         let l:p = substitute(l:p, '\\', '/', 'g')
-        let l:p = substitute(l:p, '[^A-Za-z0-9._~/:@!$&''()*+,;=]',
-            \ '\=printf("%%%02X", char2nr(submatch(0)))', 'g')
-        return 'file:///' . l:p
+        return 'file:///' . s:url_encode(l:p)
     endif
-    let l:p = substitute(l:p, '[^A-Za-z0-9._~/-]',
-        \ '\=printf("%%%02X", char2nr(submatch(0)))', 'g')
-    return 'file://' . (l:p[0] ==# '/' ? '' : '/') . l:p
+    return 'file://' . (l:p[0] ==# '/' ? '' : '/') . s:url_encode(l:p)
 endfunction
 
 function! s:get_buf_uri(buf) abort
@@ -124,11 +136,23 @@ endfunction
 
 function! s:decode_uri_path(uri) abort
     let l:path = substitute(a:uri, '\v^file:/*(localhost)?', '', '')
-    let l:path = substitute(l:path, '%\(\x\x\)', '\=nr2char("0x".submatch(1))', 'g')
-    if l:path =~# '^[A-Za-z]:[\\/]'
-        return l:path
+    let l:len = strlen(l:path)
+    let l:i = 0
+    let l:res = ''
+    while l:i < l:len
+        if strpart(l:path, l:i, 1, 1) ==# '%' && l:i + 2 < l:len && strpart(l:path, l:i+1, 2, 1) =~# '^\x\x$'
+            let l:hex = strpart(l:path, l:i+1, 2, 1)
+            let l:res .= nr2char(str2nr(l:hex, 16), 1)
+            let l:i += 3
+        else
+            let l:res .= strpart(l:path, l:i, 1, 1)
+            let l:i += 1
+        endif
+    endwhile
+    if l:res =~# '^[A-Za-z]:[\\/]'
+        return l:res
     endif
-    return l:path[0] ==# '/' ? l:path : '/' . l:path
+    return l:res[0] ==# '/' ? l:res : '/' . l:res
 endfunction
 
 function! s:get_request_params(method) abort
@@ -164,6 +188,7 @@ function! s:did_open(ft) abort
     let b:wplus_lsp_version = get(b:, 'wplus_lsp_version', 0) + 1
     let l:params = {'textDocument': {'uri': l:uri, 'languageId': a:ft, 'version': b:wplus_lsp_version, 'text': join(getline(1, '$'), "\n") . "\n"}}
     call s:send(a:ft, 'textDocument/didOpen', l:params, 1)
+    call wplus#lsp#request_inlay_hints()
 endfunction
 
 function! s:on_change(ft) abort
@@ -193,6 +218,7 @@ function! s:did_save(ft) abort
     let l:uri = s:get_buf_uri(bufnr('%'))
     if empty(l:uri) | return | endif
     call s:send(a:ft, 'textDocument/didSave', {'textDocument': {'uri': l:uri}}, 1)
+    call wplus#lsp#request_inlay_hints()
 endfunction
 
 function! s:start_server(ft) abort
@@ -213,6 +239,7 @@ function! s:start_server(ft) abort
         \   'rename': {'dynamicRegistration': v:true, 'prepareSupport': v:false},
         \   'codeAction': {'dynamicRegistration': v:true, 'codeActionLiteralSupport': {'codeActionKind': {'valueSet': []}}},
         \   'signatureHelp': {'signatureInformation': {'documentationFormat': ['plaintext', 'markdown']}},
+        \   'inlayHint': {'dynamicRegistration': v:true},
         \ }}})
 endfunction
 
@@ -247,13 +274,17 @@ function! s:on_stdout(ft, channel, msg) abort
     while 1
         let l:idx = stridx(l:s.buffer, "Content-Length: ")
         if l:idx == -1 | break | endif
-        if l:idx > 0 | let l:s.buffer = l:s.buffer[l:idx :] | let l:idx = 0 | endif
+        if l:idx > 0
+            let l:s.buffer = strpart(l:s.buffer, l:idx, strlen(l:s.buffer) - l:idx, 1)
+            let l:idx = 0
+        endif
         let l:end = stridx(l:s.buffer, "\r\n\r\n")
         if l:end == -1 | break | endif
-        let l:len = str2nr(l:s.buffer[len(s:CONTENT_LENGTH_PREFIX) : l:end])
+        let l:len_str = strpart(l:s.buffer, len(s:CONTENT_LENGTH_PREFIX), l:end - len(s:CONTENT_LENGTH_PREFIX), 1)
+        let l:len = str2nr(l:len_str)
         if strlen(l:s.buffer) < l:end + 4 + l:len | break | endif
-        let l:body = l:s.buffer[l:end + 4 : l:end + 3 + l:len]
-        let l:s.buffer = l:s.buffer[l:end + 4 + l:len :]
+        let l:body = strpart(l:s.buffer, l:end + 4, l:len, 1)
+        let l:s.buffer = strpart(l:s.buffer, l:end + 4 + l:len, strlen(l:s.buffer) - (l:end + 4 + l:len), 1)
         call s:handle_message(a:ft, l:body)
     endwhile
 endfunction
@@ -294,6 +325,8 @@ function! s:handle_request_result(ft, method, result) abort
         call s:show_code_actions(a:result)
     elseif a:method ==# 'textDocument/signatureHelp'
         call s:show_signature_help(a:result)
+    elseif a:method ==# 'textDocument/inlayHint'
+        call s:show_inlay_hints(a:result)
     endif
 endfunction
 
@@ -347,7 +380,64 @@ function! s:define_diag_signs() abort
         silent! call prop_type_add('WplusLspDiagWarn', {'highlight': 'WplusDiagWarn'})
         silent! call prop_type_add('WplusLspDiagInfo', {'highlight': 'WplusDiagInfo'})
         silent! call prop_type_add('WplusLspDiagHint', {'highlight': 'WplusDiagHint'})
+        if empty(prop_type_get('WplusLspInlay'))
+            silent! call prop_type_add('WplusLspInlay', {'highlight': 'WplusDiagHint'})
+        endif
     endif
+endfunction
+
+function! wplus#lsp#request_inlay_hints() abort
+    if !get(g:, 'wplus_lsp_inlay_hints', 1) | return | endif
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:params = {
+        \ 'textDocument': {'uri': l:uri},
+        \ 'range': {
+        \   'start': {'line': 0, 'character': 0},
+        \   'end': {'line': line('$'), 'character': 0},
+        \ },
+        \ }
+    call s:send(l:ft, 'textDocument/inlayHint', l:params, 0)
+endfunction
+
+function! s:show_inlay_hints(result) abort
+    if !has('textprop') || empty(a:result) | return | endif
+    let l:bufnr = bufnr('%')
+    silent! call prop_remove({'type': 'WplusLspInlay', 'bufnr': l:bufnr, 'all': v:true})
+    let l:items = type(a:result) == v:t_list ? a:result : get(a:result, 'items', [])
+    for l:hint in l:items
+        let l:pos = get(l:hint, 'position', {})
+        if empty(l:pos) | continue | endif
+        let l:lnum = get(l:pos, 'line', 0) + 1
+        let l:col = get(l:pos, 'character', 0) + 1
+        let l:raw_label = get(l:hint, 'label', '')
+        let l:text = ''
+        if type(l:raw_label) == v:t_string
+            let l:text = l:raw_label
+        elseif type(l:raw_label) == v:t_list
+            let l:parts = []
+            for l:part in l:raw_label
+                if type(l:part) == v:t_dict
+                    call add(l:parts, get(l:part, 'value', ''))
+                elseif type(l:part) == v:t_string
+                    call add(l:parts, l:part)
+                endif
+            endfor
+            let l:text = join(l:parts, '')
+        endif
+        if empty(l:text) | continue | endif
+        if get(l:hint, 'paddingLeft', v:false) | let l:text = ' ' . l:text | endif
+        if get(l:hint, 'paddingRight', v:false) | let l:text = l:text . ' ' | endif
+
+        silent! call prop_add(l:lnum, l:col, {
+            \ 'bufnr': l:bufnr,
+            \ 'type': 'WplusLspInlay',
+            \ 'text': l:text,
+            \ 'text_align': 'inline',
+            \ })
+    endfor
 endfunction
 
 function! s:update_diagnostics(ft, params) abort
@@ -656,8 +746,9 @@ function! s:apply_text_edits(path, edits) abort
         let l:prefix = l:sc > 0 ? l:start_line[: l:sc - 1] : ''
         let l:suffix = l:end_line[l:ec : ]
 
+        let l:replacement = split(l:prefix . l:e.newText . l:suffix, "\n", 1)
+        call append(l:el, l:replacement)
         call deletebufline(l:bufnr, l:sl, l:el)
-        call append(l:sl - 1, split(l:prefix . l:e.newText . l:suffix, "\n", 1))
     endfor
 
     call setbufvar(l:bufnr, '&modified', 1)
