@@ -102,6 +102,15 @@ endfunction
 
 " ── async refresh ─────────────────────────────────────────────────────────
 
+function! s:channel_key(channel) abort
+    try
+        let l:info = ch_info(a:channel)
+        return string(get(l:info, 'id', a:channel))
+    catch
+        return string(a:channel)
+    endtry
+endfunction
+
 function! wplus#gitgutter#refresh(bufnr) abort
     let bufnr = a:bufnr == 0 ? bufnr('%') : a:bufnr
     let file  = bufname(bufnr)
@@ -130,18 +139,19 @@ function! wplus#gitgutter#refresh(bufnr) abort
         \ 'close_cb': Cb,
         \ 'err_cb':  {_ch, _msg -> 0},
         \ })
+
     let s:pending[bufnr] = job
     " Store data for close_cb to access
-    let s:job_data[job_getchannel(job)] = {'bufnr': bufnr, 'lines': lines}
+    let s:job_data[s:channel_key(job_getchannel(job))] = {'bufnr': bufnr, 'lines': lines}
     " Also capture branch name while we're here
     call s:update_branch(bufnr, root)
 endfunction
 
 function! s:on_diff_complete(channel) abort
     " Find job data for this channel
-    if has_key(s:job_data, a:channel)
-        let data = s:job_data[a:channel]
-        unlet s:job_data[a:channel]
+    let l:key = s:channel_key(a:channel)
+    if has_key(s:job_data, l:key)
+        let data = remove(s:job_data, l:key)
         call s:on_diff_done(data.bufnr, data.lines, a:channel)
     endif
 endfunction
@@ -292,6 +302,37 @@ function! wplus#gitgutter#stage_hunk() abort
     endif
 endfunction
 
+function! wplus#gitgutter#revert_hunk() abort
+    let l:bufnr = bufnr('%')
+    let l:h = s:find_hunk_at(line('.'))
+    if empty(l:h)
+        call wplus#util#warn_msg('gitgutter', 'No hunk at cursor')
+        return
+    endif
+    let l:file = fnamemodify(bufname(l:bufnr), ':p')
+    let l:root = wplus#util#find_git_root(fnamemodify(l:file, ':h'))
+    if empty(l:root)
+        call wplus#util#error_msg('gitgutter', 'Not in a git repository')
+        return
+    endif
+    let l:header = getbufvar(l:bufnr, 'wplus_gitgutter_diff_header', [])
+    if empty(l:header)
+        call wplus#util#error_msg('gitgutter', 'No diff header available — save the file first')
+        return
+    endif
+    let l:tmp = tempname()
+    call writefile(l:header + l:h.lines, l:tmp)
+    let l:out = system('git -C ' . shellescape(l:root) . ' apply --reverse ' . shellescape(l:tmp))
+    call delete(l:tmp)
+    if v:shell_error != 0
+        call wplus#util#error_msg('gitgutter', 'Revert failed: ' . trim(l:out))
+    else
+        silent execute 'edit!'
+        call wplus#util#info_msg('gitgutter', 'Hunk reverted')
+        call wplus#gitgutter#refresh(l:bufnr)
+    endif
+endfunction
+
 " ── setup ─────────────────────────────────────────────────────────────────
 
 function! wplus#gitgutter#setup() abort
@@ -307,10 +348,14 @@ function! wplus#gitgutter#setup() abort
         autocmd VimLeavePre * call s:cleanup_jobs()
     augroup END
 
+    command! WplusGitStageHunk call wplus#gitgutter#stage_hunk()
+    command! WplusGitRevertHunk call wplus#gitgutter#revert_hunk()
+
     nnoremap <silent> ]h :call wplus#gitgutter#next_hunk()<CR>
     nnoremap <silent> [h :call wplus#gitgutter#prev_hunk()<CR>
     nnoremap <silent> <leader>hp :call wplus#gitgutter#preview_hunk()<CR>
     nnoremap <silent> <leader>hs :call wplus#gitgutter#stage_hunk()<CR>
+    nnoremap <silent> <leader>hr :call wplus#gitgutter#revert_hunk()<CR>
 endfunction
 
 function! s:on_buf_delete() abort

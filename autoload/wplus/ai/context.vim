@@ -50,6 +50,31 @@ endfunction
 
 " ── Public functions ──────────────────────────────────────────────────────────
 
+function! s:collect_workspace_symbols(ft) abort
+    let l:symbols = []
+    for l:info in getbufinfo({'buflisted': 1})
+        if l:info.bufnr == bufnr('%') || !bufloaded(l:info.bufnr) | continue | endif
+        if getbufvar(l:info.bufnr, '&filetype') !=# a:ft | continue | endif
+        let l:sample = getbufline(l:info.bufnr, 1, 50)
+        for l:line in l:sample
+            let l:m = matchstr(l:line, '\v^\s*%(class|struct|def|func|function|fn|enum|interface)\s+\zs\w+')
+            if !empty(l:m)
+                call add(l:symbols, l:m)
+            endif
+        endfor
+    endfor
+    try
+        let l:tags = taglist('.*')
+        for l:t in l:tags[:29]
+            if has_key(l:t, 'name') && l:t.name =~# '^\w\+$'
+                call add(l:symbols, l:t.name)
+            endif
+        endfor
+    catch
+    endtry
+    return l:symbols
+endfunction
+
 " Extract symbols from current buffer context
 function! wplus#ai#context#extract_symbols() abort
     let l:buf = bufnr('%')
@@ -59,6 +84,7 @@ function! wplus#ai#context#extract_symbols() abort
     endif
     let l:symbols = []
     let l:lines = getline(max([1, line('.') - 100]), min([line('$'), line('.') + 100]))
+    call extend(l:symbols, s:collect_workspace_symbols(l:ft))
     let l:ft = &filetype
     
     for l:line in l:lines
@@ -283,7 +309,7 @@ function! wplus#ai#context#get_prefix(line_nr, col, ...) abort
     endif
     
     let l:before_lines = getline(l:boundary_line, a:line_nr - 1)
-    let l:current_line_before = getline(a:line_nr)[:a:col - 2]
+    let l:current_line_before = a:col > 1 ? strpart(getline(a:line_nr), 0, a:col - 1, 1) : ''
     return join(l:before_lines + [l:current_line_before], "\n")
 endfunction
 
@@ -292,7 +318,8 @@ function! wplus#ai#context#get_suffix(line_nr, col, ...) abort
     let l:max_lines = a:0 >= 1 ? max([0, a:1]) : 30
     let l:last_line = line('$')
     let l:end_line = min([l:last_line, a:line_nr + l:max_lines])
-    let l:current_line_after = getline(a:line_nr)[a:col - 1:]
+    let l:cur_line = getline(a:line_nr)
+    let l:current_line_after = strpart(l:cur_line, a:col - 1, strlen(l:cur_line) - (a:col - 1), 1)
     let l:after_lines = getline(a:line_nr + 1, l:end_line)
     return join([l:current_line_after] + l:after_lines, "\n")
 endfunction

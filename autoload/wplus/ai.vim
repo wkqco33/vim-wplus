@@ -456,6 +456,13 @@ function! s:send_request(bufnr, lnum, prompt) abort
 endfunction
 
 function! s:on_error(channel, msg) abort
+    let l:key = s:channel_key(a:channel)
+    if has_key(s:command_channels, l:key)
+        let l:request_id = remove(s:command_channels, l:key)
+        if has_key(s:command_requests, l:request_id)
+            call remove(s:command_requests, l:request_id)
+        endif
+    endif
     call wplus#util#error_msg('ai', 'request error: ' . a:msg)
 endfunction
 
@@ -600,6 +607,11 @@ function! s:dismiss_suggestion() abort
         let s:suggest_timer = v:null
     endif
 
+    if !empty(s:suggest_request) && has_key(s:suggest_request, 'job')
+        silent! call job_stop(s:suggest_request.job)
+        let s:suggest_request = {}
+    endif
+
     if l:bufnr > 0 && bufloaded(l:bufnr)
         call prop_remove({'type': 'WplusAISuggest', 'all': 1, 'bufnr': l:bufnr})
     endif
@@ -616,7 +628,10 @@ function! wplus#ai#accept_suggestion() abort
     let l:content = s:suggest_content
     call s:dismiss_suggestion()
     call s:suggest_debug('suggestion accepted')
-    " Convert raw newlines into key-notation CR so feed via <expr> works
+    if mode() =~# 'i'
+        call feedkeys(l:content, 'n')
+        return ''
+    endif
     return substitute(l:content, '\n', "\<CR>", 'g')
 endfunction
 
@@ -670,6 +685,10 @@ function! wplus#ai#accept_word_suggestion() abort
         call s:show_suggestion()
     endif
     call s:suggest_debug('accepted word: ' . l:word)
+    if mode() =~# 'i'
+        call feedkeys(l:word, 'n')
+        return ''
+    endif
     return substitute(l:word, '\n', "\<CR>", 'g')
 endfunction
 
@@ -913,37 +932,23 @@ function! s:on_suggest_response(request_id, channel, msg) abort
         return
     endif
     if get(s:suggest_request, 'stream', 0)
-        " Vim job out_cb default out_mode is NL: it delivers one line per call
-        " with the trailing newline STRIPPED. So a:msg is usually a complete
-        " line already. Only when a line is very long or output is raw might a
-        " single msg contain multiple lines or a partial fragment.
-        " Strategy: append to buffer, split on \n; any complete line (i.e. the
-        " buffer has a \n, OR the buffer had no prior partial content and this
-        " msg has no \n) is parsed immediately.
         let s:suggest_request.stream_buffer .= substitute(a:msg, "\r\n\=", "\n", 'g')
-        let l:has_nl = s:suggest_request.stream_buffer =~# "\n"
-        if l:has_nl
+        if s:suggest_request.stream_buffer =~# "\n"
             let l:parts = split(s:suggest_request.stream_buffer, "\n", 1)
-            " If buffer ends with \n, last element is empty → complete flush.
             if s:suggest_request.stream_buffer =~# "\n$"
                 let s:suggest_request.stream_buffer = ''
             else
                 let s:suggest_request.stream_buffer = remove(l:parts, -1)
             endif
-        else
-            " No newline: a:msg is one complete line (NL mode strips \n).
-            " Parse it directly and reset buffer.
-            let l:parts = [s:suggest_request.stream_buffer]
-            let s:suggest_request.stream_buffer = ''
+            for l:line in l:parts
+                if empty(l:line) | continue | endif
+                let l:delta = s:parse_stream_delta(l:line, get(s:suggest_request, 'fim', 0))
+                if !empty(l:delta)
+                    let s:suggest_request.stream_content .= l:delta
+                    call s:render_stream_increment(s:suggest_request)
+                endif
+            endfor
         endif
-        for l:line in l:parts
-            if empty(l:line) | continue | endif
-            let l:delta = s:parse_stream_delta(l:line, get(s:suggest_request, 'fim', 0))
-            if !empty(l:delta)
-                let s:suggest_request.stream_content .= l:delta
-                call s:render_stream_increment(s:suggest_request)
-            endif
-        endfor
     else
         let s:suggest_request.response_buffer .= a:msg
     endif
@@ -1089,6 +1094,7 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
     let s:suggest_request_id += 1
     let l:rid = s:suggest_request_id
     let l:job = job_start(l:cmd, {
+        \ 'out_mode': 'raw',
         \ 'out_cb': function('s:on_suggest_response', [l:rid]),
         \ 'close_cb': function('s:on_suggest_response_complete', [l:rid]),
         \ })
