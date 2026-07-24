@@ -46,25 +46,47 @@ function! s:add_to_history(query) abort
     endif
 endfunction
 
-function! wplus#grep#search(args) abort
+let s:grep_job = v:null
+
+function! wplus#grep#search_async(args) abort
     call s:configure_grep()
-    let grep_cmd = &grepprg
-    if empty(grep_cmd) | let grep_cmd = 'grep -n $* /dev/null' | endif
-
-    " Add to history
-    call s:add_to_history(a:args)
-
-    " Run grep and open quickfix
-    execute 'silent grep! ' . a:args
-    botright copen
-    " If no matches, close quickfix
-    if empty(getqflist())
-        cclose
-        call wplus#util#warn_msg('grep', 'no matches found for: ' . a:args)
-    else
-        call wplus#util#info_msg('grep', 'found ' . len(getqflist()) . ' match(es)')
-        redraw!
+    if s:grep_job != v:null
+        silent! call job_stop(s:grep_job)
+        let s:grep_job = v:null
     endif
+    call setqflist([], 'r')
+    call s:add_to_history(a:args)
+    call wplus#util#info_msg('grep', 'Searching for: ' . a:args . '...')
+    
+    let l:cmd = []
+    if executable('rg')
+        let l:cmd = ['rg', '--vimgrep', '--smart-case', '--', a:args]
+    elseif executable('git') && isdirectory('.git')
+        let l:cmd = ['git', 'grep', '-n', '--column', a:args]
+    else
+        let l:cmd = ['grep', '-RIn', a:args, '.']
+    endif
+    
+    let s:grep_job = job_start(l:cmd, {
+        \ 'out_cb': {ch, msg -> caddexpr(msg)},
+        \ 'close_cb': {ch -> s:on_grep_complete()},
+        \ })
+endfunction
+
+function! s:on_grep_complete() abort
+    let s:grep_job = v:null
+    let l:qf = getqflist()
+    if empty(l:qf)
+        cclose
+        call wplus#util#warn_msg('grep', 'No matches found')
+    else
+        botright copen
+        call wplus#util#info_msg('grep', 'Found ' . len(l:qf) . ' match(es)')
+    endif
+endfunction
+
+function! wplus#grep#search(args) abort
+    call wplus#grep#search_async(a:args)
 endfunction
 
 function! wplus#grep#search_visual() abort
