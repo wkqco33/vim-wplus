@@ -16,10 +16,6 @@ let s:timer     = -1
 let s:job       = v:null
 let s:last_job_data = {} " {bufnr, lnum, lines} for current job
 
-function! s:git_relpath(root, file) abort
-    return a:file[: len(a:root)] ==# a:root . '/' ? a:file[len(a:root) + 1 :] : a:file
-endfunction
-
 " ── highlight & prop type ─────────────────────────────────────────────────
 
 function! s:init() abort
@@ -117,7 +113,7 @@ function! s:start_job(bufnr, lnum, root, file, lines) abort
     let s:last_job_data = {'bufnr': a:bufnr, 'lnum': a:lnum, 'lines': a:lines}
     let s:job = job_start(
                 \ ['git', '-C', a:root, 'blame', '--porcelain', '-L',
-                \   a:lnum . ',' . a:lnum, s:git_relpath(a:root, a:file)], {
+                \   a:lnum . ',' . a:lnum, wplus#util#relpath(a:root, a:file)], {
                 \ 'out_cb':  {_, l -> add(a:lines, l)},
                 \ 'close_cb': function('s:on_blame_complete'),
                 \ 'err_cb':  {_ch, _msg -> 0},
