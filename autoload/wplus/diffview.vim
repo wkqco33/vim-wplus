@@ -21,11 +21,6 @@ function! s:git_root(file) abort
     return v:shell_error == 0 && !empty(l:out) ? trim(l:out[0]) : ''
 endfunction
 
-function! s:git_relpath(root, file) abort
-    let l:rel = substitute(a:file, '^' . escape(a:root, '/\'), '', '')
-    return substitute(l:rel, '^[/\\]', '', '')
-endfunction
-
 " ── diff buffer rendering ─────────────────────────────────────────────────
 
 function! s:open_diff_buf() abort
@@ -63,7 +58,7 @@ function! wplus#diffview#open(...) abort
     let l:root = s:git_root(l:file)
     if empty(l:root) | call wplus#util#warn_msg('diffview', 'Not a git repository') | return | endif
 
-    let l:rel  = s:git_relpath(l:root, l:file)
+    let l:rel  = wplus#util#relpath(l:root, l:file)
     let l:args = get(a:, 1, '') ==# 'all'
         \ ? ['git', '-C', l:root, 'diff', 'HEAD']
         \ : ['git', '-C', l:root, 'diff', 'HEAD', '--', l:rel]

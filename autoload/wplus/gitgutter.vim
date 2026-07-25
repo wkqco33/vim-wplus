@@ -12,10 +12,6 @@ let s:sign_group = 'wplus_gitgutter'
 let s:pending    = {}   " bufnr → job handle
 let s:job_data   = {}   " job → {bufnr, lines}
 
-function! s:git_relpath(root, file) abort
-    return a:file[: len(a:root)] ==# a:root . '/' ? a:file[len(a:root) + 1 :] : a:file
-endfunction
-
 " ── sign definitions ──────────────────────────────────────────────────────
 
 function! s:define_signs() abort
@@ -124,7 +120,7 @@ function! wplus#gitgutter#refresh(bufnr) abort
         call setbufvar(bufnr, 'wplus_git_branch', '')
         return
     endif
-    let relfile = s:git_relpath(root, fnamemodify(file, ':p'))
+    let relfile = wplus#util#relpath(root, fnamemodify(file, ':p'))
 
     " Kill previous pending job for this buffer
     if has_key(s:pending, bufnr)

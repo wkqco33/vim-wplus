@@ -67,6 +67,35 @@ source ~/.vim/plugged/vim-wplus/plugin/wplus.vim
 
 ---
 
+## Windows 사용 시 참고사항
+
+vim-wplus는 Windows(gvim/터미널 Vim)에서 동작하도록 만들어졌지만, 아래 기능들은
+외부 도구가 PATH에 있어야 정상 동작합니다. Windows는 이 도구들을 기본 내장하지
+않으므로 별도 설치가 필요합니다.
+
+| 기능 | 필요 도구 | 설치 예시 |
+|------|-----------|-----------|
+| `:Wgrep`, `WgrepRx`, `WgrepWord` (grep.vim) | ripgrep(`rg`) 권장 | `winget install BurntSushi.ripgrep.MSVC` 또는 `scoop install ripgrep` |
+| `WtodoQuickfix`, `WtodoFind` (todo.vim) | ripgrep(`rg`) 권장 | 위와 동일 |
+| `WoutlineToggle` (outline.vim) | `ctags` (universal-ctags) | `winget install universal-ctags` 또는 `scoop install universal-ctags` |
+| `WaiComment`/`WaiComplete`/`WaiRefactor` (ai.vim) | `curl` | Windows 10 1803+에는 기본 포함 |
+| `WfindFiles` (finder.vim) | `rg` 또는 `git` (없으면 내장 `glob()`로 자동 대체) | 선택사항 |
+
+`rg`/`ctags`가 없어도 플러그인은 죽지 않고 가능한 대체 수단으로 넘어갑니다
+(`git grep` → 순정 `grep` → Windows 내장 `findstr`). 다만 `findstr`은 정규식
+기능이 제한적이고 다중 키워드는 OR로만 동작하므로, 원활한 검색을 위해서는
+ripgrep 설치를 권장합니다.
+
+**`&shell` 관련 주의사항**: `format.vim`, `gitgutter.vim`(hunk stage/revert),
+`outline.vim`, `diffview.vim` 등은 `shellescape()` + `system()`/`:!` 조합으로
+외부 명령을 실행합니다. 이 조합은 Windows 기본값인 `&shell=cmd.exe` 기준으로
+검증되었습니다. `.vimrc`에서 `&shell`을 PowerShell 등으로 바꾸면
+`shellescape()`의 인용부호 규칙이 맞지 않아 공백/특수문자가 포함된 경로에서
+명령이 깨질 수 있으니, 위 기능들을 사용한다면 `&shell`을 cmd.exe로 유지하는
+것을 권장합니다.
+
+---
+
 ## 문제 해결
 
 ### E492: Not an editor command (예: WexplorerToggle)
@@ -165,7 +194,9 @@ let g:wplus_ai_azure_api_version = '2024-02-15-preview'  " (선택사항)
 ```vim
 :WaiComment         " 선택 영역에 주석 추가
 :WaiComplete        " 코드 완성 제안 표시
-:'<,'>WaiRefactor   " 선택 영역 리팩토링
+:'<,'>WaiRefactor   " 선택 영역 리팩토링 (수락 시 선택 영역을 결과로 교체)
+:WaiFixDiag         " 현재 줄의 LSP 진단(에러/경고)을 AI가 수정
+:WaiCommitMsg       " 스테이징된 변경사항(git diff --cached)으로 커밋 메시지 생성
 :WaiToggleSuggest   " Ghost Text 자동완성 on/off
 ```
 
@@ -174,8 +205,26 @@ let g:wplus_ai_azure_api_version = '2024-02-15-preview'  " (선택사항)
 nnoremap <leader>ac :WaiComment<CR>
 nnoremap <leader>ao :WaiComplete<CR>
 vnoremap <leader>ar :WaiRefactor<CR>
+nnoremap <leader>af :WaiFixDiag<CR>
+nnoremap <leader>am :WaiCommitMsg<CR>
 nnoremap <leader>at :WaiToggleSuggest<CR>
 ```
+
+#### 응답 미리보기 팝업
+
+`WaiComment`/`WaiComplete`/`WaiRefactor`/`WaiFixDiag`/`WaiCommitMsg`는 AI 응답을 바로 버퍼에 쓰지 않고
+가운데 팝업으로 먼저 보여줍니다.
+
+- `Enter` 또는 `a` : 수락 — 버퍼에 적용 (Refactor/FixDiag는 대상 범위를 교체, Comment/Complete는 해당
+  위치 아래에 삽입, CommitMsg는 레지스터(`"`, 가능하면 `+`)에 복사하고 `gitcommit` 버퍼라면 1번째 줄에 삽입)
+- `Esc`, `q`, 그 외 아무 키 : 취소 — 버퍼 변경 없음
+
+#### WaiFixDiag / WaiCommitMsg 참고사항
+
+- `WaiFixDiag`는 `lsp.vim`이 해당 파일 타입에 대해 LSP 서버를 띄우고 진단을 받은 상태여야 동작합니다
+  (`g:wplus_lsp_enabled`, LSP 설정 참고). 진단은 시작 줄 단위로만 추적되므로, 여러 줄에 걸친 진단이어도
+  교체 대상은 해당 줄 1줄입니다.
+- `WaiCommitMsg`는 git 저장소 안에서 실행해야 하며, `git add`로 스테이징된 변경이 있어야 합니다.
 
 #### Ghost Text 자동완성
 

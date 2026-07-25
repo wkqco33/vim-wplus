@@ -86,7 +86,7 @@ function! s:init_buffer() abort
 
     " Syntax highlighting
     syntax clear
-    syntax match WplusExplorerRoot /^\/.*$/
+    syntax match WplusExplorerRoot /^\%(\a:[\\\/]\|\/\).*$/
     syntax match WplusExplorerDir /^ \+▸.*/
     syntax match WplusExplorerDirOpen /^ \+▾.*/
     
