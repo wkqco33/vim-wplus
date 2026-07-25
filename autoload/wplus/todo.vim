@@ -56,44 +56,67 @@ function! wplus#todo#quickfix() abort
         call wplus#util#warn_msg('todo', 'no TODOs found')
         return
     endif
-    
+
     let l:qflist = []
     for l:item in l:items
-        let l:match = matchlist(l:item, '^\(.*\):\(\d\+\):\(\d\+\):\(.*\)')
-        if len(l:match) >= 5
+        let l:parsed = s:parse_grep_line(l:item)
+        if !empty(l:parsed)
             call add(l:qflist, {
-                \ 'filename': l:match[1],
-                \ 'lnum': str2nr(l:match[2]),
-                \ 'col': str2nr(l:match[3]),
-                \ 'text': trim(l:match[4]),
+                \ 'filename': l:parsed.file,
+                \ 'lnum': l:parsed.lnum,
+                \ 'col': l:parsed.col,
+                \ 'text': trim(l:parsed.text),
                 \ 'type': 'I'
                 \ })
         endif
     endfor
-    
+
     call setqflist(l:qflist)
     botright copen
     call wplus#util#info_msg('todo', 'found ' . len(l:qflist) . ' TODO(s)')
 endfunction
 
+" Parse one line of grep-like output into {file, lnum, col, text}.
+" rg --vimgrep emits 'file:line:col:text'; git grep -n / grep -rn / findstr
+" emit 'file:line:text' with no column, so try the column-aware pattern
+" first and fall back when it doesn't match. Filename uses a greedy match so
+" a Windows drive letter ('C:\...') isn't mistaken for the field separator.
+function! s:parse_grep_line(line) abort
+    let l:m = matchlist(a:line, '^\(.*\):\(\d\+\):\(\d\+\):\(.*\)$')
+    if !empty(l:m)
+        return {'file': l:m[1], 'lnum': str2nr(l:m[2]), 'col': str2nr(l:m[3]), 'text': l:m[4]}
+    endif
+    let l:m = matchlist(a:line, '^\(.*\):\(\d\+\):\(.*\)$')
+    if !empty(l:m)
+        return {'file': l:m[1], 'lnum': str2nr(l:m[2]), 'col': 1, 'text': l:m[3]}
+    endif
+    return {}
+endfunction
+
 function! s:get_todos() abort
-    " Try ripgrep first, fallback to git grep, then plain grep
+    " Try ripgrep first, fallback to git grep, then plain grep/findstr
     if executable('rg')
         let l:cmd = 'rg --vimgrep --smart-case "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"'
         let l:items = systemlist(l:cmd)
     elseif executable('git') && isdirectory('.git')
         let l:cmd = 'git grep -n "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"'
         let l:items = systemlist(l:cmd)
-    else
+    elseif executable('grep')
         let l:items = systemlist('grep -rn "TODO\|FIXME\|XXX\|NOTE\|BUG\|HACK\|WARN" .')
+    elseif has('win32')
+        " findstr has no regex alternation; space-separated words are OR'd.
+        let l:items = systemlist('findstr /S /N /I "TODO FIXME XXX NOTE BUG HACK WARN" *')
+    else
+        call wplus#util#warn_msg('todo', 'no grep backend found — install ripgrep (rg) for TODO search')
+        let l:items = []
     endif
     return filter(l:items, '!empty(v:val)')
 endfunction
 
 function! s:jump_to_todo(item) abort
-    let l:match = matchlist(a:item, '^\(.*\):\(\d\+\):\(\d\+\):')
-    if len(l:match) >= 4
-        execute 'edit +' . l:match[2] . ' ' . fnameescape(l:match[1])
+    let l:parsed = s:parse_grep_line(a:item)
+    if !empty(l:parsed)
+        execute 'edit +' . l:parsed.lnum . ' ' . fnameescape(l:parsed.file)
     endif
 endfunction
 

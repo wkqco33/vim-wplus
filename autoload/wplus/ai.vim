@@ -52,7 +52,7 @@ let g:wplus_ai_stream = get(g:, 'wplus_ai_stream', 1)
 " Minimum accumulated chars before first incremental ghost-text render.
 let g:wplus_ai_stream_min_chars = get(g:, 'wplus_ai_stream_min_chars', 20)
 
-let s:command_requests = {} " request_id -> {job, bufnr, lnum, response_buffer}
+let s:command_requests = {} " request_id -> {job, on_content, response_buffer}
 let s:command_channels = {} " channel_key -> request_id
 let s:suggest_request = {} " {request_id, job, channel_key, bufnr, lnum, line, col, fim, response_buffer}
 let s:suggest_request_id = 0  " monotonic id to defeat channel reuse races
@@ -336,23 +336,21 @@ function! s:on_response_complete(channel) abort
         return
     endif
     let l:request = remove(s:command_requests, l:request_id)
-    
+
     let l:response = l:request.response_buffer
-    let l:bufnr = l:request.bufnr
-    let l:lnum = l:request.lnum
-    
+
     if empty(l:response)
         call wplus#util#error_msg('ai', 'empty response from API')
         return
     endif
-    
+
     try
         let l:json = json_decode(l:response)
     catch
         call wplus#util#error_msg('ai', 'failed to parse response')
         return
     endtry
-    
+
     " Extract content based on provider
     let l:content = s:extract_response_content(l:json)
     if empty(l:content)
@@ -364,20 +362,102 @@ function! s:on_response_complete(channel) abort
         endif
         return
     endif
-    
-    " Insert response at current position
-    if bufloaded(l:bufnr)
-        let l:lines = split(l:content, "\n")
-        call append(l:lnum, l:lines)
-        call wplus#util#info_msg('ai', 'response inserted')
+
+    call l:request.on_content(l:content)
+endfunction
+
+" ── Response preview popup (accept/discard before touching the buffer) ────
+
+let s:ai_preview_apply = v:null
+
+" Show a:lines in a centered popup highlighted as a:ft. On accept, call
+" a:ApplyFn (a zero-arg partial with all context already bound); on
+" discard, drop it. Used by every non-streaming AI command below so a
+" response is never written to a buffer/register without explicit accept.
+function! s:open_ai_preview(ft, lines, ApplyFn) abort
+    let s:ai_preview_apply = a:ApplyFn
+    let l:header = '[wplus-ai] Enter/a = apply   Esc/q = discard'
+    let l:width  = float2nr(&columns * 0.6)
+    let l:height = min([len(a:lines) + 2, float2nr(&lines * 0.6)])
+    let l:winid = popup_create([l:header, repeat('─', max([min([l:width - 4, 60]), 1]))] + a:lines, {
+        \ 'title': ' AI Preview ',
+        \ 'line': (&lines - l:height) / 2,
+        \ 'col': (&columns - l:width) / 2,
+        \ 'minwidth': l:width, 'maxwidth': l:width,
+        \ 'minheight': l:height, 'maxheight': l:height,
+        \ 'border': [1, 1, 1, 1],
+        \ 'padding': [0, 1, 0, 1],
+        \ 'filter': 'wplus#ai#preview_filter',
+        \ 'mapping': 0,
+        \ })
+    call setbufvar(winbufnr(l:winid), '&filetype', a:ft)
+endfunction
+
+function! wplus#ai#preview_filter(winid, key) abort
+    call popup_close(a:winid)
+    let l:Apply = s:ai_preview_apply
+    let s:ai_preview_apply = v:null
+    if a:key ==# "\<CR>" || a:key ==? 'a'
+        if !empty(l:Apply) | call l:Apply() | endif
+    else
+        call wplus#util#info_msg('ai', 'discarded')
     endif
+    return 1
+endfunction
+
+" ── Apply callbacks (each is bound via function(name, [args]) partials) ───
+
+function! s:apply_insert_after(bufnr, lnum, lines) abort
+    if !bufloaded(a:bufnr) | return | endif
+    call appendbufline(a:bufnr, a:lnum, a:lines)
+    call wplus#util#info_msg('ai', 'response inserted')
+endfunction
+
+function! s:apply_replace_range(bufnr, start, end, lines) abort
+    if !bufloaded(a:bufnr) | return | endif
+    call deletebufline(a:bufnr, a:start, a:end)
+    call appendbufline(a:bufnr, a:start - 1, a:lines)
+    call wplus#util#info_msg('ai', 'replaced')
+endfunction
+
+function! s:apply_commit(msg) abort
+    call setreg('"', a:msg)
+    if has('clipboard') | silent! call setreg('+', a:msg) | endif
+    if &filetype ==# 'gitcommit'
+        call append(0, split(a:msg, "\n"))
+        call wplus#util#info_msg('ai', 'commit message inserted')
+    else
+        call wplus#util#info_msg('ai', 'commit message copied to register "')
+    endif
+endfunction
+
+" ── OnContent callbacks: parse response text into lines, show preview ─────
+
+function! s:preview_insert_after(bufnr, lnum, content) abort
+    let l:lines = split(a:content, "\n")
+    if empty(l:lines) | call wplus#util#warn_msg('ai', 'empty response') | return | endif
+    call s:open_ai_preview(getbufvar(a:bufnr, '&filetype'), l:lines,
+        \ function('s:apply_insert_after', [a:bufnr, a:lnum, l:lines]))
+endfunction
+
+function! s:preview_replace_range(bufnr, start, end, content) abort
+    let l:lines = split(a:content, "\n")
+    if empty(l:lines) | call wplus#util#warn_msg('ai', 'empty response') | return | endif
+    call s:open_ai_preview(getbufvar(a:bufnr, '&filetype'), l:lines,
+        \ function('s:apply_replace_range', [a:bufnr, a:start, a:end, l:lines]))
+endfunction
+
+function! s:preview_commit(content) abort
+    let l:msg = trim(a:content)
+    if empty(l:msg) | call wplus#util#warn_msg('ai', 'empty commit message') | return | endif
+    call s:open_ai_preview('gitcommit', split(l:msg, "\n"), function('s:apply_commit', [l:msg]))
 endfunction
 
 function! wplus#ai#comment(range_type) abort
     " Generate comment for current selection/function
     let l:bufnr = bufnr('%')
     let l:lnum = line('.')
-    
+
     if a:range_type ==# 'visual'
         let [l:line_start, l:col_start] = getpos("'<")[1:2]
         let [l:line_end, l:col_end] = getpos("'>")[1:2]
@@ -385,9 +465,9 @@ function! wplus#ai#comment(range_type) abort
     else
         let l:code = getline(l:lnum)
     endif
-    
+
     let l:prompt = "Write a concise comment for this code:\n\n" . l:code
-    call s:send_request(l:bufnr, l:lnum, l:prompt)
+    call s:send_request(l:prompt, function('s:preview_insert_after', [l:bufnr, l:lnum]))
 endfunction
 
 function! wplus#ai#complete(context_lines) abort
@@ -395,28 +475,102 @@ function! wplus#ai#complete(context_lines) abort
     let l:bufnr = bufnr('%')
     let l:lnum = line('.')
     let l:col = col('.')
-    
+
     let l:start = max([1, l:lnum - a:context_lines])
     let l:context = join(getline(l:start, l:lnum), "\n")
-    
+
     let l:prompt = "Complete this code. Respond with only the completion, no explanation:\n\n" . l:context
-    call s:send_request(l:bufnr, l:lnum, l:prompt)
+    call s:send_request(l:prompt, function('s:preview_insert_after', [l:bufnr, l:lnum]))
 endfunction
 
 function! wplus#ai#refactor() abort
-    " Suggest refactoring
+    " Suggest refactoring; replaces the visual selection on accept.
     let l:bufnr = bufnr('%')
-    let l:lnum = line('.')
-    
     let [l:line_start, l:col_start] = getpos("'<")[1:2]
     let [l:line_end, l:col_end] = getpos("'>")[1:2]
     let l:code = join(getline(l:line_start, l:line_end), "\n")
-    
-    let l:prompt = "Refactor this code to be more efficient and readable:\n\n" . l:code
-    call s:send_request(l:bufnr, l:lnum, l:prompt)
+
+    let l:prompt = "Refactor this code to be more efficient and readable. "
+        \ . "Return ONLY the replacement code for these lines, no explanation, no markdown code fences:\n\n"
+        \ . l:code
+    call s:send_request(l:prompt, function('s:preview_replace_range', [l:bufnr, l:line_start, l:line_end]))
 endfunction
 
-function! s:send_request(bufnr, lnum, prompt) abort
+" Explain and fix the LSP diagnostic on the current line, replacing just
+" that line on accept. Requires lsp.vim to be running for this filetype
+" (b:wplus_lsp_diags is populated by wplus#lsp#setup()'s diagnostic handler).
+function! wplus#ai#fix_diagnostic() abort
+    let l:bufnr = bufnr('%')
+    let l:lnum = line('.')
+    let l:diags = getbufvar(l:bufnr, 'wplus_lsp_diags', {})
+    if !has_key(l:diags, l:lnum)
+        call wplus#util#warn_msg('ai', 'no diagnostic on this line')
+        return
+    endif
+    let l:diag = l:diags[l:lnum]
+
+    " get_prefix(lnum, 1, ...) excludes the current line; get_suffix must be
+    " called with lnum+1 for the same reason, else it re-includes it (see
+    " ai/context.vim get_suffix: col=1 keeps the whole line at line_nr).
+    let l:prefix = wplus#ai#context#get_prefix(l:lnum, 1, 15)
+    let l:suffix = wplus#ai#context#get_suffix(l:lnum + 1, 1, 15)
+    let l:line   = getline(l:lnum)
+
+    let l:prompt = "The following " . &filetype . " code has a diagnostic on the marked line.\n"
+        \ . "Diagnostic: " . l:diag.msg . "\n\n"
+        \ . "Code before:\n" . l:prefix . "\n\n"
+        \ . ">>> " . l:line . "\n\n"
+        \ . "Code after:\n" . l:suffix . "\n\n"
+        \ . "Return ONLY the corrected replacement for the marked line (prefixed with >>>). "
+        \ . "No explanation, no markdown fences, no line-number prefix."
+    call s:send_request(l:prompt, function('s:preview_replace_range', [l:bufnr, l:lnum, l:lnum]))
+endfunction
+
+" Generate a commit message from the staged (git diff --cached) changes.
+" On accept: copied to the unnamed (and system, if available) register, and
+" auto-inserted at the top of the buffer when it's a gitcommit buffer.
+function! wplus#ai#commit_message() abort
+    let l:file = expand('%:p')
+    let l:root = !empty(l:file) ? wplus#util#find_git_root(fnamemodify(l:file, ':h')) : ''
+    if empty(l:root)
+        let l:root = wplus#util#find_git_root(getcwd())
+    endif
+    if empty(l:root)
+        call wplus#util#error_msg('ai', 'not a git repository')
+        return
+    endif
+    if g:wplus_ai_provider !=# 'ollama' && empty(g:wplus_ai_api_key)
+        call wplus#util#error_msg('ai', 'API key not configured (g:wplus_ai_api_key)')
+        return
+    endif
+    if empty(g:wplus_ai_model)
+        call wplus#util#error_msg('ai', 'model not configured (g:wplus_ai_model)')
+        return
+    endif
+
+    let l:lines = []
+    call job_start(['git', '-C', l:root, 'diff', '--cached'], {
+        \ 'out_cb':   {_, l -> add(l:lines, l)},
+        \ 'close_cb': {_ -> s:on_commit_diff(l:lines)},
+        \ 'err_cb':   {_ch, _msg -> 0},
+        \ })
+    call wplus#util#info_msg('ai', 'reading staged changes...')
+endfunction
+
+function! s:on_commit_diff(lines) abort
+    let l:diff = join(a:lines, "\n")
+    if empty(trim(l:diff))
+        call wplus#util#warn_msg('ai', 'no staged changes (git add first)')
+        return
+    endif
+    let l:prompt = "Write a concise git commit message for the following staged diff. "
+        \ . "First line: a short imperative summary (max 50 chars). "
+        \ . "Then a blank line and, only if needed, a short body explaining what changed. "
+        \ . "No markdown fences.\n\ndiff:\n" . l:diff
+    call s:send_request(l:prompt, function('s:preview_commit'))
+endfunction
+
+function! s:send_request(prompt, OnContent) abort
     if g:wplus_ai_provider !=# 'ollama' && empty(g:wplus_ai_api_key)
         call wplus#util#error_msg('ai', 'API key not configured (g:wplus_ai_api_key)')
         return
@@ -426,15 +580,15 @@ function! s:send_request(bufnr, lnum, prompt) abort
         call wplus#util#error_msg('ai', 'model not configured (g:wplus_ai_model)')
         return
     endif
-    
+
     let l:endpoint = s:get_api_endpoint()
     let l:headers = s:get_request_headers()
     if empty(l:headers) | return | endif
-    
+
     let l:payload = s:build_request_payload(a:prompt)
     let l:request_id = reltimestr(reltime())
     let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers, g:wplus_ai_timeout)
-    
+
     let l:job = job_start(l:cmd, {
         \ 'out_cb': function('s:on_response'),
         \ 'close_cb': function('s:on_response_complete'),
@@ -444,11 +598,10 @@ function! s:send_request(bufnr, lnum, prompt) abort
         call wplus#util#error_msg('ai', 'failed to start request')
         return
     endif
-    
+
     let s:command_requests[l:request_id] = {
         \ 'job': l:job,
-        \ 'bufnr': a:bufnr,
-        \ 'lnum': a:lnum,
+        \ 'on_content': a:OnContent,
         \ 'response_buffer': ''
         \ }
     let s:command_channels[s:channel_key(job_getchannel(l:job))] = l:request_id
@@ -492,6 +645,8 @@ function! wplus#ai#setup() abort
     command! -range WaiComment   call wplus#ai#comment('visual')
     command! -nargs=? WaiComplete call wplus#ai#complete(<q-args> != '' ? <q-args> : 5)
     command! -range WaiRefactor  call wplus#ai#refactor()
+    command! WaiFixDiag          call wplus#ai#fix_diagnostic()
+    command! WaiCommitMsg        call wplus#ai#commit_message()
     command! WaiToggleSuggest    call wplus#ai#toggle_suggest()
     command! WaiAcceptSuggest    call wplus#ai#accept_suggestion_insert()
     command! WaiDismissSuggest   call wplus#ai#dismiss_suggestion()
@@ -501,6 +656,8 @@ function! wplus#ai#setup() abort
     nnoremap <silent> <Plug>WaiComment   :WaiComment<CR>
     nnoremap <silent> <Plug>WaiComplete  :WaiComplete<CR>
     xnoremap <silent> <Plug>WaiRefactor  :WaiRefactor<CR>
+    nnoremap <silent> <Plug>WaiFixDiag   :WaiFixDiag<CR>
+    nnoremap <silent> <Plug>WaiCommitMsg :WaiCommitMsg<CR>
     nnoremap <silent> <Plug>WaiToggleSuggest :WaiToggleSuggest<CR>
     inoremap <silent> <Plug>WaiDismissSuggest <C-r>=wplus#ai#dismiss_suggestion()<CR>
     inoremap <silent> <expr> <Plug>WaiAcceptWord wplus#ai#accept_word_suggestion()

@@ -38,6 +38,17 @@ function! wplus#util#null_redirect() abort
     return has('win32') ? '2>nul' : '2>/dev/null'
 endfunction
 
+" Strip a:root prefix from a:file to get a path relative to the repo root.
+" git commands (rev-parse --show-toplevel, etc.) always return '/'-separated
+" paths, while expand('%:p')/fnamemodify() return native paths ('\' on
+" Windows unless 'shellslash' is set). Normalize both to '/' before comparing
+" so the prefix match works regardless of which style either side used.
+function! wplus#util#relpath(root, file) abort
+    let l:root = substitute(a:root, '\\', '/', 'g')
+    let l:file = substitute(a:file, '\\', '/', 'g')
+    return l:file[: len(l:root)] ==# l:root . '/' ? l:file[len(l:root) + 1 :] : a:file
+endfunction
+
 let s:git_root_cache = {}
 
 function! wplus#util#find_git_root(dir) abort

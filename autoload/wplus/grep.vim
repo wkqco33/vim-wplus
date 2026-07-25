@@ -12,9 +12,15 @@ function! s:configure_grep() abort
     elseif executable('git') && isdirectory('.git')
         let &grepprg = 'git grep -n --column'
         let &grepformat = '%f:%l:%c:%m'
-    else
+    elseif executable('grep')
         let &grepprg = 'grep -RIn $* .'
         let &grepformat = '%f:%l:%m'
+    elseif has('win32')
+        " findstr ships with every Windows install, unlike grep/rg.
+        let &grepprg = 'findstr /S /N /P $* *'
+        let &grepformat = '%f:%l:%m'
+    else
+        call wplus#util#warn_msg('grep', 'no grep backend found — install ripgrep (rg) for :grep support')
     endif
 endfunction
 
@@ -63,8 +69,13 @@ function! wplus#grep#search_async(args) abort
         let l:cmd = ['rg', '--vimgrep', '--smart-case', '--', a:args]
     elseif executable('git') && isdirectory('.git')
         let l:cmd = ['git', 'grep', '-n', '--column', a:args]
-    else
+    elseif executable('grep')
         let l:cmd = ['grep', '-RIn', a:args, '.']
+    elseif has('win32')
+        let l:cmd = ['findstr', '/S', '/N', '/P', a:args, '*']
+    else
+        call wplus#util#warn_msg('grep', 'no grep backend found — install ripgrep (rg) for search support')
+        return
     endif
     
     let s:grep_job = job_start(l:cmd, {
