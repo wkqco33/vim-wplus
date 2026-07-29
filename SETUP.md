@@ -1,515 +1,241 @@
-# vim-wplus 설정 가이드
+﻿# vim-wplus 설정 가이드
 
-vim-wplus는 31개 모듈로 구성된 완전한 Vim IDE입니다. 이 가이드는 각 기능을 설정하는 방법을 설명합니다.
+> [← README](README.md) · [모듈 문서](docs/) · [단축키](docs/keymaps.md)
+
+vim-wplus는 **43개 모듈**로 구성된 의존성 없는 Vim 올인원 플러그인입니다.  
+이 가이드는 설치·외부 도구·문제 해결·빠른 시작 설정을 다룹니다.
+
+---
 
 ## 설치
 
-### 1. vim-plug를 사용한 설치 (권장)
+### 요구사항
 
-**~/.vimrc**에 다음을 추가합니다:
+- **Vim 9.1+** (또는 NeoVim 0.7+)
+- 필수 기능 확인:
+
+```vim
+:echo has('job') && has('channel') && has('popupwin') && has('signs') && has('textprop')
+" 1이 출력되어야 합니다
+```
+
+### 방법 1 — vim-plug (권장)
 
 ```vim
 call plug#begin()
-" vim-wplus를 로컬 경로에서 로드
-Plug '/path/to/vim-wplus'
+Plug 'wkqco33/vim-wplus'   " GitHub
+" 또는 로컬 경로
+" Plug '/path/to/vim-wplus'
 call plug#end()
 ```
 
-그 후 Vim에서 다음을 실행합니다:
-```vim
-:PlugInstall
-```
+Vim에서 `:PlugInstall` 실행.
 
-### 2. 직접 설정 (vim-plug 없음)
-
-**~/.vimrc**에 다음을 추가합니다:
-
-```vim
-set runtimepath+=/path/to/vim-wplus
-set packpath+=/path/to/vim-wplus
-
-" 모듈 사용 전에 반드시 이 라인 추가
-if filereadable('/path/to/vim-wplus/plugin/wplus.vim')
-    source /path/to/vim-wplus/plugin/wplus.vim
-endif
-```
-
-**Windows 예시**:
-
-```vim
-set runtimepath+=C:/Users/wkqco/Workspace/utils/vim-wplus
-set packpath+=C:/Users/wkqco/Workspace/utils/vim-wplus
-
-if filereadable('C:/Users/wkqco/Workspace/utils/vim-wplus/plugin/wplus.vim')
-    source C:/Users/wkqco/Workspace/utils/vim-wplus/plugin/wplus.vim
-endif
-```
-
-### 3. 빠른 시작 (예시)
+### 방법 2 — pack 직접 설치
 
 ```bash
-# vim-wplus를 ~/.vim/plugged에 설치
-git clone https://github.com/your-user/vim-wplus ~/.vim/plugged/vim-wplus
+# Unix / macOS
+git clone <url> ~/.vim/pack/user/start/vim-wplus
 
-# 또는 ~/.local/share/nvim/site/pack/user/start에 설치
-mkdir -p ~/.local/share/nvim/site/pack/user/start
-git clone https://github.com/your-user/vim-wplus ~/.local/share/nvim/site/pack/user/start/vim-wplus
+# Windows (PowerShell)
+git clone <url> "$env:USERPROFILE\vimfiles\pack\user\start\vim-wplus"
 ```
 
-**~/.vimrc**:
-```vim
-" 경로 설정
-set runtimepath+=~/.vim/plugged/vim-wplus
+별도 `source` 없이 자동 로드됩니다.
 
-" 플러그인 로드
-source ~/.vim/plugged/vim-wplus/plugin/wplus.vim
+### 방법 3 — 수동 설치
+
+```vim
+" ~/.vimrc (Unix)
+set runtimepath+=~/.vim/pack/user/start/vim-wplus
+source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
+```
+
+```vim
+" _vimrc (Windows — 슬래시 사용 권장)
+set runtimepath+=C:/Users/<user>/vimfiles/pack/user/start/vim-wplus
+source C:/Users/<user>/vimfiles/pack/user/start/vim-wplus/plugin/wplus.vim
+```
+
+### 빠른 시작
+
+```bash
+# 1. 복제
+git clone <url> ~/.vim/pack/user/start/vim-wplus
+
+# 2. 예시 설정 복사
+cp ~/.vim/pack/user/start/vim-wplus/.vimrc.example ~/.vimrc
+
+# 3. Vim 시작
+vim
 ```
 
 ---
 
-## Windows 사용 시 참고사항
+## 외부 도구
 
-vim-wplus는 Windows(gvim/터미널 Vim)에서 동작하도록 만들어졌지만, 아래 기능들은
-외부 도구가 PATH에 있어야 정상 동작합니다. Windows는 이 도구들을 기본 내장하지
-않으므로 별도 설치가 필요합니다.
+vim-wplus 자체는 의존성이 없지만, 일부 모듈은 외부 도구가 있으면 기능이 향상됩니다.
 
-| 기능 | 필요 도구 | 설치 예시 |
-|------|-----------|-----------|
-| `:Wgrep`, `WgrepRx`, `WgrepWord` (grep.vim) | ripgrep(`rg`) 권장 | `winget install BurntSushi.ripgrep.MSVC` 또는 `scoop install ripgrep` |
-| `WtodoQuickfix`, `WtodoFind` (todo.vim) | ripgrep(`rg`) 권장 | 위와 동일 |
-| `WoutlineToggle` (outline.vim) | `ctags` (universal-ctags) | `winget install universal-ctags` 또는 `scoop install universal-ctags` |
-| `WaiComment`/`WaiComplete`/`WaiRefactor` (ai.vim) | `curl` | Windows 10 1803+에는 기본 포함 |
-| `WfindFiles` (finder.vim) | `rg` 또는 `git` (없으면 내장 `glob()`로 자동 대체) | 선택사항 |
+| 도구 | 관련 모듈 | 비고 |
+|------|-----------|------|
+| `git` | gitgutter, blame, diffview, conflict, ai | 대부분의 환경에 기본 포함 |
+| `ripgrep` (`rg`) | grep, todo, finder | 강력 권장 (없으면 git grep → grep으로 폴백) |
+| `curl` | ai | Windows 10 1803+에 기본 포함 |
+| `ctags` (universal-ctags) | outline, ai/context | outline 사용 시 필수 |
+| LSP 언어 서버 | lsp | 언어별 별도 설치 필요 |
+| 포매터 (`gofmt`, `prettier` 등) | format | 없으면 `gg=G`로 폴백 |
 
-`rg`/`ctags`가 없어도 플러그인은 죽지 않고 가능한 대체 수단으로 넘어갑니다
-(`git grep` → 순정 `grep` → Windows 내장 `findstr`). 다만 `findstr`은 정규식
-기능이 제한적이고 다중 키워드는 OR로만 동작하므로, 원활한 검색을 위해서는
-ripgrep 설치를 권장합니다.
+### 도구 설치
 
-**`&shell` 관련 주의사항**: `format.vim`, `gitgutter.vim`(hunk stage/revert),
-`outline.vim`, `diffview.vim` 등은 `shellescape()` + `system()`/`:!` 조합으로
-외부 명령을 실행합니다. 이 조합은 Windows 기본값인 `&shell=cmd.exe` 기준으로
-검증되었습니다. `.vimrc`에서 `&shell`을 PowerShell 등으로 바꾸면
-`shellescape()`의 인용부호 규칙이 맞지 않아 공백/특수문자가 포함된 경로에서
-명령이 깨질 수 있으니, 위 기능들을 사용한다면 `&shell`을 cmd.exe로 유지하는
-것을 권장합니다.
+#### ripgrep
 
----
-
-## 문제 해결
-
-### E492: Not an editor command (예: WexplorerToggle)
-
-이 오류는 vim-wplus 플러그인이 제대로 로드되지 않았다는 뜻입니다.
-
-**해결 방법:**
-
-1. **runtimepath 확인**
-```vim
-:set runtimepath?
-" /path/to/vim-wplus가 포함되어 있는지 확인
-```
-
-2. **플러그인 로드 확인**
-```vim
-:echo exists(':WexplorerToggle')
-" 2가 반환되어야 함
-
-:echo exists('*wplus#explorer#toggle')
-" 1이 반환되어야 함 (0이면 로드되지 않은 것)
-```
-
-3. **수동 로드**
-```vim
-" .vimrc에 다음을 추가
-set runtimepath+=/path/to/vim-wplus
-source /path/to/vim-wplus/plugin/wplus.vim
-```
-
-4. **모듈 활성화 확인**
-```vim
-" .vimrc의 설정이 plugin/wplus.vim 보다 먼저 로드되어야 함
-let g:wplus_explorer_enabled = 1
-source /path/to/vim-wplus/plugin/wplus.vim
-```
-
----
-
-## 빠른 시작 (설정)
-
-1. `.vimrc.example`을 복사하여 `~/.vimrc`에 적용:
 ```bash
-cp /path/to/vim-wplus/.vimrc.example ~/.vimrc
+# macOS
+brew install ripgrep
+
+# Ubuntu / Debian
+sudo apt-get install ripgrep
+
+# Windows (winget)
+winget install BurntSushi.ripgrep.MSVC
+
+# Windows (scoop)
+scoop install ripgrep
 ```
 
-2. Vim을 시작하고 필요한 설정을 추가합니다.
+#### ctags (universal-ctags)
 
-3. 필요한 언어 서버 설치 (선택사항):
 ```bash
+# macOS
+brew install universal-ctags
+
+# Ubuntu / Debian
+sudo apt-get install universal-ctags
+
+# Windows
+winget install universal-ctags
+# 또는 scoop install universal-ctags
+```
+
+#### LSP 언어 서버
+
+```bash
+# Go
+go install golang.org/x/tools/gopls@latest
+
 # Python
 pip install python-lsp-server
 
-# Go
-go install github.com/golang/tools/gopls@latest
-
-# TypeScript/JavaScript
-npm install -g typescript-language-server
-```
-
----
-
-## 설정 가이드
-
-### 1. AI Assistant (ChatGPT, Claude, Azure OpenAI)
-
-AI 기반 코드 주석, 완성, 리팩토링 기능입니다.
-
-#### OpenAI 설정
-```vimscript
-let g:wplus_ai_provider = 'openai'
-let g:wplus_ai_api_key = 'sk-...'
-let g:wplus_ai_model = 'gpt-3.5-turbo'    " 또는 'gpt-4'
-let g:wplus_ai_temperature = 0.7
-let g:wplus_ai_max_tokens = 2000
-```
-
-#### Claude 설정
-```vimscript
-let g:wplus_ai_provider = 'claude'
-let g:wplus_ai_api_key = 'sk-ant-...'
-let g:wplus_ai_model = 'claude-3-sonnet-20240229'
-```
-
-#### Azure OpenAI 설정
-```vimscript
-let g:wplus_ai_provider = 'azure'
-let g:wplus_ai_api_key = 'your-azure-key'
-let g:wplus_ai_model = 'gpt-4'
-let g:wplus_ai_azure_resource = 'your-company-ai'        " 리소스 이름
-let g:wplus_ai_azure_deployment = 'gpt-4-deployment'     " 배포명
-let g:wplus_ai_azure_api_version = '2024-02-15-preview'  " (선택사항)
-```
-
-#### 명령어
-```vim
-:WaiComment         " 선택 영역에 주석 추가
-:WaiComplete        " 코드 완성 제안 표시
-:'<,'>WaiRefactor   " 선택 영역 리팩토링 (수락 시 선택 영역을 결과로 교체)
-:WaiFixDiag         " 현재 줄의 LSP 진단(에러/경고)을 AI가 수정
-:WaiCommitMsg       " 스테이징된 변경사항(git diff --cached)으로 커밋 메시지 생성
-:WaiToggleSuggest   " Ghost Text 자동완성 on/off
-```
-
-#### 키 매핑 예시
-```vimscript
-nnoremap <leader>ac :WaiComment<CR>
-nnoremap <leader>ao :WaiComplete<CR>
-vnoremap <leader>ar :WaiRefactor<CR>
-nnoremap <leader>af :WaiFixDiag<CR>
-nnoremap <leader>am :WaiCommitMsg<CR>
-nnoremap <leader>at :WaiToggleSuggest<CR>
-```
-
-#### 응답 미리보기 팝업
-
-`WaiComment`/`WaiComplete`/`WaiRefactor`/`WaiFixDiag`/`WaiCommitMsg`는 AI 응답을 바로 버퍼에 쓰지 않고
-가운데 팝업으로 먼저 보여줍니다.
-
-- `Enter` 또는 `a` : 수락 — 버퍼에 적용 (Refactor/FixDiag는 대상 범위를 교체, Comment/Complete는 해당
-  위치 아래에 삽입, CommitMsg는 레지스터(`"`, 가능하면 `+`)에 복사하고 `gitcommit` 버퍼라면 1번째 줄에 삽입)
-- `Esc`, `q`, 그 외 아무 키 : 취소 — 버퍼 변경 없음
-
-#### WaiFixDiag / WaiCommitMsg 참고사항
-
-- `WaiFixDiag`는 `lsp.vim`이 해당 파일 타입에 대해 LSP 서버를 띄우고 진단을 받은 상태여야 동작합니다
-  (`g:wplus_lsp_enabled`, LSP 설정 참고). 진단은 시작 줄 단위로만 추적되므로, 여러 줄에 걸친 진단이어도
-  교체 대상은 해당 줄 1줄입니다.
-- `WaiCommitMsg`는 git 저장소 안에서 실행해야 하며, `git add`로 스테이징된 변경이 있어야 합니다.
-
-#### Ghost Text 자동완성
-
-InsertMode에서 자동으로 AI 완성 제안을 Ghost Text로 표시합니다.
-
-**작동 방식:**
-- 입력 모드에서 타이핑을 멈추면 설정된 delay 후 자동으로 제안 표시
-- Tab 키로 제안 수락
-- Escape나 다른 키를 누르면 제안 취소
-- 회색(NonText highlight)으로 표시되어 실제 텍스트와 구분 가능
-
-**설정:**
-```vimscript
-let g:wplus_ai_suggest_enabled = 1               " 활성화 여부 (기본값: 1)
-let g:wplus_ai_suggest_delay = 500               " 제안 지연 시간 (ms)
-let g:wplus_ai_suggest_context_lines = 50        " 컨텍스트 수집 라인 수
-let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
-let g:wplus_ai_suggest_max_lines = 3             " 제안 표시할 최대 줄 수 (장황한 스트리밍 방지)
-" let g:wplus_ai_suggest_debug = 1               " 디버그 로그 출력
-```
-
-**인자 설명:**
-- `suggest_enabled`: 자동완성 기능 활성화/비활성화
-- `suggest_delay`: 입력 후 제안까지 대기시간 (밀리초)
-  - 작을수록 빠르지만 API 비용 증가
-  - 큰값일수록 느림 (기본 500ms)
-  - 5회 타이핑 후 delay 자동 2배 증가 (빠른 입력 시 불필요한 요청 감소)
-- `context_lines`: 제안 컨텍스트로 포함할 이전 라인 수
-- `suffix_lines`: 제안 컨텍스트로 포함할 이후 라인 수
-- `suggest_max_lines`: 제안 표시할 최대 줄 수 (장황한 스트리밍 및 표시 방지)
-
-**언어별 Context 추출:**
-- Go: `func` 함수명 추출, 함수 경계 인식
-- Python: `def`/`class` 추출, 들여쓰기 기반 scope
-- TypeScript/JavaScript: `function`, `class`, `const/let/var` 추출
-- Rust: `fn`, `struct`, `impl`, `trait` 추출
-- Java: `class`, `interface`, `enum` 추출
-- Kotlin: `fun`, `class`, `object` 추출
-- Ruby: `def`, `class`, `module` 추출
-- Lua: `function` 추출
-- C/C++: 함수 선언 추출
-
-**Key Mapping:**
-```vimscript
-inoremap <expr> <Tab> wplus#ai#accept_suggestion()
-nnoremap <Leader>ai :WaiToggleSuggest<CR>
-```
-
-이미 `<Tab>`을 LSP 또는 snippet 이동에 쓰고 있다면 Ghost Text는 다른 키에 매핑하는 것이 안전합니다.
-
----
-
-### 2. Snippet Engine (스니펫)
-
-코드 템플릿을 빠르게 확장합니다.
-
-#### 지원 스니펫
-```python
-# Python
-def[Tab]    -> def function_name(${1:args}):
-class[Tab]  -> class ClassName${1:(BaseClass)}:
-if[Tab]     -> if ${1:condition}:
-for[Tab]    -> for ${1:item} in ${2:iterable}:
-```
-
-```go
-// Go
-func[Tab]   -> func ${1:function_name}(${2:params}) ${3:return_type} {
-if[Tab]     -> if ${1:condition} {
-for[Tab]    -> for ${1:i} := ${2:0}; ${1:i} < ${3:n}; ${1:i}++ {
-```
-
-#### 플레이스홀더 문법
-```
-${1:default}  - 선택 가능한 필드 (Tab으로 이동)
-${2:second}   - 두 번째 필드
-${0:end}      - 스니펫 종료 지점
-```
-
-#### 설정
-```vimscript
-let g:wplus_snippet_enabled = 1
-let g:wplus_snippet_jump_key = '<Tab>'
-let g:wplus_snippet_jump_back_key = '<S-Tab>'
-```
-
----
-
-### 3. Git Conflict Resolver (충돌 해결)
-
-Git merge 충돌을 시각적으로 해결합니다.
-
-#### 명령어
-```vim
-:WconflictNext      " 다음 충돌로 이동
-:WconflictPrev      " 이전 충돌로 이동
-:WconflictOurs      " ours 버전 선택
-:WconflictTheirs    " theirs 버전 선택
-:WconflictBoth      " 둘 다 선택
-```
-
-#### 키 매핑 예시
-```vimscript
-nnoremap <leader>cn :WconflictNext<CR>
-nnoremap <leader>co :WconflictOurs<CR>
-nnoremap <leader>ct :WconflictTheirs<CR>
-nnoremap <leader>cb :WconflictBoth<CR>
-```
-
-#### 설정
-```vimscript
-let g:wplus_conflict_enabled = 1
-let g:wplus_conflict_auto_highlight = 1
-```
-
----
-
-### 4. TODO Manager (TODO 관리)
-
-코드에서 TODO/FIXME/HACK을 찾아 Quickfix에 표시합니다.
-
-#### 명령어
-```vim
-:WtodoQuickfix      " TODO 목록을 Quickfix에 표시
-```
-
-#### 검색 대상
-```vimscript
-let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
-```
-
-#### 설정
-```vimscript
-let g:wplus_todo_enabled = 1
-let g:wplus_todo_grep_backend = 'rg'    " rg, git grep, grep
-```
-
----
-
-### 5. Advanced Search (고급 검색)
-
-정규표현식, 단어 검색, 검색 히스토리를 지원합니다.
-
-#### 명령어
-```vim
-:WgrepRx            " 정규표현식 검색
-:WgrepWord          " 단어 검색 (정확한 매칭)
-:Wgrep pattern      " 기본 검색
-```
-
-#### 키 매핑 예시
-```vimscript
-nnoremap <leader>fR :WgrepRx<CR>
-nnoremap <leader>fw :WgrepWord<CR>
-nnoremap <leader>fg :Wgrep <C-r><C-w><CR>
-```
-
-#### 설정
-```vimscript
-let g:wplus_grep_backend = 'rg'         " rg, git grep, grep
-let g:wplus_grep_max_results = 1000
-let g:wplus_grep_ignore_vcs = 1
-let g:wplus_search_history_max = 100
-```
-
----
-
-### 6. Colorscheme Auto-detect (배경색 감지)
-
-터미널의 밝기(dark/light)를 자동으로 감지하여 컬러스킴을 조정합니다.
-
-#### 설정
-```vimscript
-let g:wplus_colorscheme_auto_detect = 1
-```
-
----
-
-## LSP 설정
-
-### 지원하는 언어
-- Python (pylsp)
-- Go (gopls)
-- TypeScript/JavaScript (typescript-language-server)
-- Rust (rust-analyzer)
-- C/C++ (clangd)
-- 기타 LSP 호환 서버
-
-### LSP 서버 설치
-
-```bash
-# Python
-pip install python-lsp-server
-
-# Go
-go install github.com/golang/tools/gopls@latest
-
-# TypeScript
-npm install -g typescript-language-server
+# TypeScript / JavaScript
+npm install -g typescript-language-server typescript
 
 # Rust
 rustup component add rust-analyzer
 
-# C/C++
+# C / C++
 # macOS: brew install llvm
-# Ubuntu: sudo apt-get install clang-tools
-# Fedora: sudo dnf install clang-tools-extra
+# Ubuntu: sudo apt-get install clangd
 ```
 
-### LSP 설정
-```vimscript
-let g:wplus_lsp_enabled = 1
-let g:wplus_lsp_servers = {
-    \ 'python': { 'cmd': ['pylsp'] },
-    \ 'go': { 'cmd': ['gopls'] },
-    \ 'typescript': { 'cmd': ['typescript-language-server', '--stdio'] }
-\ }
-let g:wplus_lsp_definition_split = 0    " 0=same, 1=split, 2=vsplit, 3=tab
-```
+---
 
-### LSP 명령어
+## AI 설정
+
+> 상세 내용 → **[docs/ai.md](docs/ai.md)**
+
+### OpenAI
+
 ```vim
-gd              " 정의로 이동 (Go to Definition)
-gr              " 참조 찾기 (References)
-K               " 호버 정보 (Documentation)
-<F2>            " 이름 변경 (Rename) - 일부 플러그인
+let g:wplus_ai_provider = 'openai'
+let g:wplus_ai_api_key  = $OPENAI_API_KEY  " 환경 변수 권장
+let g:wplus_ai_model    = 'gpt-4o'
+```
+
+### Claude
+
+```vim
+let g:wplus_ai_provider = 'claude'
+let g:wplus_ai_api_key  = $ANTHROPIC_API_KEY
+let g:wplus_ai_model    = 'claude-3-5-sonnet-20241022'
+```
+
+### Azure OpenAI
+
+```vim
+let g:wplus_ai_provider         = 'azure'
+let g:wplus_ai_api_key          = $AZURE_OPENAI_KEY
+let g:wplus_ai_azure_resource   = 'your-resource'
+let g:wplus_ai_azure_deployment = 'gpt-4-deployment'
+```
+
+### Ollama (로컬)
+
+```vim
+let g:wplus_ai_provider          = 'ollama'
+let g:wplus_ai_model             = 'qwen2.5-coder:7b'
+let g:wplus_ai_ollama_host       = 'http://localhost:11434'
+let g:wplus_ai_ollama_fim        = 1   " FIM 활성화 (코드 완성 품질 향상)
+let g:wplus_ai_ollama_keep_alive = '30m'
+```
+
+**Ghost Text 수락 키 설정:**
+
+```vim
+inoremap <expr> <Tab> wplus#ai#accept_suggestion()
+" Tab을 이미 snippet/LSP에 사용 중이라면 다른 키 사용
+inoremap <expr> <C-g> wplus#ai#accept_suggestion()
 ```
 
 ---
 
-## 성능 최적화 설정
+## 권장 키 매핑
 
-### LSP 캐시 (30-50% 성능 향상)
-```vimscript
-let g:wplus_lsp_cache_enabled = 1
-let g:wplus_lsp_cache_ttl = 300        " 캐시 유효시간 (초)
-```
+```vim
+" ~/.vimrc에 추가
+let mapleader = ' '   " Space를 leader로
 
-### Gitgutter 최적화 (90% 성능 향상)
-```vimscript
-let g:wplus_gitgutter_enabled = 1
-let g:wplus_gitgutter_disable_on_large_files = 1
-let g:wplus_gitgutter_file_size_limit = 500000
-```
-
-### Finder 제한
-```vimscript
-let g:wplus_finder_match_limit = 10000  " 대용량 디렉토리 보호
-```
-
----
-
-## 추천 키 매핑
-
-```vimscript
 " 탐색
 nnoremap <leader>e  :WexplorerToggle<CR>
 nnoremap <leader>p  :WfindFiles<CR>
 nnoremap <leader>b  :WfindBuffers<CR>
-nnoremap <leader>m  :WfindMRU<CR>
+nnoremap <leader>fh :Whistory<CR>
+
+" Harpoon
+nnoremap <leader>ha :WharoonAdd<CR>
+nnoremap <leader>hl :WharoonList<CR>
+nnoremap <leader>h1 :call wplus#harpoon#jump(1)<CR>
+nnoremap <leader>h2 :call wplus#harpoon#jump(2)<CR>
+
+" AI
+vnoremap <leader>ar :WaiReview<CR>
+vnoremap <leader>ae :WaiExplain<CR>
+vnoremap <leader>af :WaiRefactor<CR>
+nnoremap <leader>am :WaiCommitMsg<CR>
+nnoremap <leader>at :WaiToggleSuggest<CR>
+inoremap <expr> <Tab> wplus#ai#accept_suggestion()
+
+" 코드 실행
+nnoremap <leader>rr :Wrun<CR>
+nnoremap <leader>rb :Wbuild<CR>
+nnoremap <leader>rt :Wtest<CR>
+
+" 프로젝트
+nnoremap <leader>sc :WscratchToggle<CR>
+nnoremap <leader>pe :WprojectEdit<CR>
+
+" Git
+nnoremap <leader>gd :WdiffviewFile<CR>
+nnoremap <leader>gD :WdiffviewRepo<CR>
 
 " 검색
 nnoremap <leader>fg :Wgrep <C-r><C-w><CR>
-nnoremap <leader>fR :WgrepRx<CR>
-nnoremap <leader>fw :WgrepWord<CR>
 
-" AI
-nnoremap <leader>ac :WaiComment<CR>
-nnoremap <leader>ao :WaiComplete<CR>
-vnoremap <leader>ar :WaiRefactor<CR>
-
-" Git
-nnoremap <leader>bl :BlamerToggle<CR>
-nnoremap <leader>cn :WconflictNext<CR>
-nnoremap <leader>co :WconflictOurs<CR>
-
-" TODO
-nnoremap <leader>tt :WtodoQuickfix<CR>
-
-" 버퍼/윈도우
+" 버퍼·창
 nnoremap <leader>bd :Bdelete<CR>
-nnoremap <leader>u  :UndotreeToggle<CR>
-nnoremap <leader>tm :WplusTerminalToggle<CR>
+nnoremap <leader>u  :WundotreeToggle<CR>
+nnoremap <leader>tt :WplusTerminalToggle<CR>
 
-" 윈도우 네비게이션
+" 창 이동
 nnoremap <C-h> <C-w>h
 nnoremap <C-j> <C-w>j
 nnoremap <C-k> <C-w>k
@@ -518,82 +244,123 @@ nnoremap <C-l> <C-w>l
 
 ---
 
+## Windows 사용 시 주의사항
+
+vim-wplus는 Windows(gvim / 터미널 Vim)에서 정상 동작하도록 만들어졌습니다.
+
+### `&shell` 설정
+
+`format.vim`, `gitgutter.vim`, `diffview.vim` 등은 `shellescape()` + `system()`으로 외부 명령을 실행합니다.  
+이 조합은 `&shell=cmd.exe` 기준으로 검증되었습니다.
+
+`.vimrc`에서 `&shell`을 PowerShell 등으로 바꾸면 공백·특수문자 경로에서 명령이 깨질 수 있으니,  
+위 기능을 사용한다면 `&shell`을 `cmd.exe`로 유지하세요.
+
+### 경로 표기
+
+```vim
+" Windows에서는 슬래시(/) 사용 권장 — 백슬래시(\)도 동작하지만 escape 문제 방지
+set runtimepath+=C:/Users/<user>/vimfiles/pack/user/start/vim-wplus
+```
+
+---
+
 ## 문제 해결
 
-### API 키 오류
-```
-[wplus-ai] API key not configured
-```
-**해결**: `.vimrc`에서 `g:wplus_ai_api_key`를 설정하세요.
+### E492: Not an editor command
 
-### 언어 서버 연결 실패
-```
-[wplus-lsp] Failed to start language server
-```
-**해결**: 해당 언어의 LSP 서버를 설치하세요.
+플러그인이 로드되지 않은 경우입니다.
 
-### 큰 파일에서 느린 성능
-```
-let g:wplus_finder_match_limit = 10000
-let g:wplus_gitgutter_file_size_limit = 500000
+```vim
+" 1. runtimepath 확인
+:set runtimepath?
+" vim-wplus 경로가 포함되어 있어야 합니다
+
+" 2. 로드 확인
+:echo exists(':WexplorerToggle')   " 2여야 함
+:echo exists('*wplus#explorer#toggle')   " 1이어야 함
+
+" 3. 수동 로드
+set runtimepath+=~/.vim/pack/user/start/vim-wplus
+source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 ```
 
-### Azure OpenAI 인증 오류
+### AI: API key not configured
+
+```vim
+let g:wplus_ai_api_key = 'sk-...'
+" 또는 환경 변수
+let g:wplus_ai_api_key = $OPENAI_API_KEY
 ```
-let g:wplus_ai_provider = 'azure'
-let g:wplus_ai_api_key = 'your-key'
-let g:wplus_ai_azure_resource = 'resource-name'
-let g:wplus_ai_azure_deployment = 'deployment-name'
+
+### Ghost Text가 표시되지 않음
+
+1. `textprop` 지원 확인: `:echo has('textprop')` → `1`이어야 함
+2. 모델 설정 확인: `let g:wplus_ai_model = 'gpt-4o'`
+3. Insert 모드에서 잠시 기다려야 함 (기본 500ms)
+4. 디버그 모드: `let g:wplus_ai_suggest_debug = 1`
+
+### LSP가 시작되지 않음
+
+```vim
+" 지원 파일타입: go, c, cpp, python, dart, rust
+" 해당 언어 파일을 열었을 때 자동 시작
+:echo exists('*wplus#lsp#request')   " 1이어야 함
+
+" 디버그 로그 활성화
+let g:wplus_lsp_log_enabled = 1
+" 프로젝트 루트에 lsp.log 파일 생성됨
+```
+
+### 대용량 파일에서 성능 저하
+
+```vim
+let g:wplus_finder_fuzzy_limit  = 5000   " finder 매칭 제한
+let g:wplus_scrollbar_min_lines = 200    " 짧은 파일 스크롤바 비활성화
+let g:wplus_ai_suggest_enabled  = 0      " AI 자동완성 비활성화
+let g:wplus_illuminate_delay    = 500    " 심볼 하이라이트 지연 증가
+```
+
+### Harpoon 슬롯이 저장되지 않음
+
+`~/.vim/harpoon/` 디렉토리가 생성되는지 확인:
+
+```vim
+:echo isdirectory(expand('~/.vim/harpoon'))
+" 0이면: :call mkdir(expand('~/.vim/harpoon'), 'p')
 ```
 
 ---
 
-## 모듈 목록 (31개)
+## 모듈 비활성화
 
-### 기본 기능 (7)
-- commentary, pairs, repeat, altfile, indent, statusline, tabline
+원하는 모듈만 비활성화할 수 있습니다. `plugin/wplus.vim` 로드 **전**에 선언해야 합니다.
 
-### VCS (5)
-- gitgutter, blame, terminal, explorer, session
+```vim
+" 자주 비활성화하는 모듈 예시
+let g:wplus_blame_enabled      = 0   " 인라인 blame 끄기 (느린 환경)
+let g:wplus_indent_enabled     = 0   " 들여쓰기 가이드 끄기
+let g:wplus_scrollbar_enabled  = 0   " 스크롤바 끄기
+let g:wplus_ai_enabled         = 0   " AI 완전 비활성화
+let g:wplus_session_enabled    = 0   " 자동 세션 끄기
+let g:wplus_fold_enabled       = 0   " 자동 폴드 끄기
+```
 
-### 에디터 (5)
-- surround, format, undotree, yankhighlight, textobj
-
-### UI (5)
-- whichkey, quickfix, grep, finder, bufdelete
-
-### 언어 (3)
-- lsp, root, illuminate
-
-### 신규 (5)
-- colorscheme, snippet, conflict, ai, todo
-
-### 유틸리티 (1)
-- util (표준화된 메시지 함수)
-
----
-
-## 성능 통계
-
-| 항목 | 개선율 |
-|------|--------|
-| LSP 정의/참조 캐시 | 30-50% 단축 |
-| Gitgutter 배치 처리 | 90% 감소 |
-| 메모리 누수 | 완전 제거 |
-| 스타트업 시간 | 모듈별 캐시 |
-
----
-
-## 지원 환경
-
-- Vim 9.0+
-- Neovim 0.9+
-- Python 3.7+
-- Git 2.20+
+> 전체 설정 레퍼런스 → **[docs/config.md](docs/config.md)**
 
 ---
 
 ## 추가 정보
 
-- [README.md](README.md) - 프로젝트 개요
-- [doc/](doc/) - 상세 문서
+| 문서 | 내용 |
+|------|------|
+| [README.md](README.md) | 모듈 목록 개요 |
+| [docs/modules/editing.md](docs/modules/editing.md) | commentary, surround, pairs, textobj … |
+| [docs/modules/navigation.md](docs/modules/navigation.md) | finder, explorer, harpoon, history … |
+| [docs/modules/git.md](docs/modules/git.md) | gitgutter, blame, diffview, conflict |
+| [docs/modules/ui.md](docs/modules/ui.md) | statusline, scrollbar, undotree … |
+| [docs/modules/code.md](docs/modules/code.md) | lsp, run, fold, snippet, marks … |
+| [docs/ai.md](docs/ai.md) | AI 어시스턴트 심화 가이드 |
+| [docs/config.md](docs/config.md) | 전체 설정 레퍼런스 |
+| [docs/keymaps.md](docs/keymaps.md) | 기본 단축키 치트시트 |
+| [CHANGE_LOG.md](CHANGE_LOG.md) | 변경 이력 |
