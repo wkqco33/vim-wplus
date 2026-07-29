@@ -619,6 +619,70 @@ function! s:on_error(channel, msg) abort
     call wplus#util#error_msg('ai', 'request error: ' . a:msg)
 endfunction
 
+" ── Review / Explain ──────────────────────────────────────────────────────
+
+" Open a dedicated read-only split to display AI review/explain output.
+function! s:open_result_split(ft, lines, title) abort
+    " Reuse an existing wplus-ai-result window if one is visible.
+    for l:win in range(1, winnr('$'))
+        if getwinvar(l:win, 'wplus_ai_result', 0)
+            execute l:win . 'wincmd w'
+            setlocal modifiable
+            silent %delete _
+            call setline(1, a:lines)
+            setlocal nomodifiable
+            return
+        endif
+    endfor
+    botright 15new
+    let w:wplus_ai_result = 1
+    setlocal buftype=nofile bufhidden=wipe noswapfile nobuflisted
+    execute 'setlocal filetype=' . a:ft
+    setlocal modifiable
+    call setline(1, a:lines)
+    setlocal nomodifiable
+    execute 'setlocal statusline=\ 🤖\ ' . escape(a:title, ' \')
+    nnoremap <buffer> <silent> q :close<CR>
+endfunction
+
+function! wplus#ai#review() range abort
+    let l:bufnr = bufnr('%')
+    let l:ft = &filetype
+    let [l:line_start, l:col_start] = getpos("'<")[1:2]
+    let [l:line_end,   l:col_end]   = getpos("'>")[1:2]
+    " Fall back to current line when called from Normal mode
+    if l:line_start == 0
+        let l:line_start = line('.')
+        let l:line_end   = line('.')
+    endif
+    let l:code = join(getline(l:line_start, l:line_end), "\n")
+    let l:prompt = "Review the following " . l:ft . " code. "
+        \ . "List issues, potential bugs, security concerns, and improvement suggestions. "
+        \ . "Be concise and use bullet points.\n\n```" . l:ft . "\n" . l:code . "\n```"
+    call s:send_request(l:prompt, function('s:show_review_result', [l:ft]))
+    call wplus#util#info_msg('ai', 'reviewing code...')
+endfunction
+
+function! s:show_review_result(ft, content) abort
+    let l:lines = split(a:content, "\n")
+    call s:open_result_split('markdown', l:lines, 'AI Code Review')
+endfunction
+
+function! wplus#ai#explain() range abort
+    let l:ft = &filetype
+    let [l:line_start, l:col_start] = getpos("'<")[1:2]
+    let [l:line_end,   l:col_end]   = getpos("'>")[1:2]
+    if l:line_start == 0
+        let l:line_start = line('.')
+        let l:line_end   = line('.')
+    endif
+    let l:code = join(getline(l:line_start, l:line_end), "\n")
+    let l:prompt = "Explain what the following " . l:ft . " code does step by step. "
+        \ . "Keep the explanation concise and clear.\n\n```" . l:ft . "\n" . l:code . "\n```"
+    call s:send_request(l:prompt, function('s:show_review_result', ['markdown']))
+    call wplus#util#info_msg('ai', 'explaining code...')
+endfunction
+
 function! wplus#ai#setup() abort
     augroup WplusAI
         autocmd!
@@ -651,6 +715,8 @@ function! wplus#ai#setup() abort
     command! WaiAcceptSuggest    call wplus#ai#accept_suggestion_insert()
     command! WaiDismissSuggest   call wplus#ai#dismiss_suggestion()
     command! WaiAcceptWord       call wplus#ai#accept_suggestion_insert_word()
+    command! -range WaiReview    <line1>,<line2>call wplus#ai#review()
+    command! -range WaiExplain   <line1>,<line2>call wplus#ai#explain()
 
     " Mappings
     nnoremap <silent> <Plug>WaiComment   :WaiComment<CR>
@@ -658,6 +724,8 @@ function! wplus#ai#setup() abort
     xnoremap <silent> <Plug>WaiRefactor  :WaiRefactor<CR>
     nnoremap <silent> <Plug>WaiFixDiag   :WaiFixDiag<CR>
     nnoremap <silent> <Plug>WaiCommitMsg :WaiCommitMsg<CR>
+    xnoremap <silent> <Plug>WaiReview    :WaiReview<CR>
+    xnoremap <silent> <Plug>WaiExplain   :WaiExplain<CR>
     nnoremap <silent> <Plug>WaiToggleSuggest :WaiToggleSuggest<CR>
     inoremap <silent> <Plug>WaiDismissSuggest <C-r>=wplus#ai#dismiss_suggestion()<CR>
     inoremap <silent> <expr> <Plug>WaiAcceptWord wplus#ai#accept_word_suggestion()

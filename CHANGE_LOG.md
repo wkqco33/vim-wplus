@@ -1,5 +1,56 @@
 # 변경 이력 (CHANGE LOG)
 
+## [Unreleased] - 2026-07-29
+
+### 신규 모듈 추가 (8개)
+
+1. **Harpoon — 파일 북마크 (`autoload/wplus/harpoon.vim`)**
+   - 최대 4개의 슬롯에 파일을 등록하고 `<leader>h1~4`로 즉시 이동.
+   - 슬롯 데이터는 프로젝트 루트별 `~/.vim/harpoon/*.json`에 저장.
+   - `<leader>ha` 추가, `<leader>hd` 제거, `<leader>hl` 팝업 목록.
+
+2. **Marks — 마크 시각화 (`autoload/wplus/marks.vim`)**
+   - Vim 내장 마크(a–z)를 Sign 컬럼에 노란 알파벳으로 표시.
+   - `<leader>ml` 팝업 목록, `<leader>md` 커서 줄 마크 삭제.
+   - `CmdlineLeave`/`BufEnter` 이벤트로 150ms 디바운스 자동 갱신.
+
+3. **Scratch — 스크래치 버퍼 (`autoload/wplus/scratch.vim`)**
+   - `~/.vim/scratch.txt`에 지속 저장되는 임시 버퍼.
+   - `<leader>sc` 하단 토글, `<leader>sv` 수직 분할.
+   - `BufLeave`, `VimLeavePre`에 자동 저장.
+
+4. **Run — 코드 실행/빌드 (`autoload/wplus/run.vim`)**
+   - 파일타입별 실행 명령(`g:wplus_run_commands`)으로 `<leader>rr` 실행.
+   - `Makefile`, `package.json`, `Cargo.toml`, `go.mod` 등 빌드 시스템 자동 감지 (`<leader>rb`).
+   - `<leader>rt` 테스트 실행. 터미널 또는 quickfix 출력 선택 가능.
+
+5. **Project — 프로젝트별 설정 (`autoload/wplus/project.vim`)**
+   - 프로젝트 루트의 `.wplus.vim` 자동 소스 (첫 진입 시 1회).
+   - `<leader>pe` 설정 파일 편집, `<leader>pr` 재로드.
+   - `.wplus.vim` 저장 시 자동 재로드.
+
+6. **History — 최근 파일 브라우저 (`autoload/wplus/history.vim`)**
+   - 세션 MRU + `v:oldfiles` 통합, finder 팝업으로 표시.
+   - `<leader>fh` 전체, `<leader>fH` 프로젝트 내 파일만.
+
+7. **Scrollbar — 미니맵 스크롤바 (`autoload/wplus/scrollbar.vim`)**
+   - Sign 컬럼에 `▐`/`█` 트랙·썸 렌더링 (80ms 디바운스).
+   - LSP 진단(에러/경고)을 `●`로 오버레이.
+   - `<leader>sb` 토글, `WinScrolled`/`CursorMoved` 자동 갱신.
+
+8. **Fold — 스마트 폴드 (`autoload/wplus/fold.vim`)**
+   - 들여쓰기 기반 기본 폴드; `g:wplus_fold_method='lsp'`로 LSP foldingRange 연동.
+   - `▶ 첫 줄 [N lines]` 형식의 커스텀 폴드 텍스트.
+   - `<leader>zz/za/zc/zo` 단축키.
+
+### AI 모듈 기능 추가 (`autoload/wplus/ai.vim`)
+
+- **`:WaiReview`** — Visual 선택 코드를 리뷰 (버그·보안·개선점). 결과를 하단 분할창에 markdown으로 표시.
+- **`:WaiExplain`** — Visual 선택 코드를 단계별로 설명.
+- 리뷰/설명 결과창은 `q`로 닫히고 재호출 시 재사용됨.
+
+---
+
 ## [Unreleased] - 2026-07-24
 
 ### 신규 기능 추가 (Features Added)
