@@ -54,10 +54,40 @@ function! s:validate_config() abort
             echomsg '[wplus] Warning: wplus_yank_duration must be a non-negative number, reset to 250'
         endif
     endif
-    if exists('g:wplus_finder_fuzzy_limit')
-        if type(g:wplus_finder_fuzzy_limit) != v:t_number || g:wplus_finder_fuzzy_limit < 1
-            let g:wplus_finder_fuzzy_limit = 10000
-            echomsg '[wplus] Warning: wplus_finder_fuzzy_limit must be a positive number, reset to 10000'
+    if exists('g:wplus_scroll_min_lines')
+        if type(g:wplus_scroll_min_lines) != v:t_number || g:wplus_scroll_min_lines < 1
+            let g:wplus_scroll_min_lines = 50
+            echomsg '[wplus] Warning: wplus_scroll_min_lines must be a positive number, reset to 50'
+        endif
+    endif
+    if exists('g:wplus_harpoon_max_slots')
+        if type(g:wplus_harpoon_max_slots) != v:t_number || g:wplus_harpoon_max_slots < 1
+            let g:wplus_harpoon_max_slots = 4
+            echomsg '[wplus] Warning: wplus_harpoon_max_slots must be a positive number, reset to 4'
+        endif
+    endif
+    if exists('g:wplus_scratch_height')
+        if type(g:wplus_scratch_height) != v:t_number || g:wplus_scratch_height < 1
+            let g:wplus_scratch_height = 15
+            echomsg '[wplus] Warning: wplus_scratch_height must be a positive number, reset to 15'
+        endif
+    endif
+    if exists('g:wplus_history_max')
+        if type(g:wplus_history_max) != v:t_number || g:wplus_history_max < 1
+            let g:wplus_history_max = 50
+            echomsg '[wplus] Warning: wplus_history_max must be a positive number, reset to 50'
+        endif
+    endif
+    if exists('g:wplus_fold_level')
+        if type(g:wplus_fold_level) != v:t_number || g:wplus_fold_level < 0
+            let g:wplus_fold_level = 99
+            echomsg '[wplus] Warning: wplus_fold_level must be a non-negative number, reset to 99'
+        endif
+    endif
+    if exists('g:wplus_fold_column')
+        if type(g:wplus_fold_column) != v:t_number || g:wplus_fold_column < 0
+            let g:wplus_fold_column = 0
+            echomsg '[wplus] Warning: wplus_fold_column must be a non-negative number, reset to 0'
         endif
     endif
     if exists('g:wplus_completion_max_items')
@@ -88,7 +118,7 @@ function! s:validate_config() abort
     endif
 endfunction
 
-let s:modules = ['commentary', 'pairs', 'repeat', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'colorscheme', 'snippet', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'completion']
+let s:modules = ['commentary', 'pairs', 'repeat', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'colorscheme', 'snippet', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'completion', 'harpoon', 'marks', 'scratch', 'run', 'project', 'history', 'scrollbar', 'fold']
 
 " Validate user configuration
 call s:validate_config()

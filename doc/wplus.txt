@@ -1,281 +1,770 @@
-*wplus.txt*  All-in-one Vim plugin (dependency-free)       vim-wplus
+﻿*wplus.txt*  All-in-one Vim plugin (dependency-free)              vim-wplus
+
+Author:  wkqco33
+License: MIT
 
 ==============================================================================
 CONTENTS                                                      *wplus-contents*
 
-  1. Introduction .............. |wplus-intro|
-  2. Modules ................... |wplus-modules|
-  3. Commentary ................ |wplus-commentary|
-  4. Auto Pairs ................ |wplus-pairs|
-  5. Repeat .................... |wplus-repeat|
-  6. Alternate File ............ |wplus-altfile|
-  7. Indent Guide .............. |wplus-indent|
-  8. Statusline ................ |wplus-statusline|
-  9. Tabline ................... |wplus-tabline|
- 10. Git Gutter ................ |wplus-gitgutter|
- 11. Git Blame ................. |wplus-blame|
- 12. Illuminate ................ |wplus-illuminate|
- 13. Which Key ................. |wplus-whichkey|
- 14. Undo Tree ................. |wplus-undotree|
- 15. Surround .................. |wplus-surround|
- 16. Grep ...................... |wplus-grep|
- 17. Root ...................... |wplus-root|
- 18. Terminal .................. |wplus-terminal|
- 19. LSP ....................... |wplus-lsp|
+  1.  Introduction ................. |wplus-intro|
+  2.  Module List .................. |wplus-modules|
+  3.  Installation ................. |wplus-install|
+  4.  Configuration ................ |wplus-config|
+
+  EDITING ~
+  5.  Commentary ................... |wplus-commentary|
+  6.  Surround ..................... |wplus-surround|
+  7.  Auto Pairs ................... |wplus-pairs|
+  8.  Text Objects ................. |wplus-textobj|
+  9.  Repeat ....................... |wplus-repeat|
+  10. Multi Cursor ................. |wplus-multicursor|
+  11. Register Preview ............. |wplus-register|
+  12. Yank Highlight ............... |wplus-yankhighlight|
+
+  NAVIGATION ~
+  13. Finder ....................... |wplus-finder|
+  14. Explorer ..................... |wplus-explorer|
+  15. Harpoon ...................... |wplus-harpoon|
+  16. History ...................... |wplus-history|
+  17. Alternate File ............... |wplus-altfile|
+  18. Buffer Delete ................ |wplus-bufdelete|
+  19. Quickfix ..................... |wplus-quickfix|
+  20. Which Key .................... |wplus-whichkey|
+
+  GIT ~
+  21. Git Gutter ................... |wplus-gitgutter|
+  22. Git Blame .................... |wplus-blame|
+  23. Diff View .................... |wplus-diffview|
+  24. Conflict Resolver ............ |wplus-conflict|
+
+  UI ~
+  25. Statusline ................... |wplus-statusline|
+  26. Tabline ...................... |wplus-tabline|
+  27. Indent Guide ................. |wplus-indent|
+  28. Illuminate ................... |wplus-illuminate|
+  29. Undo Tree .................... |wplus-undotree|
+  30. Scrollbar .................... |wplus-scrollbar|
+  31. Colorscheme .................. |wplus-colorscheme|
+
+  CODE TOOLS ~
+  32. LSP .......................... |wplus-lsp|
+  33. Format ....................... |wplus-format|
+  34. Completion ................... |wplus-completion|
+  35. Snippet ...................... |wplus-snippet|
+  36. Outline ...................... |wplus-outline|
+  37. Fold ......................... |wplus-fold|
+  38. Run .......................... |wplus-run|
+  39. Terminal ..................... |wplus-terminal|
+  40. Root ......................... |wplus-root|
+  41. Session ...................... |wplus-session|
+  42. Project ...................... |wplus-project|
+  43. Scratch ...................... |wplus-scratch|
+  44. Marks ........................ |wplus-marks|
+  45. TODO ......................... |wplus-todo|
+  46. Grep ......................... |wplus-grep|
+
+  AI ~
+  47. AI Assistant ................. |wplus-ai|
 
 ==============================================================================
-1. INTRODUCTION                                                 *wplus-intro*
+1. INTRODUCTION                                                  *wplus-intro*
 
-vim-wplus is a single Vim plugin that replaces 17 commonly-used plugins with
-pure VimScript implementations. Requires Vim 9.1+ with +job +channel
-+popupwin +signs.
+vim-wplus is a dependency-free, all-in-one Vim plugin that replaces over 35
+commonly-used plugins with pure VimScript implementations.
 
-To disable individual modules before the plugin loads: >
-    let g:wplus_commentary_enabled = 0
-    let g:wplus_pairs_enabled      = 0
-    " etc.
+Requires Vim 9.1+ with: >
+    +job  +channel  +popupwin  +signs  +textprop
+<
+Verify with: >
+    :echo has('job') && has('channel') && has('popupwin') && has('signs') && has('textprop')
 <
 
 ==============================================================================
-2. MODULES                                                    *wplus-modules*
+2. MODULE LIST                                                  *wplus-modules*
 
-  Module          Replaces
-  ─────────────────────────────────────────────────
-  commentary      vim-commentary
-  pairs           auto-pairs
-  repeat          vim-repeat
-  altfile         a.vim
-  indent          indentLine
-  statusline      vim-airline + vim-airline-themes
-  tabline         vim-airline tabline
-  gitgutter       vim-gitgutter
-  blame           blamer.nvim
-  illuminate      vim-illuminate
-  whichkey        vim-which-key
-  undotree        undotree
-  surround        vim-surround
-  grep            vim-grepper / ripgrep
-  root            vim-rooter
-  terminal        vim-floaterm
-  lsp             yegappan/lsp
+43 modules organized by category:
+
+  EDITING (8) ~
+    commentary    surround      pairs         textobj
+    repeat        multicursor   register      yankhighlight
+
+  NAVIGATION (8) ~
+    finder        explorer      harpoon       history
+    altfile       bufdelete     quickfix      whichkey
+
+  GIT (4) ~
+    gitgutter     blame         diffview      conflict
+
+  UI (7) ~
+    statusline    tabline       indent        illuminate
+    undotree      scrollbar     colorscheme
+
+  CODE TOOLS (15) ~
+    lsp           format        completion    snippet
+    outline       fold          run           terminal
+    root          session       project       scratch
+    marks         todo          grep
+
+  AI (1) ~
+    ai
 
 ==============================================================================
-3. COMMENTARY                                             *wplus-commentary*
+3. INSTALLATION                                                *wplus-install*
 
-Replaces: vim-commentary
+vim-plug: >
+    Plug 'wkqco33/vim-wplus'
+<
+Pack: >
+    git clone <url> ~/.vim/pack/user/start/vim-wplus
+<
+Manual: >
+    set runtimepath+=~/.vim/pack/user/start/vim-wplus
+    source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
+<
+
+==============================================================================
+4. CONFIGURATION                                               *wplus-config*
+
+Disable individual modules (before plugin/wplus.vim loads): >
+    let g:wplus_<module>_enabled = 0
+    " Example:
+    let g:wplus_blame_enabled   = 0
+    let g:wplus_ai_enabled      = 0
+    let g:wplus_fold_enabled    = 0
+<
+See |wplus-<module>| sections below for per-module settings.
+
+Full reference: docs/config.md in the plugin directory.
+
+==============================================================================
+5. COMMENTARY                                              *wplus-commentary*
+
+Toggle comments for the current line, motion, or visual selection.
+Comment tokens are read from &commentstring automatically.
 
 Mappings: >
-    gcc        Toggle comment on current line
-    gc{motion} Toggle comment on motion
-    gc         Toggle comment on visual selection
-<
-The comment tokens are determined from &commentstring for the current filetype.
-
-==============================================================================
-4. AUTO PAIRS                                                  *wplus-pairs*
-
-Replaces: auto-pairs
-
-Automatically closes brackets and quotes as you type. Features:
-- Auto-close ( [ { " ' `
-- Skip over existing closing character with <Right>
-- Delete matching pair on <BS>
-
-Configuration: >
-    " Custom pair map (before plugin loads)
-    let g:wplus_pairs_map = { '(': ')', '[': ']', '{': '}' }
+    gcc            Toggle comment on current line
+    gc{motion}     Toggle comment on motion range  (e.g. gc3j, gcip)
+    gc             Toggle comment on visual selection
 <
 
 ==============================================================================
-5. REPEAT                                                      *wplus-repeat*
+6. SURROUND                                                   *wplus-surround*
 
-Replaces: vim-repeat
+Add, change, or delete surrounding characters.
 
-Allows plugin operations (surround, commentary, etc.) to be repeated with the
-. command. Also compatible with tpope/vim-repeat if installed.
+Mappings: >
+    ys{motion}{c}  Surround motion with c       (ysiw" → "hello")
+    yss{c}         Surround current line
+    cs{old}{new}   Change surrounding           (cs"' → 'hello')
+    ds{c}          Delete surrounding           (ds" → hello)
+    S{c}           (Visual) Surround selection
+<
+Supported: ( ) [ ] { } < > " ' ` and HTML tag (t).
+
+==============================================================================
+7. AUTO PAIRS                                                    *wplus-pairs*
+
+Automatically closes brackets and quotes as you type.
+
+  ( → ()    [ → []    { → {}    " → ""    ' → ''    ` → ``
+
+  <BS>  inside empty pair → deletes both characters
+  )     if already present → skips (no duplicate)
+
+==============================================================================
+8. TEXT OBJECTS                                                 *wplus-textobj*
+
+Indent block: >
+    ii    inner indent block (same level lines)
+    ai    indent block + header line above
+<
+Function argument: >
+    ia    inner argument (without surrounding whitespace)
+    aa    argument including adjacent comma
+<
+Works with all operators: d, c, y, v, >, <, =, gq, ...
+
+==============================================================================
+9. REPEAT                                                        *wplus-repeat*
+
+Extends the |.| command to repeat plugin operations (surround, commentary …).
+Compatible with tpope/vim-repeat if installed.
 
 API for plugin authors: >
-    call wplus#repeat#set("\<Plug>MyPlugMapping", v:count1)
+    call wplus#repeat#set("\<Plug>MyAction", v:count)
 <
 
 ==============================================================================
-6. ALTERNATE FILE                                            *wplus-altfile*
+10. MULTI CURSOR                                             *wplus-multicursor*
 
-Replaces: a.vim
+Select multiple occurrences of a word and edit them simultaneously.
+
+Mappings: >
+    <C-n>    Add next match to selection
+    <C-x>    Skip current match, add next
+    <C-a>    Select all matches in buffer
+    c        Replace all selected (prompts for new text)
+    d        Delete all selected
+    <Esc>    Exit multi-cursor mode
+<
+
+==============================================================================
+11. REGISTER PREVIEW                                           *wplus-register*
+
+Preview register contents in a popup before pasting.
+
+Mappings: >
+    "    (Normal) Open register popup, then type register key as usual
+    @    (Normal) Open register popup for macro execution
+<
+
+==============================================================================
+12. YANK HIGHLIGHT                                        *wplus-yankhighlight*
+
+Briefly highlights yanked text for visual feedback.
+
+Configuration: >
+    let g:wplus_yank_duration = 250    " highlight duration (ms)
+<
+Customize highlight: >
+    highlight WplusYankHL guibg=#fabd2f guifg=#282828
+<
+
+==============================================================================
+13. FINDER                                                      *wplus-finder*
+
+Fast fuzzy finder using Vim 9 matchfuzzy() and popup windows.
+
+Mappings: >
+    <leader>p    Find files
+    <leader>b    Find buffers
+    <leader>m    Find recent files (MRU)
+<
+Popup keys: >
+    <C-n> / ↓    Next item
+    <C-p> / ↑    Previous item
+    <CR>         Open in current window
+    <C-v>        Open in vertical split
+    <C-s>        Open in horizontal split
+    <C-t>        Open in new tab
+    <Esc>        Close
+<
+Configuration: >
+    let g:wplus_finder_width_ratio  = 0.7
+    let g:wplus_finder_height_ratio = 0.4
+    let g:wplus_finder_fuzzy_limit  = 10000
+<
+
+==============================================================================
+14. EXPLORER                                                   *wplus-explorer*
+
+Sidebar file explorer.
+
+Mappings: >
+    <leader>e  /  :WexplorerToggle    Toggle sidebar
+<
+Inside explorer: >
+    <CR>    Open file or enter directory
+    a       Create new file/directory  (append / for directory)
+    d       Delete
+    r       Rename
+    R       Refresh
+    q       Close
+<
+Configuration: >
+    let g:wplus_explorer_max_entries = 1000
+    let g:wplus_explorer_max_depth   = 8
+<
+
+==============================================================================
+15. HARPOON                                                     *wplus-harpoon*
+
+Quick file bookmarks with per-project persistence (~/.vim/harpoon/).
+
+Mappings: >
+    <leader>ha  /  :WharoonAdd       Add current file to next empty slot
+    <leader>hd  /  :WharoonRemove    Remove current file from its slot
+    <leader>hl  /  :WharoonList      Open slot list popup
+    <leader>h1 … h4                  Jump to slot 1–4
+<
+Configuration: >
+    let g:wplus_harpoon_max_slots = 4
+<
+
+==============================================================================
+16. HISTORY                                                     *wplus-history*
+
+Session MRU + v:oldfiles merged into a finder popup.
+
+Mappings: >
+    <leader>fh  /  :Whistory           All recent files
+    <leader>fH  /  :WhistoryProject    Project-scoped recent files
+<
+Configuration: >
+    let g:wplus_history_max          = 50
+    let g:wplus_history_project_only = 0
+<
+
+==============================================================================
+17. ALTERNATE FILE                                              *wplus-altfile*
+
+Toggle between header and source files.
 
 Commands: >
-    :A    Open alternate file (.h <-> .c/.cpp) in current window
-    :AV   Open alternate file in vertical split
-    :AS   Open alternate file in horizontal split
+    :A     Open alternate file (.h ↔ .c/.cpp) in current window
+    :AV    Open in vertical split
+    :AS    Open in horizontal split
+<
+Supported pairs: .h↔.c  .h↔.cpp  .hpp↔.cpp
+
+==============================================================================
+18. BUFFER DELETE                                             *wplus-bufdelete*
+
+Delete a buffer without closing its window.
+
+Mappings / Commands: >
+    <leader>bd  /  :Bdelete     Delete buffer, keep window
+    <leader>bD  /  :Bwipeout    Wipeout buffer (removes history too)
+    :Bdelete!                   Force-delete unsaved buffer
 <
 
 ==============================================================================
-7. INDENT GUIDE                                               *wplus-indent*
+19. QUICKFIX                                                   *wplus-quickfix*
 
-Replaces: indentLine
+Enhanced quickfix and location list navigation.
 
-Draws a guide character (▏) at each indent level using Vim's conceal feature.
-
-Configuration: >
-    let g:wplus_indent_char       = '▏'   " guide character
-    let g:wplus_indent_ft_exclude = ['json', 'markdown', 'help']
+Mappings: >
+    <leader>xq    Toggle quickfix panel
+    <leader>xl    Toggle location list
+    ]q / [q       Next / previous error (wraps)
+    ]Q / [Q       Last / first error
+    ]l / [l       Next / previous location item
+    <leader>xr    Project-wide replace (based on quickfix items)
 <
 
 ==============================================================================
-8. STATUSLINE                                             *wplus-statusline*
+20. WHICH KEY                                                  *wplus-whichkey*
 
-Replaces: vim-airline + vim-airline-themes
+After pressing <leader> and waiting timeoutlen ms, a popup lists registered
+key bindings.
 
-Shows (left to right):
-  Mode | Git branch | Filename [flags] | → | Diagnostics | Filetype | Pos
-
-Integrates with coc.nvim diagnostic counts automatically.
-
-==============================================================================
-9. TABLINE                                                 *wplus-tabline*
-
-Replaces: vim-airline tabline extension
-
-Shows all listed buffers. Active buffer is highlighted. Modified buffers show
-a ● indicator. Mouse-click on a buffer label switches to that buffer.
+Register custom hints: >
+    call wplus#whichkey#register('w', 'save file')
+    call wplus#whichkey#register('q', 'quit')
+<
 
 ==============================================================================
-10. GIT GUTTER                                            *wplus-gitgutter*
+21. GIT GUTTER                                                *wplus-gitgutter*
 
-Replaces: vim-gitgutter
-
-Shows +/~/▁ signs in the sign column for added/changed/deleted lines.
-Uses async job_start() so it never blocks the UI.
+Async sign-column diff markers.
 
 Signs: >
-    ┃  Added    (WplusGGAdd    highlight)
-    ┃  Changed  (WplusGGChange highlight)
-    ▁  Deleted  (WplusGGDelete highlight)
+    ┃  (green)   Added line
+    ┃  (yellow)  Changed line
+    ▁  (red)     Deleted line
 <
-Refreshes on: BufReadPost, BufWritePost, InsertLeave.
+Mappings: >
+    <leader>hr  /  :WplusGitRevertHunk    Revert hunk at cursor
+    ]h / [h                               Next / previous hunk
+<
+Configuration: >
+    let g:wplus_gitgutter_sign_add    = '┃'
+    let g:wplus_gitgutter_sign_change = '┃'
+    let g:wplus_gitgutter_sign_delete = '▁'
+<
 
 ==============================================================================
-11. GIT BLAME                                               *wplus-blame*
+22. GIT BLAME                                                    *wplus-blame*
 
-Replaces: blamer.nvim / APZelos/blamer.nvim
+Inline git blame as virtual text at the end of each line.
 
-Shows inline git blame for the current line as virtual text after a delay.
-
+Commands: >
+    :BlamerToggle    Toggle blame display
+<
 Configuration: >
-    let g:wplus_blame_delay       = 500           " ms
+    let g:wplus_blame_delay       = 500
     let g:wplus_blame_prefix      = '   '
     let g:wplus_blame_template    = '<author>, <date> • <summary>'
     let g:wplus_blame_date_format = '%y/%m/%d'
 <
+Template variables: <author>  <date>  <summary>  <hash>
+
+==============================================================================
+23. DIFF VIEW                                                  *wplus-diffview*
+
+Visual Git diff viewer with hunk navigation.
+
 Mappings: >
-    <leader>bl   Toggle blame on/off
-    :BlamerToggle Toggle blame on/off
+    <leader>gd    Diff current file (HEAD)
+    <leader>gD    Diff whole repository
+    ]h / [h       Next / previous hunk
+    q             Close diff view
 <
 
 ==============================================================================
-12. ILLUMINATE                                            *wplus-illuminate*
+24. CONFLICT RESOLVER                                          *wplus-conflict*
 
-Replaces: vim-illuminate
+Detect and resolve Git merge conflicts visually.
 
-Highlights all occurrences of the word under the cursor using matchadd().
-Updates after |g:wplus_illuminate_delay| ms of cursor inactivity.
+Commands: >
+    :WconflictNext      Jump to next conflict
+    :WconflictPrev      Jump to previous conflict
+    :WconflictOurs      Accept ours (HEAD) version
+    :WconflictTheirs    Accept theirs (incoming) version
+    :WconflictBoth      Accept both versions
+<
+Configuration: >
+    let g:wplus_conflict_auto_highlight = 1
+<
+
+==============================================================================
+25. STATUSLINE                                                *wplus-statusline*
+
+Custom statusline showing:
+  Mode | Git branch | Filename [flags] | → | LSP diagnostics | ft | enc | pos
+
+No configuration needed; activates automatically.
+
+==============================================================================
+26. TABLINE                                                    *wplus-tabline*
+
+Buffer tabline at the top of the screen.
+  • Lists all listed buffers with index numbers
+  • ● indicates unsaved buffer
+  • Click to switch (mouse required)
+
+==============================================================================
+27. INDENT GUIDE                                                *wplus-indent*
+
+Draws a guide character at each indent level (conceal-based).
+
+Configuration: >
+    let g:wplus_indent_char       = '▏'
+    let g:wplus_indent_ft_exclude = ['help', 'nerdtree', 'undotree', 'tagbar']
+<
+
+==============================================================================
+28. ILLUMINATE                                               *wplus-illuminate*
+
+Highlight all occurrences of the word under the cursor.
 
 Configuration: >
     let g:wplus_illuminate_delay    = 200   " ms
-    let g:wplus_illuminate_ft_block = ['NERDTree', 'tagbar']
+    let g:wplus_illuminate_ft_block = ['help', 'nerdtree']
 <
 
 ==============================================================================
-13. WHICH KEY                                             *wplus-whichkey*
+29. UNDO TREE                                                  *wplus-undotree*
 
-Replaces: vim-which-key
+Sidebar showing the full undo history tree.
 
-After pressing <leader> and waiting for |timeoutlen| ms, a popup window
-appears listing registered key bindings.
-
-Register additional hints: >
-    call wplus#whichkey#register('<leader>x', 'My custom command')
+Mappings: >
+    <leader>u  /  :WundotreeToggle    Toggle sidebar
 <
-
-==============================================================================
-14. UNDO TREE                                             *wplus-undotree*
-
-Replaces: mbbill/undotree
-
-Opens a sidebar showing the full undo history tree using Vim's built-in
-undotree() function.
-
-Commands: >
-    :UndotreeToggle   Open/close the undo tree sidebar
-    <leader>u         Same (defined in vimrc)
+Inside sidebar: >
+    j / k     Move to next / previous state
+    <CR>      Restore that state
+    q         Close
 <
 Configuration: >
-    let g:wplus_undotree_width = 30   " sidebar width
+    let g:wplus_undotree_width = 30
 <
 
 ==============================================================================
-15. SURROUND                                              *wplus-surround*
+30. SCROLLBAR                                                  *wplus-scrollbar*
 
-Replaces: vim-surround
+Text-based scrollbar in the sign column with LSP diagnostic overlay.
+
+  ▐  (grey)    Track (outside viewport)
+  █  (light)   Thumb (current viewport)
+  ●  (red)     LSP error position
+  ●  (yellow)  LSP warning position
 
 Mappings: >
-    ys{motion}{char}   Surround motion with char
-    yss{char}          Surround current line
-    cs{old}{new}       Change surrounding char
-    ds{char}           Delete surrounding char
-    S{char}  (visual)  Surround visual selection
+    <leader>sb  /  :WscrollbarToggle    Toggle scrollbar
 <
-Example pairs: ( ) [ ] { } < > " ' `
-  - ys2w"   → surround next 2 words with double quotes
-  - cs({    → change ( to { with spaces: { text }
-  - ds"     → delete surrounding double quotes
+Configuration: >
+    let g:wplus_scrollbar_enabled   = 1
+    let g:wplus_scrollbar_char      = '▐'
+    let g:wplus_scrollbar_thumb     = '█'
+    let g:wplus_scrollbar_min_lines = 50
+<
 
 ==============================================================================
-16. GREP                                                         *wplus-grep*
+31. COLORSCHEME                                              *wplus-colorscheme*
 
-Replaces: vim-grepper / ripgrep integration
+Auto-detect terminal background brightness and adjust colorscheme.
 
-Fast grep integration using ripgrep (rg) or git grep.
+Configuration: >
+    let g:wplus_colorscheme_auto_detect = 1
+<
+
+==============================================================================
+32. LSP                                                           *wplus-lsp*
+
+Lightweight LSP client using Vim 9 job/channel.
+
+Mappings: >
+    gd              Go to Definition
+    gr              Find References
+    K               Hover (symbol info)
+    <leader>rn      Rename symbol
+    <leader>ca      Code Action
+    ]e / [e         Next / previous diagnostic
+    <leader>E       Diagnostic popup for current line
+<
+Supported servers: gopls (Go), pylsp (Python), typescript-language-server,
+  rust-analyzer, clangd (C/C++).
 
 Commands: >
-    :Wgrep {pattern}  Search for pattern and open quickfix
+    :WplusLspInlayHints    Refresh inlay hints (type/param hints)
 <
-Mappings: >
-    <leader>fg        Search for word under cursor (Normal or Visual)
-<
-
-==============================================================================
-17. ROOT                                                         *wplus-root*
-
-Replaces: vim-rooter
-
-Automatically changes the current window's directory (lcd) to the project
-root when opening a file. Looks for .git, go.mod, Makefile, etc.
-
-==============================================================================
-18. TERMINAL                                                 *wplus-terminal*
-
-Replaces: vim-floaterm (split version)
-
-Quickly toggle a terminal in a bottom split.
-
-Mappings: >
-    <leader>tt        Toggle terminal split
-    <Esc><Esc>        (Terminal mode) Exit to Normal mode
+Configuration: >
+    let g:wplus_lsp_log_enabled  = 0     " debug log → lsp.log
+    let g:wplus_lsp_signcolumn   = 'yes'
+    let g:wplus_lsp_cache_ttl    = 300   " definition/reference cache TTL (s)
 <
 
 ==============================================================================
-19. LSP                                                           *wplus-lsp*
+33. FORMAT                                                      *wplus-format*
 
-Replaces: yegappan/lsp (minimal features)
-
-Provides minimal LSP features like Go to Definition and Hover information.
-Prioritizes Go (gopls) and falls back to tags for other languages.
+Smart formatter with priority fallback:
+  LSP formatter → external tool → ALE → gg=G
 
 Mappings: >
-    gd                Go to Definition
-    K                 Show Hover information
+    <M-F>    (Normal/Insert)  Format entire file
+    <M-F>    (Visual)         Format selection
 <
+External tools per filetype:
+  Go → goimports / gofmt     Rust → rustfmt
+  Python → autopep8          C/C++ → clang-format
+  JS/TS/JSON → prettier      Shell → shfmt     Lua → stylua
+
+==============================================================================
+34. COMPLETION                                               *wplus-completion*
+
+Lightweight auto-completion (file paths, buffer words, LSP suggestions).
+
+Mappings: >
+    <C-Space>    Trigger completion popup
+<
+Configuration: >
+    let g:wplus_completion_max_items = 200
+<
+
+==============================================================================
+35. SNIPPET                                                    *wplus-snippet*
+
+Snippet engine with tabstop placeholders.
+
+Placeholder syntax: >
+    ${1:default}    First tabstop
+    ${2:label}      Second tabstop
+    ${0}            Final cursor position
+<
+Mappings: >
+    <Tab>      Expand snippet / jump to next placeholder
+    <S-Tab>    Jump to previous placeholder
+<
+Configuration: >
+    let g:wplus_snippet_jump_key      = '<Tab>'
+    let g:wplus_snippet_jump_back_key = '<S-Tab>'
+<
+
+==============================================================================
+36. OUTLINE                                                    *wplus-outline*
+
+Sidebar showing functions, classes, structs, etc. from ctags.
+Requires universal-ctags (or Exuberant ctags).
+
+Mappings: >
+    <leader>o  /  :WoutlineToggle    Toggle sidebar
+<
+Inside sidebar: >
+    <CR>    Jump to symbol definition
+    R       Refresh
+    q       Close
+<
+
+==============================================================================
+37. FOLD                                                          *wplus-fold*
+
+Smart fold management (indent-based by default; LSP foldingRange optional).
+
+Fold text format: >
+    ▶ first line content  [N lines]
+<
+Mappings: >
+    <leader>zz  /  :WfoldToggle        Toggle fold at cursor
+    <leader>za  /  :WfoldOpenAll       Open all folds
+    <leader>zc  /  :WfoldCloseAll      Close all folds
+    <leader>zo  /  :WfoldCloseOthers   Close all except current
+<
+Configuration: >
+    let g:wplus_fold_method   = 'indent'  " 'indent' | 'lsp' | 'syntax'
+    let g:wplus_fold_level    = 99        " initial foldlevel (99 = all open)
+    let g:wplus_fold_column   = 0         " foldcolumn width
+<
+
+==============================================================================
+38. RUN                                                           *wplus-run*
+
+Filetype-aware code runner and build system launcher.
+
+Mappings: >
+    <leader>rr  /  :Wrun      Run current file
+    <leader>rb  /  :Wbuild    Build project
+    <leader>rt  /  :Wtest     Test project
+<
+Default run commands: python, go, javascript, typescript, lua, sh, bash,
+  ruby, rust, c, cpp.
+Build detection: Makefile, package.json, Cargo.toml, go.mod, CMakeLists.txt.
+
+Configuration: >
+    " %s = file path,  %r = filename without extension
+    let g:wplus_run_commands   = {'python': 'python3 -u %s'}
+    let g:wplus_build_commands = {'Makefile': 'make release'}
+    let g:wplus_run_use_terminal = 1    " 1=terminal  0=quickfix
+<
+
+==============================================================================
+39. TERMINAL                                                   *wplus-terminal*
+
+Toggle a terminal in a bottom split.
+
+Mappings: >
+    <leader>tt  /  :WplusTerminalToggle    Toggle terminal
+    <Esc><Esc>  (Terminal mode)            Return to Normal mode
+<
+
+==============================================================================
+40. ROOT                                                          *wplus-root*
+
+Auto-detect project root and set lcd when opening a file.
+Looks for: .git  go.mod  Makefile  package.json  Cargo.toml
+
+No configuration needed; required by run, grep, session, project, harpoon.
+
+==============================================================================
+41. SESSION                                                     *wplus-session*
+
+Per-project session management (save/restore buffers, folds, marks).
+
+Commands: >
+    :WsessionSave      Save current session
+    :WsessionLoad      Load current session
+    :WsessionDelete    Delete current project's session file
+<
+Configuration: >
+    let g:wplus_session_autoload  = 1
+    let g:wplus_session_autosave  = 1
+    let g:wplus_session_max_files = 50
+<
+
+==============================================================================
+42. PROJECT                                                     *wplus-project*
+
+Per-project configuration via .wplus.vim in the project root.
+Auto-sourced once on first buffer entry per session.
+
+Commands: >
+    <leader>pe  /  :WprojectEdit      Edit (or create) .wplus.vim
+    <leader>pr  /  :WprojectReload    Re-source .wplus.vim
+<
+Example .wplus.vim: >
+    set tabstop=2 shiftwidth=2
+    let g:wplus_run_commands = {'go': 'go run ./cmd/server.go'}
+<
+Configuration: >
+    let g:wplus_project_config  = '.wplus.vim'
+    let g:wplus_project_verbose = 0
+<
+
+==============================================================================
+43. SCRATCH                                                     *wplus-scratch*
+
+Persistent scratch buffer backed by ~/.vim/scratch.txt.
+Auto-saved on hide; reloaded on show.
+
+Commands: >
+    <leader>sc  /  :WscratchToggle      Toggle horizontal split
+    <leader>sv  /  :WscratchVertical    Open in vertical split
+<
+Configuration: >
+    let g:wplus_scratch_file   = expand('~/.vim/scratch.txt')
+    let g:wplus_scratch_height = 15
+    let g:wplus_scratch_ft     = 'markdown'
+<
+
+==============================================================================
+44. MARKS                                                        *wplus-marks*
+
+Visualize Vim marks (a–z) in the sign column as colored letters.
+
+Commands: >
+    <leader>ml  /  :WmarksList      Open mark list in finder popup
+    <leader>md  /  :WmarksDelete    Delete mark on cursor line
+    :WmarksRefresh                  Force sign-column refresh
+<
+Configuration: >
+    let g:wplus_marks_sign_prefix = ''    " prefix before mark letter
+<
+
+==============================================================================
+45. TODO                                                          *wplus-todo*
+
+Collect TODO/FIXME/HACK comments and show them in quickfix or finder.
+
+Commands: >
+    <leader>ft  /  :WtodoFind        Find TODOs in finder popup
+    <leader>tq  /  :WtodoQuickfix    Send TODOs to quickfix list
+<
+Configuration: >
+    let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
+<
+
+==============================================================================
+46. GREP                                                          *wplus-grep*
+
+Fast project-wide search using ripgrep, git grep, or grep.
+
+Commands / Mappings: >
+    :Wgrep {pattern}    Search and populate quickfix
+    <leader>fg          Search word under cursor (Normal or Visual)
+<
+
+==============================================================================
+47. AI ASSISTANT                                                    *wplus-ai*
+
+Integrated AI assistant supporting OpenAI, Claude, Azure OpenAI, and Ollama.
+
+Commands: >
+    :WaiComment          Generate comment for current code
+    :WaiComplete         Suggest code completion
+    :'<,'>WaiRefactor    Refactor selected code (preview before applying)
+    :'<,'>WaiReview      Review selected code (bugs, security, suggestions)
+    :'<,'>WaiExplain     Explain selected code step by step
+    :WaiCommitMsg        Generate commit message from staged diff
+    :WaiFixDiag          Fix LSP diagnostic on current line
+    :WaiToggleSuggest    Toggle Ghost Text auto-completion
+<
+All commands show a preview popup — press Enter/a to apply, Esc to discard.
+
+Ghost Text: shows AI suggestion as grey virtual text while typing in Insert
+mode. Accept with <Tab> (or your configured key).
+
+Provider configuration: >
+    let g:wplus_ai_provider = 'openai'   " 'openai'|'claude'|'azure'|'ollama'
+    let g:wplus_ai_api_key  = $OPENAI_API_KEY
+    let g:wplus_ai_model    = 'gpt-4o'
+<
+Ghost Text configuration: >
+    let g:wplus_ai_suggest_enabled = 1
+    let g:wplus_ai_suggest_delay   = 500    " ms
+    let g:wplus_ai_suggest_max_lines = 3
+<
+See docs/ai.md for the full provider setup guide.
 
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:
