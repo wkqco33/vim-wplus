@@ -15,23 +15,12 @@ let g:wplus_ai_azure_deployment = get(g:, 'wplus_ai_azure_deployment', '')  " e.
 let g:wplus_ai_azure_api_version = get(g:, 'wplus_ai_azure_api_version', '2024-02-15-preview')
 
 " Ollama-specific settings
-let g:wplus_ai_ollama_host = get(g:, 'wplus_ai_ollama_host', 'http://localhost:11434')
-" Thinking 모델(reasoning)을 사용할지 여부. 기본 0(끔): 추론 모델이 content를
-" 비우고 reasoning으로 응답을 보내거나 max_tokens를 추론에 소진하는 문제를 방지한다.
-let g:wplus_ai_ollama_think = get(g:, 'wplus_ai_ollama_think', 0)
-" 모델을 메모리에 유지하는 시간. native /api/chat 에서만 적용된다.
-" 기본 '30m': 코드를 읽느라 잠깐 멈춰도 모델이 내려가지 않아 첫 응답 지연을
-" 막는다. 무한 유지는 '-1', 즉시 해제는 '0'.
-let g:wplus_ai_ollama_keep_alive = get(g:, 'wplus_ai_ollama_keep_alive', '30m')
-" FIM(Fill-In-the-Middle): 코드 전용 모델(qwen2.5-coder 등)에서 prefix/suffix
-" 사이를 정확히 채운다. 자동완성 품질이 크게 오르고 prefix 에코가 사라진다.
-" 모델이 insert 를 지원해야 한다(미지원 시 chat 방식으로 자동 폴백).
-let g:wplus_ai_ollama_fim = get(g:, 'wplus_ai_ollama_fim', 0)
-" 샘플링 옵션 오버라이드. 사용자가 지정한 키가 기본값 위에 병합된다.
-" 예: {'repeat_penalty': 1.1, 'top_p': 0.9, 'stop': ['\n\n']}
-let g:wplus_ai_ollama_options = get(g:, 'wplus_ai_ollama_options', {})
-" 자동완성 샘플링 온도. 코드 완성은 낮을수록 정확/일관적이다.
-let g:wplus_ai_suggest_temperature = get(g:, 'wplus_ai_suggest_temperature', 0.2)
+let g:wplus_ai_ollama_host          = get(g:, 'wplus_ai_ollama_host',          'http://localhost:11434')
+let g:wplus_ai_ollama_think         = get(g:, 'wplus_ai_ollama_think',         0)      " Reasoning/thinking mode toggle
+let g:wplus_ai_ollama_keep_alive    = get(g:, 'wplus_ai_ollama_keep_alive',    '30m')  " Model memory retention duration ('30m', '-1', '0')
+let g:wplus_ai_ollama_fim           = get(g:, 'wplus_ai_ollama_fim',           0)      " Fill-In-Middle prompt format for code models
+let g:wplus_ai_ollama_options       = get(g:, 'wplus_ai_ollama_options',       {})     " Custom sampling options override
+let g:wplus_ai_suggest_temperature  = get(g:, 'wplus_ai_suggest_temperature',  0.2)
 
 " Ghost Text auto-suggestion settings
 let g:wplus_ai_suggest_enabled = get(g:, 'wplus_ai_suggest_enabled', 1)
@@ -399,7 +388,7 @@ function! s:extract_error_message(json) abort
     return ''
 endfunction
 
-" 기본 옵션에 사용자 오버라이드(g:wplus_ai_ollama_options)를 병합한다.
+" Merge user-defined sampling options (g:wplus_ai_ollama_options)
 function! s:ollama_options(max_tokens, temperature) abort
     let l:opts = {'temperature': a:temperature, 'num_predict': a:max_tokens}
     if type(g:wplus_ai_ollama_options) == v:t_dict
@@ -408,8 +397,7 @@ function! s:ollama_options(max_tokens, temperature) abort
     return l:opts
 endfunction
 
-" native /api/chat 페이로드. stream:false 로 단일 JSON 응답을 받고,
-" think 로 추론을 토글, keep_alive 로 모델을 메모리에 유지해 재로딩 지연을 막는다.
+" Native Ollama /api/chat payload builder
 function! s:build_ollama_payload(messages, max_tokens, temperature, ...) abort
     let l:stream = a:0 >= 1 ? a:1 : 0
     return json_encode({
@@ -422,7 +410,7 @@ function! s:build_ollama_payload(messages, max_tokens, temperature, ...) abort
         \ })
 endfunction
 
-" FIM(/api/generate) 페이로드. prefix=prompt, suffix=suffix 로 중간을 채운다.
+" Native Ollama FIM (/api/generate) payload builder
 function! s:build_ollama_fim_payload(prefix, suffix, max_tokens, temperature, ...) abort
     let l:stream = a:0 >= 1 ? a:1 : 0
     return json_encode({
@@ -436,7 +424,7 @@ function! s:build_ollama_fim_payload(prefix, suffix, max_tokens, temperature, ..
         \ })
 endfunction
 
-" FIM 사용 여부. provider 가 ollama 이고 사용자가 켰을 때만.
+" Check if FIM is enabled and supported for the current model
 function! s:use_ollama_fim() abort
     return g:wplus_ai_provider ==# 'ollama' && g:wplus_ai_ollama_fim && !get(s:fim_unsupported_models, g:wplus_ai_model, 0)
 endfunction
@@ -1155,7 +1143,7 @@ function! s:on_insert_enter() abort
     let s:suggest_keystroke_count = 0
 endfunction
 
-" 작은 모델 정확도를 위해 언어/스코프/주변 심볼을 프롬프트 머리에 붙인다.
+" Prepend language, scope, and symbols to improve suggestion accuracy
 function! s:suggest_context_hint() abort
     let l:parts = []
     if !empty(&filetype)
