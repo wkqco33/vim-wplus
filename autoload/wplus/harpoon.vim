@@ -71,7 +71,7 @@ function! wplus#harpoon#add() abort
         call s:save_slots()
         call wplus#util#info_msg('harpoon', 'added to slot ' . (l:empty + 1) . ': ' . fnamemodify(l:file, ':~:.'))
     else
-        call wplus#util#warn_msg('harpoon', 'all slots full — use :WharoonRemove or <leader>hd')
+        call wplus#util#warn_msg('harpoon', 'all slots full — use :WharpoonRemove or <leader>hd')
     endif
 endfunction
 
@@ -131,13 +131,13 @@ endfunction
 " ── setup ─────────────────────────────────────────────────────────────────
 
 function! wplus#harpoon#setup() abort
-    command! WharoonAdd    call wplus#harpoon#add()
-    command! WharoonRemove call wplus#harpoon#remove()
-    command! WharoonList   call wplus#harpoon#list()
+    command! WharpoonAdd    call wplus#harpoon#add()
+    command! WharpoonRemove call wplus#harpoon#remove()
+    command! WharpoonList   call wplus#harpoon#list()
 
-    nnoremap <silent> <leader>ha :WharoonAdd<CR>
-    nnoremap <silent> <leader>hd :WharoonRemove<CR>
-    nnoremap <silent> <leader>hl :WharoonList<CR>
+    nnoremap <silent> <leader>ha :WharpoonAdd<CR>
+    nnoremap <silent> <leader>hd :WharpoonRemove<CR>
+    nnoremap <silent> <leader>hl :WharpoonList<CR>
 
     for s:i in range(1, g:wplus_harpoon_max_slots)
         execute 'nnoremap <silent> <leader>h' . s:i

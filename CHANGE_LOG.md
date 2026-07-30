@@ -23,6 +23,36 @@
 - `g:wplus_{repeat,whichkey,scrollbar,snippet,undotree,completion}_*` 설정은 무시된다.
   제거해도 되고 남겨두어도 오류는 없다
 
+### ⚠️ 파괴적 변경: 키맵 소유권 정리
+
+**`]h` / `[h` — gitgutter 소유로 확정.** gitgutter 와 diffview 가 둘 다 정의했고
+diffview 가 나중에 로드되어 조용히 이겼다. 그런데 diffview 쪽 구현은 gitgutter 의
+*사인* 을 다시 읽는 방식이어서, 이기는 구현이 지는 모듈의 활성화에 의존했다.
+diffview 는 순수 뷰어가 되고 `wplus#diffview#next_hunk`/`prev_hunk` 는 제거됐다.
+대신 문서에만 있고 존재하지 않던 `:WdiffviewFile` / `:WdiffviewRepo` 를 추가했다.
+
+**접두 그림자 해소.** 완전 매핑이 더 긴 매핑의 접두이면, 짧은 쪽을 누를 때마다
+`timeoutlen` 을 기다린다.
+
+| 이전 | 이후 | 충돌 상대 |
+|---|---|---|
+| `<leader>p` | `<leader>ff` | project `<leader>pe`/`pr` |
+| `<leader>b` | `<leader>fb` | bufdelete `<leader>bd`/`bD`, blame `<leader>bl` |
+| `<leader>m` | `<leader>fr` | marks `<leader>ml`/`md` |
+
+`gc`/`gcc` 와 `ys`/`yss` 는 **의도적으로 유지했다.** 오퍼레이터 뒤에는 항상 모션이
+따라오고 Vim 은 그 다음 키 입력에서 모호성을 즉시 해소하므로 실제 지연이 없다.
+(`timeoutlen` 은 입력을 멈출 때만 적용되는데, 오퍼레이터 중간에 멈추는 것은
+의미가 없다.) `health.vim` 의 `s:allowed_prefixes` 에 근거와 함께 명시해 두었다.
+
+**네이티브 키 반환.** multicursor 의 skip/select-all 이 Vim 의 숫자
+감소/증가 명령인 `<C-x>`/`<C-a>` 를 전역으로 가져가고 있었다. 필요할 때만
+활성화되는 모듈이 치를 대가가 아니므로 `<leader>vx`/`<leader>va` 로 옮기고
+`:WmulticursorSkip`/`:WmulticursorSelectAll` 명령을 추가했다. `<C-n>` 은 유지.
+
+**`:Wharoon*` → `:Wharpoon*`.** harpoon 명령 3개가 오타 상태였고 문서 3곳이
+그 오타를 충실히 재현하고 있었다.
+
 ### 신규: 테스트 하네스
 
 - `test/run.sh` + `test/test_*.vim` — Vim 내장 `assert_*` 와 `v:errors` 기반.
