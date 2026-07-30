@@ -1,4 +1,4 @@
-﻿*wplus.txt*  All-in-one Vim plugin (dependency-free)              vim-wplus
+*wplus.txt*  All-in-one Vim plugin (dependency-free)              vim-wplus
 
 Author:  wkqco33
 License: MIT
@@ -73,6 +73,8 @@ Requires Vim 9.1+ with: >
 Verify with: >
     :echo has('job') && has('channel') && has('popupwin') && has('signs') && has('textprop')
 <
+
+Run |:WplusHealth| to check your setup and diagnose environment issues.
 
 ==============================================================================
 2. MODULE LIST                                                 *wplus-modules*
