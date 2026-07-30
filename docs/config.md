@@ -146,7 +146,6 @@ let g:wplus_ai_model       = ''           " 모델명 (필수)
 let g:wplus_ai_temperature = 0.7
 let g:wplus_ai_max_tokens  = 2000
 let g:wplus_ai_timeout     = 30           " 명령어 타임아웃 (초)
-let g:wplus_ai_stream      = 1            " 스트리밍 응답
 
 " ── Azure ────────────────────────────────────────────────────────────────
 let g:wplus_ai_azure_resource    = ''
@@ -170,5 +169,4 @@ let g:wplus_ai_suggest_max_lines     = 3
 let g:wplus_ai_suggest_temperature   = 0.2
 let g:wplus_ai_suggest_timeout       = 10
 let g:wplus_ai_suggest_debug         = 0
-let g:wplus_ai_stream_min_chars      = 20
 ```

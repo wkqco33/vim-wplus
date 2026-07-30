@@ -36,3 +36,19 @@ function! Test_ai_unknown_provider_fails_loudly() abort
     let l:payload = wplus#ai#_test_build_suggest_payload('def foo():', '')
     call assert_equal('', l:payload, 'Unknown provider should return empty payload and log error')
 endfunction
+
+function! Test_ai_get_api_endpoint_without_arguments() abort
+    call wplus#ai#setup()
+    for l:provider in ['openai', 'claude', 'azure', 'ollama']
+        let g:wplus_ai_provider = l:provider
+        let g:wplus_ai_azure_resource = 'testres'
+        let g:wplus_ai_azure_deployment = 'testdep'
+        let g:wplus_ai_azure_api_version = '2023-05-15'
+
+        let l:ep1 = wplus#ai#_test_get_api_endpoint()
+        call assert_true(!empty(l:ep1), 'Endpoint without args should not be empty for provider: ' . l:provider)
+
+        let l:ep2 = wplus#ai#_test_get_api_endpoint({'user': 'test'})
+        call assert_equal(l:ep1, l:ep2, 'Endpoint with spec should match endpoint without args for provider: ' . l:provider)
+    endfor
+endfunction
