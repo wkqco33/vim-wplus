@@ -161,16 +161,12 @@ let g:wplus_ai_ollama_fim = 1
 
 ---
 
-## 스트리밍 설정
+## 타임아웃 설정
 
 ```vim
-let g:wplus_ai_stream           = 1   " 스트리밍 응답 (기본 활성화)
-let g:wplus_ai_stream_min_chars = 20  " 첫 ghost text 렌더링 최소 누적 문자
 let g:wplus_ai_timeout          = 30  " 명령어 타임아웃 (초)
 let g:wplus_ai_suggest_timeout  = 10  " 자동완성 타임아웃 (초)
 ```
-
-> SSE를 버퍼링하는 프록시를 사용하는 경우 `let g:wplus_ai_stream = 0`으로 비활성화하세요.
 
 ---
 

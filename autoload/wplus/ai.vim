@@ -35,14 +35,7 @@ let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
 let g:wplus_ai_timeout = get(g:, 'wplus_ai_timeout', 30)
 let g:wplus_ai_suggest_timeout = get(g:, 'wplus_ai_suggest_timeout', 10)
 
-" Streaming responses: render suggestions incrementally as tokens arrive.
-" Disable for providers/proxies that buffer SSE.
-let g:wplus_ai_stream = get(g:, 'wplus_ai_stream', 1)
-" Minimum accumulated chars before first incremental ghost-text render.
-let g:wplus_ai_stream_min_chars = get(g:, 'wplus_ai_stream_min_chars', 20)
-
-let s:command_requests = {} " request_id -> {job, on_content, response_buffer}
-let s:command_channels = {} " channel_key -> request_id
+let s:command_requests = {} " request_id -> {job, on_content, response_buffer, error_buffer}
 let s:suggest_request = {} " {request_id, job, channel_key, bufnr, lnum, line, col, fim, response_buffer}
 let s:suggest_request_id = 0  " monotonic id to defeat channel reuse races
 
@@ -103,9 +96,6 @@ function! s:build_openai_payload(spec) abort
     else
         let l:body.max_tokens = a:spec.max_tokens
     endif
-    if get(a:spec, 'stream', 0)
-        let l:body.stream = v:true
-    endif
     return json_encode(l:body)
 endfunction
 
@@ -119,9 +109,6 @@ function! s:build_claude_payload(spec) abort
         \ }
     if !empty(a:spec.system)
         let l:body.system = a:spec.system
-    endif
-    if get(a:spec, 'stream', 0)
-        let l:body.stream = v:true
     endif
     return json_encode(l:body)
 endfunction
@@ -140,7 +127,7 @@ function! s:build_ollama_payload_spec(spec) abort
         \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'codellama',
         \ 'messages': l:msgs,
         \ 'options': l:options,
-        \ 'stream': get(a:spec, 'stream', 0) ? v:true : v:false,
+        \ 'stream': v:false,
         \ 'keep_alive': '5m',
         \ }
     return json_encode(l:body)
@@ -178,30 +165,6 @@ function! s:extract_ollama(json) abort
     return ''
 endfunction
 
-function! s:delta_openai(json) abort
-    if has_key(a:json, 'choices') && len(a:json.choices) > 0
-        let l:delta = get(a:json.choices[0], 'delta', {})
-        return get(l:delta, 'content', '')
-    endif
-    return ''
-endfunction
-
-function! s:delta_claude(json) abort
-    if get(a:json, 'type', '') ==# 'content_block_delta'
-                \ && has_key(a:json, 'delta')
-                \ && get(a:json.delta, 'type', '') ==# 'text_delta'
-        return get(a:json.delta, 'text', '')
-    endif
-    return ''
-endfunction
-
-function! s:delta_ollama(json) abort
-    if has_key(a:json, 'message') && type(a:json.message) == v:t_dict
-        return get(a:json.message, 'content', '')
-    endif
-    return ''
-endfunction
-
 function! s:error_openai(json) abort
     if has_key(a:json, 'error')
         if type(a:json.error) == v:t_dict
@@ -233,7 +196,6 @@ call wplus#ai#register_provider('openai', {
     \ 'headers': {key -> ['Content-Type: application/json', 'Authorization: Bearer ' . key]},
     \ 'payload': function('s:build_openai_payload'),
     \ 'extract': function('s:extract_openai'),
-    \ 'delta': function('s:delta_openai'),
     \ 'error': function('s:error_openai'),
     \ })
 
@@ -243,7 +205,6 @@ call wplus#ai#register_provider('claude', {
     \ 'headers': {key -> ['Content-Type: application/json', 'x-api-key: ' . key, 'anthropic-version: 2023-06-01']},
     \ 'payload': function('s:build_claude_payload'),
     \ 'extract': function('s:extract_claude'),
-    \ 'delta': function('s:delta_claude'),
     \ 'error': function('s:error_claude'),
     \ })
 
@@ -253,7 +214,6 @@ call wplus#ai#register_provider('azure', {
     \ 'headers': {key -> ['Content-Type: application/json', 'api-key: ' . key]},
     \ 'payload': function('s:build_openai_payload'),
     \ 'extract': function('s:extract_openai'),
-    \ 'delta': function('s:delta_openai'),
     \ 'error': function('s:error_openai'),
     \ })
 
@@ -263,15 +223,15 @@ call wplus#ai#register_provider('ollama', {
     \ 'headers': {key -> ['Content-Type: application/json', 'Authorization: Bearer ollama']},
     \ 'payload': function('s:build_ollama_payload_spec'),
     \ 'extract': function('s:extract_ollama'),
-    \ 'delta': function('s:delta_ollama'),
     \ 'error': function('s:error_ollama'),
     \ })
 
-function! s:get_api_endpoint(spec) abort
+function! s:get_api_endpoint(...) abort
+    let l:spec = a:0 >= 1 ? a:1 : {}
     let l:prov = s:get_provider(g:wplus_ai_provider)
     if empty(l:prov) | return '' | endif
     if type(l:prov.endpoint) == v:t_func
-        return call(l:prov.endpoint, [a:spec])
+        return call(l:prov.endpoint, [l:spec])
     endif
     return l:prov.endpoint
 endfunction
@@ -295,15 +255,8 @@ endfunction
 
 function! s:build_curl_command(payload, endpoint, headers, ...) abort
     let l:timeout = a:0 >= 1 ? a:1 : g:wplus_ai_timeout
-    let l:stream = a:0 >= 2 ? a:2 : 0
-    " -N: disable output buffering so streaming chunks reach out_cb promptly.
-    "     Without it curl block-buffers piped output and out_cb sees nothing
-    "     until close_cb, breaking incremental ghost-text rendering.
     let l:cmd = ['curl', '-s', '-S', '--max-time', string(l:timeout),
                 \ '-X', 'POST', '-d', a:payload]
-    if l:stream
-        call insert(l:cmd, '-N', 1)
-    endif
     call add(l:cmd, a:endpoint)
     for l:header in a:headers
         call insert(l:cmd, l:header, 2)
@@ -398,12 +351,11 @@ function! s:ollama_options(max_tokens, temperature) abort
 endfunction
 
 " Native Ollama /api/chat payload builder
-function! s:build_ollama_payload(messages, max_tokens, temperature, ...) abort
-    let l:stream = a:0 >= 1 ? a:1 : 0
+function! s:build_ollama_payload(messages, max_tokens, temperature) abort
     return json_encode({
         \ 'model': g:wplus_ai_model,
         \ 'think': g:wplus_ai_ollama_think ? v:true : v:false,
-        \ 'stream': l:stream ? v:true : v:false,
+        \ 'stream': v:false,
         \ 'keep_alive': g:wplus_ai_ollama_keep_alive,
         \ 'messages': a:messages,
         \ 'options': s:ollama_options(a:max_tokens, a:temperature),
@@ -411,12 +363,11 @@ function! s:build_ollama_payload(messages, max_tokens, temperature, ...) abort
 endfunction
 
 " Native Ollama FIM (/api/generate) payload builder
-function! s:build_ollama_fim_payload(prefix, suffix, max_tokens, temperature, ...) abort
-    let l:stream = a:0 >= 1 ? a:1 : 0
+function! s:build_ollama_fim_payload(prefix, suffix, max_tokens, temperature) abort
     return json_encode({
         \ 'model': g:wplus_ai_model,
         \ 'think': g:wplus_ai_ollama_think ? v:true : v:false,
-        \ 'stream': l:stream ? v:true : v:false,
+        \ 'stream': v:false,
         \ 'keep_alive': g:wplus_ai_ollama_keep_alive,
         \ 'prompt': a:prefix,
         \ 'suffix': a:suffix,
@@ -461,44 +412,43 @@ function! s:build_request_payload(prompt) abort
         \ 'user': a:prompt,
         \ 'max_tokens': get(g:, 'wplus_ai_max_tokens', 2048),
         \ 'temperature': get(g:, 'wplus_ai_temperature', 0.7),
-        \ 'stream': g:wplus_ai_stream,
         \ 'purpose': 'command',
         \ }
     return call(l:prov.payload, [l:spec])
 endfunction
 
-function! s:on_response(channel, msg) abort
-    let l:key = s:channel_key(a:channel)
-    if has_key(s:command_channels, l:key)
-        let l:request_id = s:command_channels[l:key]
-        if has_key(s:command_requests, l:request_id)
-            let s:command_requests[l:request_id].response_buffer .= a:msg
-        endif
+function! s:on_response(request_id, channel, msg) abort
+    if has_key(s:command_requests, a:request_id)
+        let s:command_requests[a:request_id].response_buffer .= a:msg
     endif
 endfunction
 
-function! s:on_response_complete(channel) abort
-    let l:key = s:channel_key(a:channel)
-    if !has_key(s:command_channels, l:key)
+function! s:on_response_complete(request_id, channel) abort
+    if !has_key(s:command_requests, a:request_id)
         return
     endif
-    let l:request_id = remove(s:command_channels, l:key)
-    if !has_key(s:command_requests, l:request_id)
-        return
-    endif
-    let l:request = remove(s:command_requests, l:request_id)
+    let l:request = remove(s:command_requests, a:request_id)
 
-    let l:response = l:request.response_buffer
+    let l:response = trim(l:request.response_buffer)
+    let l:err_buf = trim(get(l:request, 'error_buffer', ''))
 
     if empty(l:response)
-        call wplus#util#error_msg('ai', 'empty response from API')
+        if !empty(l:err_buf)
+            call wplus#util#error_msg('ai', 'request error: ' . l:err_buf)
+        else
+            call wplus#util#error_msg('ai', 'empty response from API')
+        endif
         return
     endif
 
     try
         let l:json = json_decode(l:response)
     catch
-        call wplus#util#error_msg('ai', 'failed to parse response')
+        if !empty(l:err_buf)
+            call wplus#util#error_msg('ai', 'request error: ' . l:err_buf)
+        else
+            call wplus#util#error_msg('ai', 'failed to parse response: ' . (len(l:response) > 100 ? l:response[:100] . '...' : l:response))
+        endif
         return
     endtry
 
@@ -523,10 +473,14 @@ let s:ai_preview_apply = v:null
 
 " Show a:lines in a centered popup highlighted as a:ft. On accept, call
 " a:ApplyFn (a zero-arg partial with all context already bound); on
-" discard, drop it. Used by every non-streaming AI command below so a
+" discard, drop it. Used by every AI command below so a
 " response is never written to a buffer/register without explicit accept.
 function! s:open_ai_preview(ft, lines, ApplyFn) abort
     let s:ai_preview_apply = a:ApplyFn
+    if !exists('*popup_create')
+        if !empty(a:ApplyFn) | call a:ApplyFn() | endif
+        return
+    endif
     let l:header = '[wplus-ai] Enter/a = apply   Esc/q = discard'
     let l:width  = float2nr(&columns * 0.6)
     let l:height = min([len(a:lines) + 2, float2nr(&lines * 0.6)])
@@ -740,34 +694,32 @@ function! s:send_request(prompt, OnContent) abort
     let l:request_id = reltimestr(reltime())
     let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers, g:wplus_ai_timeout)
 
+    let s:command_requests[l:request_id] = {
+        \ 'job': v:null,
+        \ 'on_content': a:OnContent,
+        \ 'response_buffer': '',
+        \ 'error_buffer': '',
+        \ }
+
     let l:job = job_start(l:cmd, {
-        \ 'out_cb': function('s:on_response'),
-        \ 'close_cb': function('s:on_response_complete'),
-        \ 'err_cb': function('s:on_error')
+        \ 'out_cb': function('s:on_response', [l:request_id]),
+        \ 'close_cb': function('s:on_response_complete', [l:request_id]),
+        \ 'err_cb': function('s:on_error', [l:request_id])
         \ })
     if type(l:job) != v:t_job
+        call remove(s:command_requests, l:request_id)
         call wplus#util#error_msg('ai', 'failed to start request')
         return
     endif
 
-    let s:command_requests[l:request_id] = {
-        \ 'job': l:job,
-        \ 'on_content': a:OnContent,
-        \ 'response_buffer': ''
-        \ }
-    let s:command_channels[s:channel_key(job_getchannel(l:job))] = l:request_id
+    let s:command_requests[l:request_id].job = l:job
     call wplus#util#info_msg('ai', 'sending request...')
 endfunction
 
-function! s:on_error(channel, msg) abort
-    let l:key = s:channel_key(a:channel)
-    if has_key(s:command_channels, l:key)
-        let l:request_id = remove(s:command_channels, l:key)
-        if has_key(s:command_requests, l:request_id)
-            call remove(s:command_requests, l:request_id)
-        endif
+function! s:on_error(request_id, channel, msg) abort
+    if has_key(s:command_requests, a:request_id)
+        let s:command_requests[a:request_id].error_buffer .= a:msg . "\n"
     endif
-    call wplus#util#error_msg('ai', 'request error: ' . a:msg)
 endfunction
 
 " ── Review / Explain ──────────────────────────────────────────────────────
@@ -1162,8 +1114,7 @@ function! s:suggest_context_hint() abort
 endfunction
 
 " Build suggestion prompt for all providers
-function! s:build_suggest_payload(prefix, suffix, ...) abort
-    let l:stream = a:0 >= 1 ? a:1 : 0
+function! s:build_suggest_payload(prefix, suffix) abort
     let l:prov = s:get_provider(g:wplus_ai_provider)
     if empty(l:prov) | return '' | endif
 
@@ -1178,99 +1129,16 @@ function! s:build_suggest_payload(prefix, suffix, ...) abort
         \ 'suffix': a:suffix,
         \ 'max_tokens': get(g:, 'wplus_ai_suggest_max_tokens', 128),
         \ 'temperature': get(g:, 'wplus_ai_suggest_temperature', 0.2),
-        \ 'stream': l:stream,
         \ 'purpose': 'suggest',
         \ }
     return call(l:prov.payload, [l:spec])
 endfunction
 
-function! s:parse_stream_delta(line, fim) abort
-    let l:raw = a:line
-    let l:prov = s:get_provider(g:wplus_ai_provider)
-    if empty(l:prov) | return '' | endif
-
-    if g:wplus_ai_provider !=# 'ollama'
-        if l:raw =~# '^data:'
-            let l:raw = substitute(l:raw, '^data:\s*', '', '')
-            if l:raw =~# '\[DONE\]'
-                return ''
-            endif
-        else
-            return ''
-        endif
-    endif
-    let l:raw = trim(l:raw)
-    if empty(l:raw) | return '' | endif
-    try
-        let l:json = json_decode(l:raw)
-    catch
-        return ''
-    endtry
-    return call(l:prov.delta, [l:json])
-endfunction
-
-" Render incremental ghost text from accumulated content.
-function! s:render_stream_increment(request) abort
-    let l:content = get(a:request, 'stream_content', '')
-    if empty(l:content) | return | endif
-    let l:clean = s:clean_suggest_content(l:content)
-    if len(l:clean) < g:wplus_ai_stream_min_chars | return | endif
-    if line('.') != a:request.line || col('.') != a:request.col || bufnr('%') != a:request.bufnr
-        return
-    endif
-
-    let l:lines = split(l:clean, "\n", 1)
-    let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
-    let l:should_stop = 0
-
-    if len(l:lines) > l:max_lines
-        let l:clean = join(l:lines[:l:max_lines - 1], "\n")
-        let l:should_stop = 1
-    endif
-
-    let s:suggest_content = l:clean
-    let s:suggest_line = a:request.line
-    let s:suggest_col = a:request.col
-    let s:suggest_bufnr = a:request.bufnr
-    call s:show_suggestion()
-
-    if l:should_stop
-        call s:suggest_debug('reached max lines, stopping job')
-        if has_key(a:request, 'job') && type(a:request.job) == v:t_job
-            silent! call job_stop(a:request.job)
-        endif
-        let s:suggest_request = {}
-    endif
-endfunction
-
-" Response handler for suggestions. request_id is bound via partial and thus
-" comes first in the argument list. Streaming: parse each chunk for deltas and
-" render incrementally. Non-streaming: buffer raw response for final decode.
 function! s:on_suggest_response(request_id, channel, msg) abort
     if empty(s:suggest_request) || get(s:suggest_request, 'request_id', -1) != a:request_id
         return
     endif
-    if get(s:suggest_request, 'stream', 0)
-        let s:suggest_request.stream_buffer .= substitute(a:msg, "\r\n\=", "\n", 'g')
-        if s:suggest_request.stream_buffer =~# "\n"
-            let l:parts = split(s:suggest_request.stream_buffer, "\n", 1)
-            if s:suggest_request.stream_buffer =~# "\n$"
-                let s:suggest_request.stream_buffer = ''
-            else
-                let s:suggest_request.stream_buffer = remove(l:parts, -1)
-            endif
-            for l:line in l:parts
-                if empty(l:line) | continue | endif
-                let l:delta = s:parse_stream_delta(l:line, get(s:suggest_request, 'fim', 0))
-                if !empty(l:delta)
-                    let s:suggest_request.stream_content .= l:delta
-                    call s:render_stream_increment(s:suggest_request)
-                endif
-            endfor
-        endif
-    else
-        let s:suggest_request.response_buffer .= a:msg
-    endif
+    let s:suggest_request.response_buffer .= a:msg
 endfunction
 
 " Complete response handler for suggestions. request_id is bound via partial.
@@ -1281,41 +1149,6 @@ function! s:on_suggest_response_complete(request_id, channel) abort
     let l:request = s:suggest_request
     let s:suggest_request = {}
 
-    " ── Streaming path: finalize accumulated content ──
-    if get(l:request, 'stream', 0)
-        " Flush any remaining buffered partial line
-        if !empty(l:request.stream_buffer)
-            let l:delta = s:parse_stream_delta(l:request.stream_buffer, get(l:request, 'fim', 0))
-            if !empty(l:delta)
-                let l:request.stream_content .= l:delta
-            endif
-            let l:request.stream_buffer = ''
-        endif
-        let l:content = l:request.stream_content
-        if empty(l:content)
-            call s:suggest_debug('empty streaming suggestion response')
-            return
-        endif
-        let l:content = s:clean_suggest_content(l:content)
-
-        let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
-        let l:lines = split(l:content, "\n", 1)
-        if len(l:lines) > l:max_lines
-            let l:content = join(l:lines[:l:max_lines - 1], "\n")
-        endif
-        if line('.') == l:request.line && col('.') == l:request.col && bufnr('%') == l:request.bufnr
-            let s:suggest_content = l:content
-            let s:suggest_line = l:request.line
-            let s:suggest_col = l:request.col
-            let s:suggest_bufnr = l:request.bufnr
-            call s:show_suggestion()
-        else
-            call s:suggest_debug('dropped stale streaming suggestion')
-        endif
-        return
-    endif
-
-    " ── Non-streaming path ──
     let l:response = l:request.response_buffer
 
     if empty(l:response)
@@ -1387,23 +1220,22 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
     endif
 
     let l:is_fim = s:use_ollama_fim()
-    let l:stream = g:wplus_ai_stream ? 1 : 0
     if l:is_fim
         let l:endpoint = g:wplus_ai_ollama_host . '/api/generate'
         let l:payload = s:build_ollama_fim_payload(a:prefix, a:suffix,
-            \ g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature, l:stream)
+            \ g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature)
     else
         let l:endpoint = s:get_api_endpoint()
         if empty(l:endpoint)
             call s:suggest_debug('empty API endpoint')
             return
         endif
-        let l:payload = s:build_suggest_payload(a:prefix, a:suffix, l:stream)
+        let l:payload = s:build_suggest_payload(a:prefix, a:suffix)
     endif
     let l:headers = s:get_request_headers()
     if empty(l:headers) | return | endif
 
-    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers, g:wplus_ai_suggest_timeout, l:stream)
+    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers, g:wplus_ai_suggest_timeout)
 
     if !empty(s:suggest_request)
         silent! call job_stop(s:suggest_request.job)
@@ -1432,12 +1264,9 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
         \ 'line': s:suggest_line,
         \ 'col': s:suggest_col,
         \ 'fim': l:is_fim,
-        \ 'stream': l:stream,
-        \ 'stream_content': '',
-        \ 'stream_buffer': '',
         \ 'response_buffer': ''
         \ }
-    call s:suggest_debug('sent suggestion request' . (l:is_fim ? ' (FIM)' : '') . (l:stream ? ' (stream)' : ''))
+    call s:suggest_debug('sent suggestion request' . (l:is_fim ? ' (FIM)' : ''))
 endfunction
 
 function! wplus#ai#cancel() abort
@@ -1447,7 +1276,6 @@ function! wplus#ai#cancel() abort
         endif
     endfor
     let s:command_requests = {}
-    let s:command_channels = {}
 
     if !empty(s:suggest_request) && has_key(s:suggest_request, 'job') && type(s:suggest_request.job) == v:t_job
         try | call job_stop(s:suggest_request.job) | catch | endtry
@@ -1459,4 +1287,8 @@ endfunction
 
 function! wplus#ai#_test_build_suggest_payload(prefix, suffix) abort
     return s:build_suggest_payload(a:prefix, a:suffix)
+endfunction
+
+function! wplus#ai#_test_get_api_endpoint(...) abort
+    return call('s:get_api_endpoint', a:000)
 endfunction

@@ -30,7 +30,7 @@ let s:known_options = [
     \ 'wplus_ai_ollama_options', 'wplus_ai_suggest_enabled', 'wplus_ai_suggest_delay',
     \ 'wplus_ai_suggest_context_lines', 'wplus_ai_suggest_suffix_lines', 'wplus_ai_suggest_max_tokens',
     \ 'wplus_ai_suggest_max_lines', 'wplus_ai_suggest_temperature', 'wplus_ai_suggest_debug',
-    \ 'wplus_ai_timeout', 'wplus_ai_suggest_timeout', 'wplus_ai_stream', 'wplus_ai_stream_min_chars',
+    \ 'wplus_ai_timeout', 'wplus_ai_suggest_timeout',
     \ 'wplus_ai_openai_endpoint', 'wplus_multicursor_enabled', 'wplus_register_enabled',
     \ 'wplus_outline_enabled', 'wplus_diffview_enabled', 'wplus_harpoon_enabled', 'wplus_harpoon_max_slots',
     \ 'wplus_marks_enabled', 'wplus_scratch_enabled', 'wplus_scratch_height', 'wplus_run_enabled',
