@@ -79,6 +79,31 @@ function! wplus#util#find_git_root(dir) abort
     return ''
 endfunction
 
+function! wplus#util#ensure_bufloaded(path) abort
+    let l:abs = fnamemodify(a:path, ':p')
+    if bufnr(l:abs) == -1
+        silent execute 'badd ' . fnameescape(l:abs)
+    endif
+    let l:bufnr = bufnr(l:abs)
+    if !bufloaded(l:bufnr)
+        call bufload(l:bufnr)
+    endif
+    return l:bufnr
+endfunction
+
+function! wplus#util#popup_options(overrides) abort
+    let l:opts = {
+        \ 'border': [1, 1, 1, 1],
+        \ 'padding': [0, 1, 0, 1],
+        \ 'wrap': 1,
+        \ 'maxwidth': 80,
+        \ }
+    if type(a:overrides) == v:t_dict
+        call extend(l:opts, a:overrides)
+    endif
+    return l:opts
+endfunction
+
 augroup WplusUtil
     autocmd!
     autocmd DirChanged * call wplus#util#clear_git_root_cache()
