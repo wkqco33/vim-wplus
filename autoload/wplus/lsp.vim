@@ -742,12 +742,17 @@ function! s:apply_text_edits(path, edits) abort
         let l:ec = l:e.range.end.character
 
         let l:start_line = get(getbufline(l:bufnr, l:sl), 0, '')
-        let l:end_line   = l:el ==# l:sl ? l:start_line : get(getbufline(l:bufnr, l:el), 0, '')
+        let l:end_line   = l:el == l:sl ? l:start_line : get(getbufline(l:bufnr, l:el), 0, '')
         let l:prefix = l:sc > 0 ? l:start_line[: l:sc - 1] : ''
         let l:suffix = l:end_line[l:ec : ]
 
         let l:replacement = split(l:prefix . l:e.newText . l:suffix, "\n", 1)
-        call append(l:el, l:replacement)
+        " appendbufline, not append: every other call here is explicitly scoped to
+        " l:bufnr, but bare append() writes into the *current* buffer. During a
+        " cross-file rename that meant the edits for every other file landed in
+        " whatever buffer the user happened to be looking at, while the correct
+        " lines were deleted from the real target.
+        call appendbufline(l:bufnr, l:el, l:replacement)
         call deletebufline(l:bufnr, l:sl, l:el)
     endfor
 

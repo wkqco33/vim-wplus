@@ -109,9 +109,10 @@ function! s:run_in_quickfix(cmd) abort
 endfunction
 
 function! s:qf_add(line) abort
-    let l:items = getqflist()
-    call add(l:items, {'text': a:line, 'valid': 0})
-    call setqflist(l:items, 'r')
+    " 'a' appends. This used to getqflist() -> add() -> setqflist(..., 'r'),
+    " rebuilding the entire list for every single line of output: O(n^2) over a
+    " chatty build.
+    call setqflist([{'text': a:line, 'valid': 0}], 'a')
     " Scroll to bottom
     let l:qfwin = getqflist({'winid': 1}).winid
     if l:qfwin > 0

@@ -9,7 +9,13 @@
 if exists('g:autoloaded_wplus_surround') | finish | endif
 let g:autoloaded_wplus_surround = 1
 
-" Pair table: trigger char → [open, close]
+" Pair table: trigger char → [open, close] as *inserted*.
+"
+" The opening-bracket triggers insert padding ( ys( → "( x )" ) while the
+" closing-bracket triggers do not ( ys) → "(x)" ). That padding must never reach
+" the matching code -- use s:bare_pair() there. 't' (HTML tag) used to map to
+" ['',''], which made yst/cst/dst silently do nothing; an absent entry at least
+" falls through to the [char, char] default.
 let s:pairs = {
     \ '(':  ['( ', ' )'],  ')':  ['(',  ')'],
     \ '[':  ['[ ', ' ]'],  ']':  ['[',  ']'],
@@ -18,7 +24,6 @@ let s:pairs = {
     \ '"':  ['"',  '"'],
     \ "'":  ["'",  "'"],
     \ '`':  ['`',  '`'],
-    \ 't':  ['',   ''],
     \ }
 
 " ── helpers ───────────────────────────────────────────────────────────────
@@ -27,9 +32,20 @@ function! s:get_pair(char) abort
     return get(s:pairs, a:char, [a:char, a:char])
 endfunction
 
+" The delimiters to *match* against buffer text: single characters, with the
+" cosmetic padding from s:pairs stripped.
+"
+" Matching used to run against the padded forms, so searchpairpos() looked for
+" the two-character sequence "( " and missed every "foo(bar)", while
+" s:change_surround() advanced by len(' )') == 2 and ate one character too many.
+function! s:bare_pair(char) abort
+    let [l:open, l:close] = s:get_pair(a:char)
+    return [trim(l:open), trim(l:close)]
+endfunction
+
 function! s:find_surrounding(char) abort
     " Returns [open_line, open_col, close_line, close_col] (1-indexed) or []
-    let [open, close] = s:get_pair(a:char)
+    let [open, close] = s:bare_pair(a:char)
     " For symmetric chars (quotes, backtick) search forward from cursor
     if open ==# close
         let line = getline('.')
@@ -55,16 +71,21 @@ function! s:find_surrounding(char) abort
         endwhile
         return []
     endif
-    " Asymmetric pairs: use searchpairpos()
-    let open_pos  = searchpairpos(escape(open, '\/'), '', escape(close, '\/'), 'bnW')
-    let close_pos = searchpairpos(escape(open, '\/'), '', escape(close, '\/'), 'nW')
+    " Asymmetric pairs: use searchpairpos().
+    " \V (very nomagic) so bracket delimiters are matched literally -- escaping
+    " only \ and / left '[' to open a regex character class, which made ds]/cs]
+    " and friends silently find nothing.
+    let l:o = '\V' . escape(open, '\')
+    let l:c = '\V' . escape(close, '\')
+    let open_pos  = searchpairpos(l:o, '', l:c, 'bnW')
+    let close_pos = searchpairpos(l:o, '', l:c, 'nW')
     if open_pos == [0, 0] || close_pos == [0, 0] | return [] | endif
     return [open_pos[0], open_pos[1], close_pos[0], close_pos[1]]
 endfunction
 
 function! s:delete_surround(char) abort
-    let [open, close] = s:get_pair(a:char)
-    let pos = s:find_surrounding(open ==# close ? open : open[0])
+    let [open, close] = s:bare_pair(a:char)
+    let pos = s:find_surrounding(open ==# close ? open : open)
     if empty(pos) | return | endif
     let [ol, oc, cl, cc] = pos
     " Delete close first (so positions don't shift)
@@ -75,16 +96,18 @@ function! s:delete_surround(char) abort
 endfunction
 
 function! s:change_surround(old, new) abort
-    let [open, close] = s:get_pair(a:old)
+    let [open, close] = s:bare_pair(a:old)
     let [nopen, nclose] = s:get_pair(a:new)
-    let pos = s:find_surrounding(open ==# close ? open : open[0])
+    let pos = s:find_surrounding(open ==# close ? open : open)
     if empty(pos) | return | endif
     let [ol, oc, cl, cc] = pos
-    " Replace close first
+    " Replace close first so the open position stays valid. The delimiters found
+    " by s:find_surrounding() are always one character wide, so advance by 1 --
+    " len(close) on the padded ' )' skipped an extra character.
     let cline = getline(cl)
-    call setline(cl, cline[:cc - 2] . nclose . cline[cc + len(close) - 1:])
+    call setline(cl, cline[:cc - 2] . nclose . cline[cc :])
     let oline = getline(ol)
-    call setline(ol, oline[:oc - 2] . nopen . oline[oc + len(open) - 1:])
+    call setline(ol, oline[:oc - 2] . nopen . oline[oc :])
 endfunction
 
 function! s:surround_range(sl, sc, el, ec, char) abort

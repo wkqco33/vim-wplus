@@ -86,8 +86,11 @@ function! wplus#project#setup() abort
         autocmd!
         " Load config whenever we enter a buffer that belongs to a project
         autocmd BufEnter * call s:load_config(wplus#root#find_root())
-        " After saving the project config file, reload it automatically
-        execute 'autocmd BufWritePost ' . escape(g:wplus_project_config, '.') .
+        " After saving the project config file, reload it automatically.
+        " The pattern is a glob, not a regex -- escaping the dots produced
+        " '\.wplus\.vim', which matches no filename, so this never once fired.
+        execute 'autocmd BufWritePost */' . g:wplus_project_config .
+                    \ ',' . g:wplus_project_config .
                     \ ' call wplus#project#reload()'
     augroup END
 endfunction

@@ -98,9 +98,12 @@ function! s:get_todos() abort
     if executable('rg')
         let l:cmd = 'rg --vimgrep --smart-case "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"'
         let l:items = systemlist(l:cmd)
-    elseif executable('git') && isdirectory('.git')
-        let l:cmd = 'git grep -n "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"'
-        let l:items = systemlist(l:cmd)
+    elseif executable('git') && !empty(wplus#util#find_git_root(getcwd()))
+        " -E is required: git grep defaults to basic regex, so the alternation
+        " below was read literally and this backend always returned 0 matches.
+        " Argv list form also avoids a shell round-trip.
+        let l:items = systemlist(['git', 'grep', '-n', '-E',
+            \ '\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b'])
     elseif executable('grep')
         let l:items = systemlist('grep -rn "TODO\|FIXME\|XXX\|NOTE\|BUG\|HACK\|WARN" .')
     elseif has('win32')

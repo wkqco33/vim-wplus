@@ -110,18 +110,31 @@ function! s:try_external() abort
     return s:run_stdin_fmt(l:cmd, l:bin)
 endfunction
 
+" Restore the buffer to a captured snapshot.
+"
+" This replaces what used to be `silent undo`. Two things were wrong with that:
+" the undo point it relied on was never created (undofile() returns the name of
+" the undo file, it does not write an undo entry), and if the filter produced no
+" change at all there was nothing to undo, so `undo` reverted the *user's*
+" previous edit instead.
+function! s:restore(lines) abort
+    if getline(1, '$') ==# a:lines
+        return
+    endif
+    call setline(1, a:lines)
+    if line('$') > len(a:lines)
+        call deletebufline('%', len(a:lines) + 1, line('$'))
+    endif
+endfunction
+
 function! s:run_stdin_fmt(cmd, bin) abort
     let l:view = winsaveview()
     let l:orig = getline(1, '$')
-    
-    " Create undo point before formatting
-    call undofile(expand('%'))
-    
+
     silent execute '%!' . a:cmd
 
     if v:shell_error != 0
-        " Restore original content via undo
-        silent undo
+        call s:restore(l:orig)
         call wplus#util#warn_msg('format', 'formatter failed: ' . a:bin . ' (exit ' . v:shell_error . ')')
         call winrestview(l:view)
         return 0
@@ -129,7 +142,7 @@ function! s:run_stdin_fmt(cmd, bin) abort
 
     " Guard against empty output (some tools output nothing on failure)
     if getline(1, '$') == ['']
-        silent undo
+        call s:restore(l:orig)
         call wplus#util#warn_msg('format', 'formatter returned empty output: ' . a:bin)
         call winrestview(l:view)
         return 0

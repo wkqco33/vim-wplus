@@ -34,12 +34,15 @@ function! wplus#quickfix#setup() abort
     augroup END
 endfunction
 
+" A bar has to be escaped too, not just the delimiter and backslash: inside
+" :execute, an unescaped | ends the :substitute early, so the trailing
+" '| update' was silently absorbed into the replacement text.
 function! s:escape_sub_pattern(text) abort
-    return escape(a:text, '\/')
+    return escape(a:text, '\/|')
 endfunction
 
 function! s:escape_sub_replacement(text) abort
-    return escape(a:text, '\/&~')
+    return escape(a:text, '\/&~|')
 endfunction
 
 function! s:collect_quickfix_files(qflist) abort
@@ -79,7 +82,10 @@ function! wplus#quickfix#run_replace(mode, from, to) abort
     let l:pattern = s:escape_sub_pattern(a:from)
     let l:replacement = s:escape_sub_replacement(a:to)
     let l:flags = a:mode ==# 'confirm' ? 'gce' : 'ge'
-    execute 'cfdo keepjumps keeppatterns silent %s/' . l:pattern . '/' . l:replacement . '/' . l:flags . ' | update'
+    " Two separate :cfdo passes rather than one bar-joined command, so a bar in
+    " the user's input cannot detach ':update' and leave every file unsaved.
+    execute 'cfdo keepjumps keeppatterns silent %s/' . l:pattern . '/' . l:replacement . '/' . l:flags
+    cfdo silent update
     echomsg '[wplus] project replace done: ' . a:from . ' → ' . a:to . ' (' . a:mode . ')'
 endfunction
 
