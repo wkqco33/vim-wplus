@@ -12,15 +12,6 @@ let s:buf_name = '__WplusDiff__'
 let s:diff_buf = -1
 let s:job      = v:null
 
-" ── git helpers (same pattern as gitgutter.vim) ───────────────────────────
-
-function! s:git_root(file) abort
-    let l:dir = fnamemodify(a:file, ':h')
-    let l:out = systemlist('git -C ' . shellescape(l:dir) .
-        \ ' rev-parse --show-toplevel ' . wplus#util#null_redirect())
-    return v:shell_error == 0 && !empty(l:out) ? trim(l:out[0]) : ''
-endfunction
-
 " ── diff buffer rendering ─────────────────────────────────────────────────
 
 function! s:open_diff_buf() abort
@@ -55,7 +46,7 @@ function! wplus#diffview#open(...) abort
     let l:file = expand('%:p')
     if empty(l:file) | call wplus#util#warn_msg('diffview', 'No file') | return | endif
 
-    let l:root = s:git_root(l:file)
+    let l:root = wplus#util#find_git_root(fnamemodify(l:file, ':h'))
     if empty(l:root) | call wplus#util#warn_msg('diffview', 'Not a git repository') | return | endif
 
     let l:rel  = wplus#util#relpath(l:root, l:file)

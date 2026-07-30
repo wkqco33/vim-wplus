@@ -5,23 +5,48 @@ let g:autoloaded_wplus_grep = 1
 
 let s:search_history = [] " Search history list
 
-function! s:configure_grep() abort
+function! wplus#grep#backend() abort
     if executable('rg')
-        let &grepprg = 'rg --vimgrep --smart-case'
-        let &grepformat = '%f:%l:%c:%m'
-    elseif executable('git') && isdirectory('.git')
-        let &grepprg = 'git grep -n --column'
-        let &grepformat = '%f:%l:%c:%m'
+        return {
+            \ 'name': 'rg',
+            \ 'grepprg': 'rg --vimgrep --smart-case',
+            \ 'format': '%f:%l:%c:%m',
+            \ 'supports_ere': 1,
+            \ }
+    elseif executable('git') && !empty(wplus#util#find_git_root(getcwd()))
+        return {
+            \ 'name': 'git',
+            \ 'grepprg': 'git grep -n --column',
+            \ 'format': '%f:%l:%c:%m',
+            \ 'supports_ere': 1,
+            \ }
     elseif executable('grep')
-        let &grepprg = 'grep -RIn $* .'
-        let &grepformat = '%f:%l:%m'
+        return {
+            \ 'name': 'grep',
+            \ 'grepprg': 'grep -RIn $* .',
+            \ 'format': '%f:%l:%m',
+            \ 'supports_ere': 1,
+            \ }
     elseif has('win32')
-        " findstr ships with every Windows install, unlike grep/rg.
-        let &grepprg = 'findstr /S /N /P $* *'
-        let &grepformat = '%f:%l:%m'
+        return {
+            \ 'name': 'findstr',
+            \ 'grepprg': 'findstr /S /N /P $* *',
+            \ 'format': '%f:%l:%m',
+            \ 'supports_ere': 0,
+            \ }
     else
-        call wplus#util#warn_msg('grep', 'no grep backend found — install ripgrep (rg) for :grep support')
+        return {}
     endif
+endfunction
+
+function! s:configure_grep() abort
+    let l:b = wplus#grep#backend()
+    if empty(l:b)
+        call wplus#util#warn_msg('grep', 'no grep backend found — install ripgrep (rg) for :grep support')
+        return
+    endif
+    let &grepprg = l:b.grepprg
+    let &grepformat = l:b.format
 endfunction
 
 function! s:escape_regex(text) abort
@@ -63,21 +88,24 @@ function! wplus#grep#search_async(args) abort
     call setqflist([], 'r')
     call s:add_to_history(a:args)
     call wplus#util#info_msg('grep', 'Searching for: ' . a:args . '...')
-    
-    let l:cmd = []
-    if executable('rg')
-        let l:cmd = ['rg', '--vimgrep', '--smart-case', '--', a:args]
-    elseif executable('git') && !empty(wplus#util#find_git_root(getcwd()))
-        let l:cmd = ['git', 'grep', '-n', '--column', a:args]
-    elseif executable('grep')
-        let l:cmd = ['grep', '-RIn', a:args, '.']
-    elseif has('win32')
-        let l:cmd = ['findstr', '/S', '/N', '/P', a:args, '*']
-    else
+
+    let l:b = wplus#grep#backend()
+    if empty(l:b)
         call wplus#util#warn_msg('grep', 'no grep backend found — install ripgrep (rg) for search support')
         return
     endif
-    
+
+    let l:cmd = []
+    if l:b.name ==# 'rg'
+        let l:cmd = ['rg', '--vimgrep', '--smart-case', '--', a:args]
+    elseif l:b.name ==# 'git'
+        let l:cmd = ['git', 'grep', '-n', '--column', a:args]
+    elseif l:b.name ==# 'grep'
+        let l:cmd = ['grep', '-RIn', a:args, '.']
+    elseif l:b.name ==# 'findstr'
+        let l:cmd = ['findstr', '/S', '/N', '/P', a:args, '*']
+    endif
+
     let s:grep_job = job_start(l:cmd, {
         \ 'out_cb': {ch, msg -> caddexpr(msg)},
         \ 'close_cb': {ch -> s:on_grep_complete()},

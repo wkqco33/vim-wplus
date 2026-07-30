@@ -41,9 +41,18 @@ function! wplus#root#change_dir() abort
     endif
 endfunction
 
+function! wplus#root#clear_cache() abort
+    let s:root_cache = {}
+endfunction
+
+function! wplus#root#find_project_root() abort
+    return wplus#root#find_root()
+endfunction
+
 function! wplus#root#setup() abort
     augroup WplusRoot
         autocmd!
         autocmd BufEnter,BufWinEnter * call wplus#root#change_dir()
+        autocmd DirChanged           * call wplus#root#clear_cache()
     augroup END
 endfunction
