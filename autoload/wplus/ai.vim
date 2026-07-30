@@ -68,46 +68,236 @@ let s:last_suggest_error = ''
 let s:last_suggest_error_at = 0
 
 
-function! s:get_api_endpoint() abort
-    if g:wplus_ai_provider ==# 'claude'
-        return 'https://api.anthropic.com/v1/messages'
-    elseif g:wplus_ai_provider ==# 'azure'
-        if empty(g:wplus_ai_azure_resource) || empty(g:wplus_ai_azure_deployment)
-            call wplus#util#error_msg('ai', 'Azure: resource and deployment must be configured')
-            return ''
-        endif
-        return 'https://' . g:wplus_ai_azure_resource . '.openai.azure.com/openai/deployments/'
-                    \ . g:wplus_ai_azure_deployment . '/chat/completions'
-                    \ . '?api-version=' . g:wplus_ai_azure_api_version
-    elseif g:wplus_ai_provider ==# 'ollama'
-        " native API: think/keep_alive/options 를 제어할 수 있다.
-        " (v1 호환 엔드포인트는 keep_alive 를 무시해 매번 모델을 재로딩한다)
-        return g:wplus_ai_ollama_host . '/api/chat'
-    else
-        return 'https://api.openai.com/v1/chat/completions'
+let s:providers = {}
+let s:fim_unsupported_models = {}
+
+function! wplus#ai#register_provider(name, dict) abort
+    let s:providers[a:name] = a:dict
+endfunction
+
+function! s:get_provider(name) abort
+    if !has_key(s:providers, a:name)
+        call wplus#util#error_msg('ai', 'Unknown AI provider: "' . a:name . '". Registered providers: ' . join(keys(s:providers), ', '))
+        return {}
     endif
+    return s:providers[a:name]
+endfunction
+
+function! s:azure_endpoint(spec) abort
+    if empty(g:wplus_ai_azure_resource) || empty(g:wplus_ai_azure_deployment)
+        call wplus#util#error_msg('ai', 'Azure: resource and deployment must be configured')
+        return ''
+    endif
+    return 'https://' . g:wplus_ai_azure_resource . '.openai.azure.com/openai/deployments/'
+                \ . g:wplus_ai_azure_deployment . '/chat/completions'
+                \ . '?api-version=' . g:wplus_ai_azure_api_version
+endfunction
+
+function! s:ollama_endpoint(spec) abort
+    return g:wplus_ai_ollama_host . '/api/chat'
+endfunction
+
+function! s:build_openai_payload(spec) abort
+    let l:model = !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo'
+    let l:msgs = []
+    if !empty(a:spec.system)
+        call add(l:msgs, {'role': 'system', 'content': a:spec.system})
+    endif
+    call add(l:msgs, {'role': 'user', 'content': a:spec.user})
+    let l:body = {
+        \ 'model': l:model,
+        \ 'messages': l:msgs,
+        \ 'temperature': a:spec.temperature,
+        \ }
+    if s:uses_max_completion_tokens()
+        let l:body.max_completion_tokens = a:spec.max_tokens
+    else
+        let l:body.max_tokens = a:spec.max_tokens
+    endif
+    if get(a:spec, 'stream', 0)
+        let l:body.stream = v:true
+    endif
+    return json_encode(l:body)
+endfunction
+
+function! s:build_claude_payload(spec) abort
+    let l:model = !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'claude-3-sonnet-20240229'
+    let l:body = {
+        \ 'model': l:model,
+        \ 'max_tokens': a:spec.max_tokens,
+        \ 'messages': [{'role': 'user', 'content': a:spec.user}],
+        \ 'temperature': a:spec.temperature,
+        \ }
+    if !empty(a:spec.system)
+        let l:body.system = a:spec.system
+    endif
+    if get(a:spec, 'stream', 0)
+        let l:body.stream = v:true
+    endif
+    return json_encode(l:body)
+endfunction
+
+function! s:build_ollama_payload_spec(spec) abort
+    let l:msgs = []
+    if !empty(a:spec.system)
+        call add(l:msgs, {'role': 'system', 'content': a:spec.system})
+    endif
+    call add(l:msgs, {'role': 'user', 'content': a:spec.user})
+    let l:options = {
+        \ 'num_predict': a:spec.max_tokens,
+        \ 'temperature': a:spec.temperature,
+        \ }
+    let l:body = {
+        \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'codellama',
+        \ 'messages': l:msgs,
+        \ 'options': l:options,
+        \ 'stream': get(a:spec, 'stream', 0) ? v:true : v:false,
+        \ 'keep_alive': '5m',
+        \ }
+    return json_encode(l:body)
+endfunction
+
+function! s:extract_openai(json) abort
+    if has_key(a:json, 'choices') && len(a:json.choices) > 0
+        let l:choice = a:json.choices[0]
+        let l:message = get(l:choice, 'message', {})
+        let l:content = get(l:message, 'content', '')
+        if type(l:content) == v:t_string
+            return l:content
+        endif
+    endif
+    return ''
+endfunction
+
+function! s:extract_claude(json) abort
+    if has_key(a:json, 'content') && len(a:json.content) > 0
+        let l:parts = []
+        for l:item in a:json.content
+            if type(l:item) == v:t_dict && has_key(l:item, 'text')
+                call add(l:parts, l:item.text)
+            endif
+        endfor
+        return join(l:parts, '')
+    endif
+    return ''
+endfunction
+
+function! s:extract_ollama(json) abort
+    if has_key(a:json, 'message') && type(a:json.message) == v:t_dict
+        return get(a:json.message, 'content', '')
+    endif
+    return ''
+endfunction
+
+function! s:delta_openai(json) abort
+    if has_key(a:json, 'choices') && len(a:json.choices) > 0
+        let l:delta = get(a:json.choices[0], 'delta', {})
+        return get(l:delta, 'content', '')
+    endif
+    return ''
+endfunction
+
+function! s:delta_claude(json) abort
+    if get(a:json, 'type', '') ==# 'content_block_delta'
+                \ && has_key(a:json, 'delta')
+                \ && get(a:json.delta, 'type', '') ==# 'text_delta'
+        return get(a:json.delta, 'text', '')
+    endif
+    return ''
+endfunction
+
+function! s:delta_ollama(json) abort
+    if has_key(a:json, 'message') && type(a:json.message) == v:t_dict
+        return get(a:json.message, 'content', '')
+    endif
+    return ''
+endfunction
+
+function! s:error_openai(json) abort
+    if has_key(a:json, 'error')
+        if type(a:json.error) == v:t_dict
+            return get(a:json.error, 'message', string(a:json.error))
+        elseif type(a:json.error) == v:t_string
+            return a:json.error
+        endif
+    endif
+    return ''
+endfunction
+
+function! s:error_claude(json) abort
+    if has_key(a:json, 'error')
+        let l:err = a:json.error
+        if type(l:err) == v:t_dict
+            return get(l:err, 'message', string(l:err))
+        endif
+    endif
+    return ''
+endfunction
+
+function! s:error_ollama(json) abort
+    return get(a:json, 'error', '')
+endfunction
+
+call wplus#ai#register_provider('openai', {
+    \ 'needs_key': 1,
+    \ 'endpoint': {spec -> get(g:, 'wplus_ai_openai_endpoint', 'https://api.openai.com/v1/chat/completions')},
+    \ 'headers': {key -> ['Content-Type: application/json', 'Authorization: Bearer ' . key]},
+    \ 'payload': function('s:build_openai_payload'),
+    \ 'extract': function('s:extract_openai'),
+    \ 'delta': function('s:delta_openai'),
+    \ 'error': function('s:error_openai'),
+    \ })
+
+call wplus#ai#register_provider('claude', {
+    \ 'needs_key': 1,
+    \ 'endpoint': {spec -> 'https://api.anthropic.com/v1/messages'},
+    \ 'headers': {key -> ['Content-Type: application/json', 'x-api-key: ' . key, 'anthropic-version: 2023-06-01']},
+    \ 'payload': function('s:build_claude_payload'),
+    \ 'extract': function('s:extract_claude'),
+    \ 'delta': function('s:delta_claude'),
+    \ 'error': function('s:error_claude'),
+    \ })
+
+call wplus#ai#register_provider('azure', {
+    \ 'needs_key': 1,
+    \ 'endpoint': function('s:azure_endpoint'),
+    \ 'headers': {key -> ['Content-Type: application/json', 'api-key: ' . key]},
+    \ 'payload': function('s:build_openai_payload'),
+    \ 'extract': function('s:extract_openai'),
+    \ 'delta': function('s:delta_openai'),
+    \ 'error': function('s:error_openai'),
+    \ })
+
+call wplus#ai#register_provider('ollama', {
+    \ 'needs_key': 0,
+    \ 'endpoint': function('s:ollama_endpoint'),
+    \ 'headers': {key -> ['Content-Type: application/json', 'Authorization: Bearer ollama']},
+    \ 'payload': function('s:build_ollama_payload_spec'),
+    \ 'extract': function('s:extract_ollama'),
+    \ 'delta': function('s:delta_ollama'),
+    \ 'error': function('s:error_ollama'),
+    \ })
+
+function! s:get_api_endpoint(spec) abort
+    let l:prov = s:get_provider(g:wplus_ai_provider)
+    if empty(l:prov) | return '' | endif
+    if type(l:prov.endpoint) == v:t_func
+        return call(l:prov.endpoint, [a:spec])
+    endif
+    return l:prov.endpoint
 endfunction
 
 function! s:get_request_headers() abort
-    let l:headers = ['Content-Type: application/json']
-    if g:wplus_ai_provider ==# 'ollama'
-        " Ollama does not require an API key
-        call add(l:headers, 'Authorization: Bearer ollama')
-        return l:headers
-    endif
-    if empty(g:wplus_ai_api_key)
-        call wplus#util#error_msg('ai', 'API key not configured')
+    let l:prov = s:get_provider(g:wplus_ai_provider)
+    if empty(l:prov) | return [] | endif
+    if l:prov.needs_key && empty(g:wplus_ai_api_key)
+        call wplus#util#error_msg('ai', 'API key not configured for provider ' . g:wplus_ai_provider)
         return []
     endif
-    if g:wplus_ai_provider ==# 'claude'
-        call add(l:headers, 'x-api-key: ' . g:wplus_ai_api_key)
-        call add(l:headers, 'anthropic-version: 2023-06-01')
-    elseif g:wplus_ai_provider ==# 'azure'
-        call add(l:headers, 'api-key: ' . g:wplus_ai_api_key)
-    else
-        call add(l:headers, 'Authorization: Bearer ' . g:wplus_ai_api_key)
+    if type(l:prov.headers) == v:t_func
+        return call(l:prov.headers, [g:wplus_ai_api_key])
     endif
-    return l:headers
+    return l:prov.headers
 endfunction
 
 function! s:channel_key(channel) abort
@@ -248,7 +438,7 @@ endfunction
 
 " FIM 사용 여부. provider 가 ollama 이고 사용자가 켰을 때만.
 function! s:use_ollama_fim() abort
-    return g:wplus_ai_provider ==# 'ollama' && g:wplus_ai_ollama_fim
+    return g:wplus_ai_provider ==# 'ollama' && g:wplus_ai_ollama_fim && !get(s:fim_unsupported_models, g:wplus_ai_model, 0)
 endfunction
 
 function! s:uses_max_completion_tokens() abort
@@ -276,39 +466,17 @@ function! s:report_suggest_error(message) abort
 endfunction
 
 function! s:build_request_payload(prompt) abort
-    let l:system_msg = 'You are a helpful code assistant. Provide concise, accurate responses.'
-
-    if g:wplus_ai_provider ==# 'ollama'
-        return s:build_ollama_payload([
-            \   {'role': 'system', 'content': l:system_msg},
-            \   {'role': 'user', 'content': a:prompt}
-            \ ], g:wplus_ai_max_tokens, g:wplus_ai_temperature)
-    endif
-
-    if g:wplus_ai_provider ==# 'claude'
-        return json_encode({
-            \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'claude-3-sonnet-20240229',
-            \ 'max_tokens': g:wplus_ai_max_tokens,
-            \ 'system': l:system_msg,
-            \ 'messages': [{'role': 'user', 'content': a:prompt}],
-            \ 'temperature': g:wplus_ai_temperature
-            \ })
-    endif
-
-    let l:payload = {
-        \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo',
-        \ 'temperature': g:wplus_ai_temperature,
-        \ 'messages': [
-        \   {'role': 'system', 'content': l:system_msg},
-        \   {'role': 'user', 'content': a:prompt}
-        \ ]
+    let l:prov = s:get_provider(g:wplus_ai_provider)
+    if empty(l:prov) | return '' | endif
+    let l:spec = {
+        \ 'system': 'You are a helpful code assistant. Provide concise, accurate responses.',
+        \ 'user': a:prompt,
+        \ 'max_tokens': get(g:, 'wplus_ai_max_tokens', 2048),
+        \ 'temperature': get(g:, 'wplus_ai_temperature', 0.7),
+        \ 'stream': g:wplus_ai_stream,
+        \ 'purpose': 'command',
         \ }
-    if s:uses_max_completion_tokens()
-        let l:payload.max_completion_tokens = g:wplus_ai_max_tokens
-    else
-        let l:payload.max_tokens = g:wplus_ai_max_tokens
-    endif
-    return json_encode(l:payload)
+    return call(l:prov.payload, [l:spec])
 endfunction
 
 function! s:on_response(channel, msg) abort
@@ -712,6 +880,7 @@ function! wplus#ai#setup() abort
     command! WaiAcceptWord       call wplus#ai#accept_suggestion_insert_word()
     command! -range WaiReview    <line1>,<line2>call wplus#ai#review()
     command! -range WaiExplain   <line1>,<line2>call wplus#ai#explain()
+    command! WaiCancel           call wplus#ai#cancel()
 
     " Mappings
     nnoremap <silent> <Plug>WaiComment   :WaiComment<CR>
@@ -724,20 +893,7 @@ function! wplus#ai#setup() abort
     nnoremap <silent> <Plug>WaiToggleSuggest :WaiToggleSuggest<CR>
     inoremap <silent> <Plug>WaiDismissSuggest <C-r>=wplus#ai#dismiss_suggestion()<CR>
     inoremap <silent> <expr> <Plug>WaiAcceptWord wplus#ai#accept_word_suggestion()
-    
-    " Ghost Text auto-suggest: register property type if missing.
-    " show_suggestion() also self-heals this, but registering here avoids the
-    " first-render E971 entirely.
-    if has('textprop') && empty(prop_type_get('WplusAISuggest'))
-        if !hlexists('WplusAISuggest')
-            if hlexists('Comment')
-                highlight default link WplusAISuggest Comment
-            else
-                highlight default WplusAISuggest ctermfg=244 guifg=#7c6f64
-            endif
-        endif
-        call prop_type_add('WplusAISuggest', {'highlight': 'WplusAISuggest'})
-    endif
+    nnoremap <silent> <leader>ac :WaiCancel<CR>
 
     if g:wplus_ai_suggest_enabled
         augroup WplusAISuggest
@@ -1020,54 +1176,31 @@ endfunction
 " Build suggestion prompt for all providers
 function! s:build_suggest_payload(prefix, suffix, ...) abort
     let l:stream = a:0 >= 1 ? a:1 : 0
+    let l:prov = s:get_provider(g:wplus_ai_provider)
+    if empty(l:prov) | return '' | endif
+
     let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
     let l:system_msg = 'You are a code completion assistant. Complete the code based on context. Return only the completion without explanation or code blocks. Keep your suggestion short (maximum ' . l:max_lines . ' lines).'
     let l:prompt = s:suggest_context_hint() . "Complete this code:\n\nPrefix:\n" . a:prefix . "\n\nSuffix:\n" . a:suffix
 
-    if g:wplus_ai_provider ==# 'ollama'
-        return s:build_ollama_payload([
-            \   {'role': 'system', 'content': l:system_msg},
-            \   {'role': 'user', 'content': l:prompt}
-            \ ], g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature, l:stream)
-    endif
-
-    if g:wplus_ai_provider ==# 'claude'
-        return json_encode({
-            \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'claude-3-sonnet-20240229',
-            \ 'max_tokens': 500,
-            \ 'system': l:system_msg,
-            \ 'messages': [{'role': 'user', 'content': l:prompt}],
-            \ 'temperature': 0.5,
-            \ 'stream': l:stream ? v:true : v:false,
-            \ })
-    endif
-
-    let l:payload = {
-        \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo',
-        \ 'temperature': 0.5,
-        \ 'stream': l:stream ? v:true : v:false,
-        \ 'messages': [
-        \   {'role': 'system', 'content': l:system_msg},
-        \   {'role': 'user', 'content': l:prompt}
-        \ ]
+    let l:spec = {
+        \ 'system': l:system_msg,
+        \ 'user': l:prompt,
+        \ 'prefix': a:prefix,
+        \ 'suffix': a:suffix,
+        \ 'max_tokens': get(g:, 'wplus_ai_suggest_max_tokens', 128),
+        \ 'temperature': get(g:, 'wplus_ai_suggest_temperature', 0.2),
+        \ 'stream': l:stream,
+        \ 'purpose': 'suggest',
         \ }
-    if s:uses_max_completion_tokens()
-        let l:payload.max_completion_tokens = g:wplus_ai_suggest_max_tokens
-    else
-        let l:payload.max_tokens = g:wplus_ai_suggest_max_tokens
-    endif
-    return json_encode(l:payload)
+    return call(l:prov.payload, [l:spec])
 endfunction
 
-" ── Streaming delta parsers ───────────────────────────────────────────────────
-" Extract text delta from one streamed chunk. Returns '' when no delta.
-"   - Ollama ndstream: {"message":{"content":"..."},...} or {"response":"..."} (FIM)
-"   - OpenAI/Azure SSE: data: {"choices":[{"delta":{"content":"..."}}]}
-"   - Claude SSE: data: {"type":"content_block_delta","delta":{"text":"..."}}
 function! s:parse_stream_delta(line, fim) abort
     let l:raw = a:line
-    " SSE: strip leading "data:" + optional spaces; stop on [DONE].
-    " Lines without data: (event:, id:, comments, blanks) → empty.
+    let l:prov = s:get_provider(g:wplus_ai_provider)
+    if empty(l:prov) | return '' | endif
+
     if g:wplus_ai_provider !=# 'ollama'
         if l:raw =~# '^data:'
             let l:raw = substitute(l:raw, '^data:\s*', '', '')
@@ -1085,29 +1218,7 @@ function! s:parse_stream_delta(line, fim) abort
     catch
         return ''
     endtry
-    if g:wplus_ai_provider ==# 'ollama'
-        if a:fim
-            return get(l:json, 'response', '')
-        endif
-        if has_key(l:json, 'message') && type(l:json.message) == v:t_dict
-            return get(l:json.message, 'content', '')
-        endif
-        return ''
-    endif
-    if g:wplus_ai_provider ==# 'claude'
-        if get(l:json, 'type', '') ==# 'content_block_delta'
-                    \ && has_key(l:json, 'delta')
-                    \ && get(l:json.delta, 'type', '') ==# 'text_delta'
-            return get(l:json.delta, 'text', '')
-        endif
-        return ''
-    endif
-    " OpenAI/Azure
-    if has_key(l:json, 'choices') && len(l:json.choices) > 0
-        let l:delta = get(l:json.choices[0], 'delta', {})
-        return get(l:delta, 'content', '')
-    endif
-    return ''
+    return call(l:prov.delta, [l:json])
 endfunction
 
 " Render incremental ghost text from accumulated content.
@@ -1339,4 +1450,25 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
         \ 'response_buffer': ''
         \ }
     call s:suggest_debug('sent suggestion request' . (l:is_fim ? ' (FIM)' : '') . (l:stream ? ' (stream)' : ''))
+endfunction
+
+function! wplus#ai#cancel() abort
+    for [l:req_id, l:req] in items(s:command_requests)
+        if has_key(l:req, 'job') && type(l:req.job) == v:t_job
+            try | call job_stop(l:req.job) | catch | endtry
+        endif
+    endfor
+    let s:command_requests = {}
+    let s:command_channels = {}
+
+    if !empty(s:suggest_request) && has_key(s:suggest_request, 'job') && type(s:suggest_request.job) == v:t_job
+        try | call job_stop(s:suggest_request.job) | catch | endtry
+        let s:suggest_request = {}
+    endif
+    call s:dismiss_suggestion()
+    call wplus#util#info_msg('ai', 'All active AI requests cancelled.')
+endfunction
+
+function! wplus#ai#_test_build_suggest_payload(prefix, suffix) abort
+    return s:build_suggest_payload(a:prefix, a:suffix)
 endfunction
