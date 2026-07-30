@@ -614,8 +614,9 @@ Example .wplus.vim: >
     let g:wplus_run_commands = {'go': 'go run ./cmd/server.go'}
 <
 Configuration: >
-    let g:wplus_project_config  = '.wplus.vim'
-    let g:wplus_project_verbose = 0
+    let g:wplus_project_config    = '.wplus.vim'
+    let g:wplus_project_verbose   = 0
+    let g:wplus_project_trust_all = 0    " 1 = skip trust prompt
 <
 
 ==============================================================================
@@ -685,6 +686,7 @@ Commands: >
     :WaiCommitMsg        Generate commit message from staged diff
     :WaiFixDiag          Fix LSP diagnostic on current line
     :WaiToggleSuggest    Toggle Ghost Text auto-completion
+    :WaiCancel           Cancel all active AI requests (<leader>ac)
 <
 All commands show a preview popup — press Enter/a to apply, Esc to discard.
 
@@ -702,6 +704,16 @@ Ghost Text configuration: >
     let g:wplus_ai_suggest_max_lines = 3
 <
 See docs/ai.md for the full provider setup guide.
+
+==============================================================================
+43. HEALTH CHECK                                              *wplus-health*
+
+Run diagnostics report covering 7 key areas: Vim features, module loading,
+external tools, LSP status, AI configuration, keymap conflicts, and options.
+
+Commands: >
+    :WplusHealth    Run diagnostics and open report buffer
+<
 
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:

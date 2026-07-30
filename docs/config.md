@@ -116,8 +116,9 @@ let g:wplus_session_autosave  = 1
 let g:wplus_session_max_files = 50
 
 " ── project ──────────────────────────────────────────────────────────────
-let g:wplus_project_config  = '.wplus.vim'
-let g:wplus_project_verbose = 0
+let g:wplus_project_config    = '.wplus.vim'
+let g:wplus_project_verbose   = 0
+let g:wplus_project_trust_all = 0            " 1이면 보안 프롬프트 건너뛰고 모든 .wplus.vim 신뢰
 
 " ── scratch ──────────────────────────────────────────────────────────────
 let g:wplus_scratch_file   = expand('~/.vim/scratch.txt')
