@@ -196,13 +196,13 @@ let mapleader = ' '   " Space를 leader로
 
 " 탐색
 nnoremap <leader>e  :WexplorerToggle<CR>
-nnoremap <leader>p  :WfindFiles<CR>
-nnoremap <leader>b  :WfindBuffers<CR>
+nnoremap <leader>ff  :WfindFiles<CR>
+nnoremap <leader>fb  :WfindBuffers<CR>
 nnoremap <leader>fh :Whistory<CR>
 
 " Harpoon
-nnoremap <leader>ha :WharoonAdd<CR>
-nnoremap <leader>hl :WharoonList<CR>
+nnoremap <leader>ha :WharpoonAdd<CR>
+nnoremap <leader>hl :WharpoonList<CR>
 nnoremap <leader>h1 :call wplus#harpoon#jump(1)<CR>
 nnoremap <leader>h2 :call wplus#harpoon#jump(2)<CR>
 

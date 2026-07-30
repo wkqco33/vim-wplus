@@ -10,9 +10,9 @@ Vim 9의 `matchfuzzy()`와 팝업 윈도우를 사용하여 파일, 버퍼, 최�
 
 | 키 | 동작 |
 |----|------|
-| `<leader>p` | 파일 찾기 |
-| `<leader>b` | 버퍼 찾기 |
-| `<leader>m` | 최근 파일 찾기 (MRU) |
+| `<leader>ff` | 파일 찾기 |
+| `<leader>fb` | 버퍼 찾기 |
+| `<leader>fr` | 최근 파일 찾기 (MRU) |
 
 **팝업 내 키:**
 
@@ -65,9 +65,9 @@ let g:wplus_explorer_max_depth   = 8     " 최대 재귀 깊이
 
 | 키 / 명령 | 동작 |
 |-----------|------|
-| `<leader>ha` / `:WharoonAdd` | 현재 파일을 다음 빈 슬롯에 추가 |
-| `<leader>hd` / `:WharoonRemove` | 현재 파일을 슬롯에서 제거 |
-| `<leader>hl` / `:WharoonList` | 슬롯 목록 팝업 |
+| `<leader>ha` / `:WharpoonAdd` | 현재 파일을 다음 빈 슬롯에 추가 |
+| `<leader>hd` / `:WharpoonRemove` | 현재 파일을 슬롯에서 제거 |
+| `<leader>hl` / `:WharpoonList` | 슬롯 목록 팝업 |
 | `<leader>h1` ~ `<leader>h4` | 해당 슬롯 파일로 즉시 이동 |
 
 ```vim

@@ -65,7 +65,7 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 
 | 모듈 | 기능 | 핵심 키 |
 |------|------|---------|
-| `finder` | 퍼지 파일/버퍼 파인더 | `<leader>p`, `<leader>b` |
+| `finder` | 퍼지 파일/버퍼 파인더 | `<leader>ff`, `<leader>fb` |
 | `explorer` | 사이드바 파일 탐색기 | `<leader>e` |
 | `harpoon` | 파일 북마크 (최대 4슬롯) | `<leader>ha`, `<leader>h1~4` |
 | `history` | 최근 파일 브라우저 | `<leader>fh` |
