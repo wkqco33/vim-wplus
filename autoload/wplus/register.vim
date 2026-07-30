@@ -68,18 +68,7 @@ endfunction
 
 " ── highlights ────────────────────────────────────────────────────────────
 
-function! s:init_highlights() abort
-    hi default WplusRegBorder ctermfg=239 guifg=#504945
-endfunction
-
-" ── setup ─────────────────────────────────────────────────────────────────
-
 function! wplus#register#setup() abort
-    call s:init_highlights()
     nnoremap <silent> " :<C-u>call wplus#register#show('"')<CR>
     nnoremap <silent> @ :<C-u>call wplus#register#show('@')<CR>
-    augroup wplus_register
-        autocmd!
-        autocmd ColorScheme * call s:init_highlights()
-    augroup END
 endfunction

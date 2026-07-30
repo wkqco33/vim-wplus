@@ -50,10 +50,11 @@ let g:wplus_illuminate_ft_block = ['help', 'nerdtree']
 
 ---
 
-## colorscheme — 배경색 자동 감지
+## theme — 테마 및 통합 하이라이트 관리
 
-터미널의 밝기(dark/light)를 자동으로 감지하여 컬러스킴을 조정합니다.
+`&background` (dark/light)를 자동으로 감지하여 모든 `Wplus*` 하이라이트 그룹의 팔레트를 조율합니다.
+사용자가 정의한 `highlight` 설정 및 `:colorscheme` 변경 시에도 하이라이트가 안전하게 유지됩니다.
 
 ```vim
-let g:wplus_colorscheme_auto_detect = 1
+let g:wplus_theme_auto = 1
 ```

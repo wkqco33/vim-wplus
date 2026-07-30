@@ -104,7 +104,7 @@ endfunction
 "
 " Not listed here, deliberately:
 "   repeat  - autoloaded shim only, has no setup(). See autoload/wplus/repeat.vim.
-let s:modules = ['commentary', 'pairs', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'colorscheme', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'harpoon', 'marks', 'scratch', 'run', 'project', 'history', 'fold']
+let s:modules = ['theme', 'commentary', 'pairs', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'harpoon', 'marks', 'scratch', 'run', 'project', 'history', 'fold']
 
 " Validate user configuration
 call s:validate_config()
