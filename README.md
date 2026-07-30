@@ -1,4 +1,4 @@
-﻿# vim-wplus
+# vim-wplus
 
 외부 의존성 없는 Vim 올인원 플러그인 — 모듈형 구성의 완전한 Vim IDE.
 
@@ -108,12 +108,13 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 | `scratch` | 스크래치 버퍼 | `<leader>sc` |
 | `marks` | 마크 시각화 | `<leader>ml` |
 | `todo` | TODO 관리 | `<leader>ft` |
+| `health` | 플러그인·환경 진단 보고서 | `:WplusHealth` |
 
 ### 🤖 AI
 
 | 모듈 | 기능 | 핵심 키 |
 |------|------|---------|
-| `ai` | Ghost Text · 코드 리뷰 · 커밋 메시지 | `<leader>ar/ae`, `:WaiCommitMsg` |
+| `ai` | Ghost Text · 코드 리뷰 · 커밋 메시지 생성 · 요청 취소 | `<leader>am` (커밋), `<leader>ac` (취소), `<leader>ar/ae` |
 
 > AI 상세 설정 → **[docs/ai.md](docs/ai.md)**
 
