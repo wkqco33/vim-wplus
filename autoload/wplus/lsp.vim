@@ -1,22 +1,27 @@
-" wplus/lsp.vim — Minimal LSP client using Vim 9 jobs/channels
+" wplus/lsp.vim — built-in Language Server Protocol client
+" Requires: Vim 9.1+ with +job +channel +json +popupwin +signs
 
 if exists('g:autoloaded_wplus_lsp') | finish | endif
 let g:autoloaded_wplus_lsp = 1
 
-let s:servers = {} " ft -> {job, channel, last_id, requests, buffer}
+let s:servers   = {} " ft -> {job, channel, last_id, requests, buffer, caps, initialized}
 let s:diag_timers = {} " uri -> timer_id
-let s:pending_actions = []
-let s:sig_winid = -1
-let s:def_cache = {} " uri:line:col -> {result, timestamp} (with TTL)
-let s:ref_cache = {} " uri:line:col -> {result, timestamp} (with TTL)
-let s:symbol_cache = {} " uri -> {line_count, timestamp, symbols} (symbol info cache)
-let g:wplus_lsp_log_enabled  = get(g:, 'wplus_lsp_log_enabled',  0)
-let g:wplus_lsp_signcolumn   = get(g:, 'wplus_lsp_signcolumn',   'yes')
-let g:wplus_lsp_cache_ttl    = get(g:, 'wplus_lsp_cache_ttl',    300)
-let g:wplus_lsp_sig_delay    = get(g:, 'wplus_lsp_sig_delay',    100)
-let g:wplus_lsp_change_delay = get(g:, 'wplus_lsp_change_delay', 800)
-let g:wplus_lsp_diag_delay   = get(g:, 'wplus_lsp_diag_delay',   300)
-let s:CONTENT_LENGTH_PREFIX  = 'Content-Length: '
+let s:hover_winid = -1
+let s:sig_winid   = -1
+let s:def_cache   = {} " uri:line:col -> {result, timestamp} (with TTL)
+let s:ref_cache   = {} " uri:line:col -> {result, timestamp} (with TTL)
+let s:symbol_cache = {} " uri -> symbols
+let s:warned_caps = {} " ft:method -> 1
+
+let g:wplus_lsp_log_enabled     = get(g:, 'wplus_lsp_log_enabled',     0)
+let g:wplus_lsp_signcolumn      = get(g:, 'wplus_lsp_signcolumn',      'yes')
+let g:wplus_lsp_cache_ttl       = get(g:, 'wplus_lsp_cache_ttl',       300)
+let g:wplus_lsp_sig_delay       = get(g:, 'wplus_lsp_sig_delay',       100)
+let g:wplus_lsp_change_delay    = get(g:, 'wplus_lsp_change_delay',    800)
+let g:wplus_lsp_diag_delay      = get(g:, 'wplus_lsp_diag_delay',      300)
+let g:wplus_lsp_request_timeout = get(g:, 'wplus_lsp_request_timeout', 10)
+let s:CONTENT_LENGTH_PREFIX     = 'Content-Length: '
+let s:timeout_timer             = -1
 
 function! s:log(ft, type, msg) abort
     if !g:wplus_lsp_log_enabled | return | endif
@@ -25,189 +30,110 @@ function! s:log(ft, type, msg) abort
     call writefile([l:line], l:log_file, 'a')
 endfunction
 
-function! wplus#lsp#setup() abort
-    if !has('job') || !has('channel') | return | endif
-    call s:ensure_signcolumn()
-    call s:define_diag_signs()
-    augroup WplusLSP
-        autocmd!
-        autocmd FileType go,c,cpp,python,dart,rust call s:on_filetype_changed()
-        autocmd BufDelete * call s:on_buf_delete()
-        autocmd VimLeavePre * call s:cleanup_all()
-    augroup END
-    nnoremap <silent> <Plug>WplusLspDefinition  :call wplus#lsp#request('textDocument/definition')<CR>
-    nnoremap <silent> <Plug>WplusLspHover       :call wplus#lsp#request('textDocument/hover')<CR>
-    nnoremap <silent> <Plug>WplusLspReferences  :call wplus#lsp#request('textDocument/references')<CR>
-    nnoremap <silent> <Plug>WplusLspRename      :call wplus#lsp#rename()<CR>
-    nnoremap <silent> <Plug>WplusLspCodeAction  :call wplus#lsp#code_action()<CR>
-    nnoremap <silent> ]e :call wplus#lsp#next_diag()<CR>
-    nnoremap <silent> [e :call wplus#lsp#prev_diag()<CR>
-    nnoremap <silent> <leader>E :call wplus#lsp#diag_popup()<CR>
-endfunction
-
-function! s:on_filetype_changed() abort
-    let l:ft = &filetype
-    call s:ensure_signcolumn()
-    call s:start_server(l:ft)
-    augroup WplusLSPBuffer
-        autocmd! * <buffer>
-        autocmd BufWritePost <buffer> call s:did_save(&filetype)
-        autocmd TextChanged,TextChangedI <buffer> call s:on_change(&filetype)
-        autocmd InsertCharPre <buffer>
-            \ if v:char ==# '(' || v:char ==# ','
-            \   | call s:throttle_signature_help()
-            \ | endif
-        autocmd InsertLeave <buffer> call s:close_signature_help()
-    augroup END
-    nmap <buffer><silent> gd         <Plug>WplusLspDefinition
-    nmap <buffer><silent> K          <Plug>WplusLspHover
-    nmap <buffer><silent> gr         <Plug>WplusLspReferences
-    nmap <buffer><silent> <leader>rn <Plug>WplusLspRename
-    nmap <buffer><silent> <leader>ca <Plug>WplusLspCodeAction
-    inoremap <buffer><silent><expr> <Tab>
-        \ (get(g:, 'wplus_ai_enabled', 1) && get(g:, 'wplus_ai_suggest_enabled', 1) && wplus#ai#has_suggestion()) ? wplus#ai#accept_suggestion() :
-        \ pumvisible() ? "\<C-n>" :
-        \ <SID>check_backspace() ? "\<Tab>" :
-        \ "\<C-r>=wplus#lsp#request('textDocument/completion')\<CR>\<Ignore>"
-endfunction
-
-function! s:throttle_signature_help() abort
-    let l:buf = bufnr('%')
-    let l:sig_timer = getbufvar(l:buf, 'wplus_lsp_sig_timer', -1)
-    if l:sig_timer != -1
-        return
-    endif
-    let l:timer = timer_start(g:wplus_lsp_sig_delay, {-> s:do_signature_help(l:buf)})
-    call setbufvar(l:buf, 'wplus_lsp_sig_timer', l:timer)
-endfunction
-
-function! s:do_signature_help(buf) abort
-    if bufnr('%') == a:buf
-        call wplus#lsp#request('textDocument/signatureHelp')
-    endif
-    call setbufvar(a:buf, 'wplus_lsp_sig_timer', -1)
-endfunction
-
-function! s:ensure_signcolumn() abort
-    if empty(g:wplus_lsp_signcolumn) | return | endif
-    if &signcolumn ==# 'auto' || empty(&signcolumn)
-        try
-            execute 'set signcolumn=' . g:wplus_lsp_signcolumn
-        catch /^Vim(set):E474/
-            silent! set signcolumn=yes
-        endtry
-    endif
-endfunction
-
-function! s:check_backspace() abort
-    let col = col('.') - 1
-    return !col || getline('.')[col - 1] =~# '\s'
-endfunction
-
-function! s:url_encode(str) abort
-    let l:res = ''
-    let l:len = strlen(a:str)
-    let l:i = 0
-    while l:i < l:len
-        let l:ch = strpart(a:str, l:i, 1, 1)
-        if l:ch =~# '[A-Za-z0-9._~/-]'
-            let l:res .= l:ch
-        else
-            let l:res .= printf('%%%02X', char2nr(l:ch))
-        endif
-        let l:i += 1
-    endwhile
-    return l:res
-endfunction
-
 function! s:get_uri(path) abort
     let l:p = fnamemodify(a:path, ':p')
     if has('win32')
         let l:p = substitute(l:p, '\\', '/', 'g')
-        return 'file:///' . s:url_encode(l:p)
+        if l:p !~# '^/' | let l:p = '/' . l:p | endif
     endif
-    return 'file://' . (l:p[0] ==# '/' ? '' : '/') . s:url_encode(l:p)
+    return 'file://' . l:p
 endfunction
 
 function! s:get_buf_uri(buf) abort
-    let l:name = bufname(a:buf)
-    return empty(l:name) ? '' : s:get_uri(l:name)
+    let l:path = bufname(a:buf)
+    return empty(l:path) ? '' : s:get_uri(l:path)
 endfunction
 
 function! s:decode_uri_path(uri) abort
-    let l:path = substitute(a:uri, '\v^file:/*(localhost)?', '', '')
-    let l:len = strlen(l:path)
-    let l:i = 0
-    let l:res = ''
-    while l:i < l:len
-        if strpart(l:path, l:i, 1, 1) ==# '%' && l:i + 2 < l:len && strpart(l:path, l:i+1, 2, 1) =~# '^\x\x$'
-            let l:hex = strpart(l:path, l:i+1, 2, 1)
-            let l:res .= nr2char(str2nr(l:hex, 16), 1)
-            let l:i += 3
-        else
-            let l:res .= strpart(l:path, l:i, 1, 1)
-            let l:i += 1
+    let l:path = substitute(a:uri, '^file://', '', '')
+    " Hex-decode percent-encoded characters (%20 -> space, etc.)
+    let l:path = substitute(l:path, '%\(\x\x\)', '\=nr2char("0x" . submatch(1))', 'g')
+    if has('win32')
+        if l:path =~# '^/[a-zA-Z]:'
+            let l:path = l:path[1:]
         endif
-    endwhile
-    if l:res =~# '^[A-Za-z]:[\\/]'
-        return l:res
+        let l:path = substitute(l:path, '/', '\\', 'g')
     endif
-    return l:res[0] ==# '/' ? l:res : '/' . l:res
+    return l:path
 endfunction
 
-function! s:get_request_params(method) abort
-    let l:uri = s:get_buf_uri(bufnr('%'))
-    if empty(l:uri)
-        return {}
-    endif
+function! s:supports(ft, method) abort
+    if !has_key(s:servers, a:ft) | return 0 | endif
+    let l:s = s:servers[a:ft]
+    if !get(l:s, 'initialized', 0) | return 1 | endif
+    let l:caps = get(l:s, 'caps', {})
+    if empty(l:caps) | return 1 | endif
 
-    let l:params = {
-        \ 'textDocument': {'uri': l:uri},
-        \ 'position': {'line': line('.') - 1, 'character': col('.') - 1},
+    let l:cap_map = {
+        \ 'textDocument/hover': 'hoverProvider',
+        \ 'textDocument/definition': 'definitionProvider',
+        \ 'textDocument/references': 'referencesProvider',
+        \ 'textDocument/completion': 'completionProvider',
+        \ 'textDocument/formatting': 'documentFormattingProvider',
+        \ 'textDocument/rangeFormatting': 'documentRangeFormattingProvider',
+        \ 'textDocument/documentSymbol': 'documentSymbolProvider',
+        \ 'textDocument/documentHighlight': 'documentHighlightProvider',
+        \ 'textDocument/foldingRange': 'foldingRangeProvider',
+        \ 'textDocument/signatureHelp': 'signatureHelpProvider',
+        \ 'textDocument/inlayHint': 'inlayHintProvider',
+        \ 'textDocument/codeAction': 'codeActionProvider',
+        \ 'textDocument/rename': 'renameProvider',
         \ }
-    if a:method ==# 'textDocument/references'
-        let l:params.context = {'includeDeclaration': v:true}
-    endif
-    return l:params
-endfunction
 
-function! s:uri_to_bufnr(uri) abort
-    let l:abs = fnamemodify(s:decode_uri_path(a:uri), ':p')
-    let l:nr = bufnr(l:abs)
-    if l:nr != -1 | return l:nr | endif
-    for l:buf in getbufinfo({'buflisted': 1})
-        if !empty(l:buf.name) && fnamemodify(l:buf.name, ':p') ==# l:abs | return l:buf.bufnr | endif
-    endfor
-    return -1
+    if has_key(l:cap_map, a:method)
+        let l:cap_key = l:cap_map[a:method]
+        let l:val = get(l:caps, l:cap_key, v:true)
+        let l:ok = 1
+        if type(l:val) == v:t_bool
+            let l:ok = l:val
+        elseif type(l:val) == v:t_dict
+            let l:ok = !empty(l:val)
+        endif
+        if !l:ok
+            let l:wkey = a:ft . ':' . a:method
+            if !has_key(s:warned_caps, l:wkey)
+                let s:warned_caps[l:wkey] = 1
+                call wplus#util#warn_msg('lsp', 'LSP server for ' . a:ft . ' does not support ' . a:method)
+            endif
+            return 0
+        endif
+    endif
+
+    return 1
 endfunction
 
 function! s:did_open(ft) abort
-    if !has_key(s:servers, a:ft) | return | endif
-    let l:uri = s:get_buf_uri(bufnr('%'))
+    let l:buf = bufnr('%')
+    let l:uri = s:get_buf_uri(l:buf)
     if empty(l:uri) | return | endif
-    let b:wplus_lsp_version = get(b:, 'wplus_lsp_version', 0) + 1
-    let l:params = {'textDocument': {'uri': l:uri, 'languageId': a:ft, 'version': b:wplus_lsp_version, 'text': join(getline(1, '$'), "\n") . "\n"}}
+    call setbufvar(l:buf, 'wplus_lsp_uri', l:uri)
+    call setbufvar(l:buf, 'wplus_lsp_version', 1)
+    let l:params = {'textDocument': {'uri': l:uri, 'languageId': a:ft, 'version': 1, 'text': join(getline(1, '$'), "\n") . "\n"}}
     call s:send(a:ft, 'textDocument/didOpen', l:params, 1)
     call wplus#lsp#request_inlay_hints()
 endfunction
 
-function! s:on_change(ft) abort
-    if !has_key(s:servers, a:ft) | return | endif
-    let l:buf = bufnr('%')
-    " Cancel previous timer to prevent duplicate timers
-    let l:timer_id = getbufvar(l:buf, 'wplus_lsp_timer', -1)
-    if l:timer_id != -1
-        silent! call timer_stop(l:timer_id)
+function! s:did_close(bufnr) abort
+    let l:uri = getbufvar(a:bufnr, 'wplus_lsp_uri', '')
+    let l:ft  = getbufvar(a:bufnr, '&filetype', '')
+    if !empty(l:uri) && !empty(l:ft) && has_key(s:servers, l:ft)
+        call s:send(l:ft, 'textDocument/didClose', {'textDocument': {'uri': l:uri}}, 1)
     endif
-    let l:timer = timer_start(g:wplus_lsp_change_delay, {-> s:send_change(l:buf, a:ft)})
-    call setbufvar(l:buf, 'wplus_lsp_timer', l:timer)
 endfunction
 
-function! s:send_change(buf, ft) abort
-    if !bufexists(a:buf) | return | endif
+function! s:did_change(ft, buf) abort
+    if !has_key(s:servers, a:ft) | return | endif
+    let l:timer = getbufvar(a:buf, 'wplus_lsp_change_timer', -1)
+    if l:timer != -1 | silent! call timer_stop(l:timer) | endif
+    let l:new_timer = timer_start(g:wplus_lsp_change_delay, {-> s:do_did_change(a:ft, a:buf)})
+    call setbufvar(a:buf, 'wplus_lsp_change_timer', l:new_timer)
+endfunction
+
+function! s:do_did_change(ft, buf) abort
+    call setbufvar(a:buf, 'wplus_lsp_change_timer', -1)
     let l:uri = s:get_buf_uri(a:buf)
     if empty(l:uri) | return | endif
-    let l:ver = getbufvar(a:buf, 'wplus_lsp_version', 0) + 1
+    let l:ver = getbufvar(a:buf, 'wplus_lsp_version', 1) + 1
     call setbufvar(a:buf, 'wplus_lsp_version', l:ver)
     let l:params = {'textDocument': {'uri': l:uri, 'version': l:ver}, 'contentChanges': [{'text': join(getbufline(a:buf, 1, '$'), "\n") . "\n"}]}
     call s:send(a:ft, 'textDocument/didChange', l:params, 1)
@@ -226,7 +152,15 @@ function! s:start_server(ft) abort
     let l:cmds = {'go': ['gopls'], 'c': ['clangd'], 'cpp': ['clangd'], 'python': ['pyright-langserver', '--stdio'], 'dart': ['dart', 'language-server', '--protocol=lsp'], 'rust': ['rust-analyzer']}
     if !has_key(l:cmds, a:ft) || !executable(l:cmds[a:ft][0]) | return | endif
     let l:job = job_start(l:cmds[a:ft], {'in_mode': 'raw', 'out_mode': 'raw', 'out_cb': {c, m -> s:on_stdout(a:ft, c, m)}, 'err_cb': {c, m -> s:log(a:ft, 'STDERR', m)}})
-    let s:servers[a:ft] = {'job': l:job, 'channel': job_getchannel(l:job), 'last_id': 0, 'requests': {}, 'buffer': ''}
+    let s:servers[a:ft] = {
+        \ 'job': l:job,
+        \ 'channel': job_getchannel(l:job),
+        \ 'last_id': 0,
+        \ 'requests': {},
+        \ 'buffer': '',
+        \ 'caps': {},
+        \ 'initialized': 0,
+        \ }
     call s:send(a:ft, 'initialize', {
         \ 'processId': getpid(),
         \ 'rootUri': s:get_uri(getcwd()),
@@ -240,23 +174,44 @@ function! s:start_server(ft) abort
         \   'codeAction': {'dynamicRegistration': v:true, 'codeActionLiteralSupport': {'codeActionKind': {'valueSet': []}}},
         \   'signatureHelp': {'signatureInformation': {'documentationFormat': ['plaintext', 'markdown']}},
         \   'inlayHint': {'dynamicRegistration': v:true},
+        \   'documentSymbol': {'hierarchicalDocumentSymbolSupport': v:true},
+        \   'formatting': {'dynamicRegistration': v:true},
+        \   'rangeFormatting': {'dynamicRegistration': v:true},
+        \   'documentHighlight': {'dynamicRegistration': v:true},
+        \   'foldingRange': {'dynamicRegistration': v:true},
+        \   'publishDiagnostics': {'relatedInformation': v:true},
         \ }}})
 endfunction
 
 function! s:send(ft, method, params, ...) abort
-    if !has_key(s:servers, a:ft) | return | endif
-    let l:s = s:servers[a:ft]
-    if job_status(l:s.job) !=# 'run' | return | endif
+    if !has_key(s:servers, a:ft) | return 0 | endif
     let l:is_notify = a:0 > 0 ? a:1 : 0
+    let l:is_user   = a:0 > 1 ? a:2 : 0
+
+    if !l:is_notify && !s:supports(a:ft, a:method)
+        return 0
+    endif
+
+    let l:s = s:servers[a:ft]
+    if job_status(l:s.job) !=# 'run' | return 0 | endif
+
     let l:req = {'jsonrpc': '2.0', 'method': a:method, 'params': a:params}
     if !l:is_notify
         let l:s.last_id += 1
         let l:req.id = l:s.last_id
-        let l:s.requests[l:s.last_id] = a:method
+        let l:s.requests[l:req.id] = {'method': a:method, 'at': localtime(), 'is_user': l:is_user}
     endif
-    let l:body = json_encode(l:req)
-    call s:log(a:ft, 'SEND', l:body)
-    call ch_sendraw(l:s.channel, 'Content-Length: ' . strlen(l:body) . "\r\n\r\n" . l:body)
+
+    let l:payload = json_encode(l:req)
+    let l:msg = 'Content-Length: ' . strlen(l:payload) . "\r\n\r\n" . l:payload
+    call s:log(a:ft, 'SEND', l:payload)
+    try
+        call ch_sendraw(l:s.channel, l:msg)
+        return l:is_notify ? 1 : l:s.last_id
+    catch
+        call s:log(a:ft, 'SEND_ERR', v:exception)
+        return 0
+    endtry
 endfunction
 
 function! s:read_location_text(uri, lnum) abort
@@ -269,6 +224,7 @@ function! s:read_location_text(uri, lnum) abort
 endfunction
 
 function! s:on_stdout(ft, channel, msg) abort
+    if !has_key(s:servers, a:ft) | return | endif
     let l:s = s:servers[a:ft]
     let l:s.buffer .= a:msg
     while 1
@@ -309,6 +265,8 @@ endfunction
 
 function! s:handle_request_result(ft, method, result) abort
     if a:method ==# 'initialize'
+        let s:servers[a:ft].caps = get(a:result, 'capabilities', {})
+        let s:servers[a:ft].initialized = 1
         call s:send(a:ft, 'initialized', {}, 1)
         call s:did_open(a:ft)
     elseif a:method ==# 'textDocument/definition'
@@ -327,6 +285,24 @@ function! s:handle_request_result(ft, method, result) abort
         call s:show_signature_help(a:result)
     elseif a:method ==# 'textDocument/inlayHint'
         call s:show_inlay_hints(a:result)
+    elseif a:method ==# 'textDocument/formatting'
+        if !empty(a:result)
+            let l:uri = s:get_buf_uri(bufnr('%'))
+            call s:apply_text_edits(s:decode_uri_path(l:uri), a:result)
+        endif
+    elseif a:method ==# 'textDocument/documentSymbol'
+        let l:uri = s:get_buf_uri(bufnr('%'))
+        if !empty(l:uri)
+            let s:symbol_cache[l:uri] = a:result
+            silent! doautocmd User WplusLspSymbolsUpdate
+        endif
+    elseif a:method ==# 'textDocument/foldingRange'
+        if !empty(a:result)
+            let b:wplus_lsp_fold_ranges = a:result
+            silent! doautocmd User WplusLspFoldsUpdate
+        endif
+    elseif a:method ==# 'textDocument/documentHighlight'
+        call s:show_document_highlights(a:result)
     endif
 endfunction
 
@@ -336,14 +312,25 @@ function! s:handle_response(ft, resp) abort
         return
     endif
     let l:id = a:resp.id
-    let l:method = get(s:servers[a:ft].requests, l:id, '')
-    if empty(l:method) | return | endif
+    if !has_key(s:servers, a:ft) | return | endif
+    let l:req_info = get(s:servers[a:ft].requests, l:id, {})
+    if empty(l:req_info) | return | endif
     unlet s:servers[a:ft].requests[l:id]
-    if has_key(a:resp, 'error') | return | endif
-    
+
+    let l:method = type(l:req_info) == v:t_dict ? get(l:req_info, 'method', '') : l:req_info
+    let l:is_user = type(l:req_info) == v:t_dict ? get(l:req_info, 'is_user', 0) : 0
+
+    if has_key(a:resp, 'error')
+        let l:err_msg = type(a:resp.error) == v:t_dict ? get(a:resp.error, 'message', string(a:resp.error)) : string(a:resp.error)
+        call s:log(a:ft, 'ERROR_RESP', l:err_msg)
+        if l:is_user
+            call wplus#util#warn_msg('lsp', 'LSP error (' . l:method . '): ' . l:err_msg)
+        endif
+        return
+    endif
+
     let l:result = get(a:resp, 'result', {})
-    
-    " Cache definition and references results
+
     if (l:method ==# 'textDocument/definition' || l:method ==# 'textDocument/references') && !empty(l:result)
         let l:uri = s:get_buf_uri(bufnr('%'))
         if !empty(l:uri)
@@ -351,7 +338,7 @@ function! s:handle_response(ft, resp) abort
             call s:store_cache(l:cache, l:uri, line('.') - 1, col('.') - 1, l:result)
         endif
     endif
-    
+
     call s:handle_request_result(a:ft, l:method, l:result)
 endfunction
 
@@ -359,29 +346,30 @@ function! s:diag_style(sev) abort
     if a:sev == 1
         return {'sign': 'WplusLspError', 'type': 'WplusLspDiagErr', 'key': 'error', 'hl': 'ErrorMsg'}
     elseif a:sev == 2
-        return {'sign': 'WplusLspWarn', 'type': 'WplusLspDiagWarn', 'key': 'warning', 'hl': 'WarningMsg'}
+        return {'sign': 'WplusLspWarn',  'type': 'WplusLspDiagWarn', 'key': 'warning', 'hl': 'WarningMsg'}
     elseif a:sev == 3
-        return {'sign': 'WplusLspInfo', 'type': 'WplusLspDiagInfo', 'key': 'info', 'hl': 'Directory'}
+        return {'sign': 'WplusLspInfo',  'type': 'WplusLspDiagInfo', 'key': 'info', 'hl': 'None'}
+    else
+        return {'sign': 'WplusLspHint',  'type': 'WplusLspDiagHint', 'key': 'hint', 'hl': 'None'}
     endif
-    return {'sign': 'WplusLspHint', 'type': 'WplusLspDiagHint', 'key': 'hint', 'hl': 'Comment'}
 endfunction
 
-function! s:define_diag_signs() abort
-    highlight default WplusDiagError guifg=#fb4934 ctermfg=167
-    highlight default WplusDiagWarn  guifg=#fabd2f ctermfg=214
-    highlight default WplusDiagInfo  guifg=#83a598 ctermfg=109
-    highlight default WplusDiagHint  guifg=#928374 ctermfg=243
-    silent! call sign_define('WplusLspError', {'text': 'E', 'texthl': 'WplusDiagError'})
-    silent! call sign_define('WplusLspWarn',  {'text': 'W', 'texthl': 'WplusDiagWarn'})
-    silent! call sign_define('WplusLspInfo',  {'text': 'I', 'texthl': 'WplusDiagInfo'})
-    silent! call sign_define('WplusLspHint',  {'text': 'H', 'texthl': 'WplusDiagHint'})
+function! s:define_signs() abort
+    call sign_define('WplusLspError', {'text': 'E', 'texthl': 'ErrorMsg'})
+    call sign_define('WplusLspWarn',  {'text': 'W', 'texthl': 'WarningMsg'})
+    call sign_define('WplusLspInfo',  {'text': 'I', 'texthl': 'None'})
+    call sign_define('WplusLspHint',  {'text': 'H', 'texthl': 'None'})
+
     if has('textprop')
-        silent! call prop_type_add('WplusLspDiagErr', {'highlight': 'WplusDiagError'})
+        silent! call prop_type_add('WplusLspDiagErr',  {'highlight': 'WplusDiagError'})
         silent! call prop_type_add('WplusLspDiagWarn', {'highlight': 'WplusDiagWarn'})
         silent! call prop_type_add('WplusLspDiagInfo', {'highlight': 'WplusDiagInfo'})
         silent! call prop_type_add('WplusLspDiagHint', {'highlight': 'WplusDiagHint'})
         if empty(prop_type_get('WplusLspInlay'))
             silent! call prop_type_add('WplusLspInlay', {'highlight': 'WplusDiagHint'})
+        endif
+        if empty(prop_type_get('WplusLspHighlight'))
+            silent! call prop_type_add('WplusLspHighlight', {'highlight': 'WplusIlluminate'})
         endif
     endif
 endfunction
@@ -440,6 +428,26 @@ function! s:show_inlay_hints(result) abort
     endfor
 endfunction
 
+function! s:show_document_highlights(result) abort
+    if !has('textprop') || empty(a:result) | return | endif
+    let l:bufnr = bufnr('%')
+    silent! call prop_remove({'type': 'WplusLspHighlight', 'bufnr': l:bufnr, 'all': v:true})
+    for l:hl in a:result
+        let l:range = get(l:hl, 'range', {})
+        if empty(l:range) | continue | endif
+        let l:sl = l:range.start.line + 1
+        let l:sc = l:range.start.character + 1
+        let l:el = l:range.end.line + 1
+        let l:ec = l:range.end.character + 1
+        silent! call prop_add(l:sl, l:sc, {
+            \ 'bufnr': l:bufnr,
+            \ 'end_lnum': l:el,
+            \ 'end_col': l:ec,
+            \ 'type': 'WplusLspHighlight',
+            \ })
+    endfor
+endfunction
+
 function! s:update_diagnostics(ft, params) abort
     let l:uri = get(a:params, 'uri', '')
     silent! call timer_stop(get(s:diag_timers, l:uri, -1))
@@ -451,49 +459,57 @@ function! s:diag_timer_fire(uri, ft, params) abort
     call s:do_update_diagnostics(a:ft, a:params)
 endfunction
 
-function! s:clear_diagnostics(bufnr, last_line) abort
-    call sign_unplace('WplusLspGroup', {'buffer': a:bufnr})
-    if has('textprop')
-        silent! call prop_remove({'type': 'WplusLspDiagErr', 'bufnr': a:bufnr, 'all': v:true}, 1, a:last_line)
-        silent! call prop_remove({'type': 'WplusLspDiagWarn', 'bufnr': a:bufnr, 'all': v:true}, 1, a:last_line)
-        silent! call prop_remove({'type': 'WplusLspDiagInfo', 'bufnr': a:bufnr, 'all': v:true}, 1, a:last_line)
-        silent! call prop_remove({'type': 'WplusLspDiagHint', 'bufnr': a:bufnr, 'all': v:true}, 1, a:last_line)
-    endif
-endfunction
-
 function! s:do_update_diagnostics(ft, params) abort
-    let l:bufnr = s:uri_to_bufnr(a:params.uri)
+    let l:path = s:decode_uri_path(a:params.uri)
+    let l:bufnr = bufnr(l:path)
     if l:bufnr == -1 | return | endif
 
-    let l:bufinfo = getbufinfo(l:bufnr)
-    if empty(l:bufinfo) | return | endif
-    let l:last_line = l:bufinfo[0].linecount
-    call s:clear_diagnostics(l:bufnr, l:last_line)
+    call sign_unplace('wplus_lsp', {'buffer': l:bufnr})
+    if has('textprop')
+        for l:pt in ['WplusLspDiagErr', 'WplusLspDiagWarn', 'WplusLspDiagInfo', 'WplusLspDiagHint']
+            silent! call prop_remove({'type': l:pt, 'bufnr': l:bufnr, 'all': v:true})
+        endfor
+    endif
 
-    let l:diags = {}
-    let l:counts = {'error': 0, 'warning': 0, 'info': 0, 'hint': 0}
-    let l:signs = []
-    let l:has_textprop = has('textprop')
-    for l:diag in a:params.diagnostics
-        let l:lnum = l:diag.range.start.line + 1
-        if l:lnum <= 0 || l:lnum > l:last_line | continue | endif
+    let l:diag_map   = {}
+    let l:counts     = {'error': 0, 'warning': 0, 'info': 0, 'hint': 0}
+    let l:seen_signs = {}
 
-        let l:sev = get(l:diag, 'severity', 1)
-        let l:style = s:diag_style(l:sev)
-        let l:counts[l:style.key] += 1
+    for l:d in a:params.diagnostics
+        let l:lnum = l:d.range.start.line + 1
+        let l:col  = l:d.range.start.character + 1
+        let l:sev  = get(l:d, 'severity', 1)
+        let l:st   = s:diag_style(l:sev)
 
-        call add(l:signs, {'id': 0, 'group': 'WplusLspGroup', 'name': l:style.sign, 'buffer': l:bufnr, 'lnum': l:lnum, 'priority': 20})
-        if l:has_textprop && get(g:, 'wplus_lsp_inline_diags', 0)
-            let l:msg = '  // ' . split(l:diag.message, "\n")[0]
-            silent! call prop_add(l:lnum, 0, {'bufnr': l:bufnr, 'type': l:style.type, 'text': l:msg, 'text_align': 'after'})
+        let l:counts[l:st.key] += 1
+
+        if !has_key(l:diag_map, l:lnum)
+            let l:diag_map[l:lnum] = []
         endif
-        if !has_key(l:diags, l:lnum) || l:sev < l:diags[l:lnum].sev
-            let l:diags[l:lnum] = {'msg': l:diag.message, 'sev': l:sev}
+        call add(l:diag_map[l:lnum], {'msg': l:d.message, 'sev': l:sev, 'col': l:col})
+
+        if !has_key(l:seen_signs, l:lnum)
+            let l:seen_signs[l:lnum] = 1
+            call sign_place(0, 'wplus_lsp', l:st.sign, l:bufnr, {'lnum': l:lnum})
+        endif
+
+        if has('textprop')
+            let l:end_lnum = get(l:d.range, 'end', {}).line + 1
+            let l:end_col  = get(l:d.range, 'end', {}).character + 1
+            if l:end_lnum < l:lnum || (l:end_lnum == l:lnum && l:end_col <= l:col)
+                let l:end_lnum = l:lnum
+                let l:end_col  = l:col + 1
+            endif
+            silent! call prop_add(l:lnum, l:col, {
+                \ 'bufnr':    l:bufnr,
+                \ 'end_lnum': l:end_lnum,
+                \ 'end_col':  l:end_col,
+                \ 'type':     l:st.type,
+                \ })
         endif
     endfor
 
-    if !empty(l:signs) | call sign_placelist(l:signs) | endif
-    call setbufvar(l:bufnr, 'wplus_lsp_diags', l:diags)
+    call setbufvar(l:bufnr, 'wplus_lsp_diags',       l:diag_map)
     call setbufvar(l:bufnr, 'wplus_lsp_diag_counts', l:counts)
     redrawstatus
 endfunction
@@ -501,8 +517,8 @@ endfunction
 function! s:echo_diag() abort
     let l:diags = getbufvar(bufnr('%'), 'wplus_lsp_diags', {})
     let l:lnum = line('.')
-    if has_key(l:diags, l:lnum)
-        let l:info = l:diags[l:lnum]
+    if has_key(l:diags, l:lnum) && !empty(l:diags[l:lnum])
+        let l:info = l:diags[l:lnum][0]
         let l:style = s:diag_style(l:info.sev)
         execute 'echohl ' . l:style.hl
         echo l:info.msg
@@ -543,23 +559,18 @@ endfunction
 function! wplus#lsp#diag_popup() abort
     let l:diags = get(b:, 'wplus_lsp_diags', {})
     let l:lnum = line('.')
-    if !has_key(l:diags, l:lnum)
+    if !has_key(l:diags, l:lnum) || empty(l:diags[l:lnum])
         call wplus#util#info_msg('lsp', 'No diagnostic on this line')
         return
     endif
-    let l:info = l:diags[l:lnum]
-    let l:style = s:diag_style(l:info.sev)
-    let l:lines = split(l:info.msg, "\n")
-    call popup_create(l:lines, {
+    let l:msgs = map(copy(l:diags[l:lnum]), 'v:val.msg')
+    let l:style = s:diag_style(l:diags[l:lnum][0].sev)
+    call popup_create(l:msgs, wplus#util#popup_options({
         \ 'line':     'cursor+1',
         \ 'col':      'cursor',
         \ 'moved':    'any',
-        \ 'border':   [1, 1, 1, 1],
         \ 'borderhighlight': [l:style.hl],
-        \ 'padding':  [0, 1, 0, 1],
-        \ 'wrap':     1,
-        \ 'maxwidth': 80,
-        \ })
+        \ }))
 endfunction
 
 function! s:make_cache_key(uri, lnum, col) abort
@@ -569,17 +580,16 @@ endfunction
 function! s:lookup_cache(cache, uri, lnum, col) abort
     let l:key = s:make_cache_key(a:uri, a:lnum, a:col)
     if !has_key(a:cache, l:key) | return v:null | endif
-    
+
     let l:entry = a:cache[l:key]
-    let l:now = reltime()[0] " Current timestamp in seconds
+    let l:now = reltime()[0]
     let l:age = l:now - l:entry.timestamp
-    
-    " Check if cache expired
+
     if l:age > g:wplus_lsp_cache_ttl
         call remove(a:cache, l:key)
         return v:null
     endif
-    
+
     return l:entry.result
 endfunction
 
@@ -588,45 +598,62 @@ function! s:store_cache(cache, uri, lnum, col, result) abort
     let a:cache[l:key] = {'result': a:result, 'timestamp': reltime()[0]}
 endfunction
 
-function! wplus#lsp#request(method) abort
+function! wplus#lsp#hover() abort
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
-    let l:params = s:get_request_params(a:method)
-    if empty(l:params) | return | endif
-    
-    " Check cache for definition/references before requesting
-    if a:method ==# 'textDocument/definition'
-        let l:cached = s:lookup_cache(s:def_cache, l:params.textDocument.uri, l:params.position.line, l:params.position.character)
-        if l:cached isnot v:null
-            call s:handle_request_result(l:ft, a:method, l:cached)
-            return
-        endif
-    elseif a:method ==# 'textDocument/references'
-        let l:cached = s:lookup_cache(s:ref_cache, l:params.textDocument.uri, l:params.position.line, l:params.position.character)
-        if l:cached isnot v:null
-            call s:handle_request_result(l:ft, a:method, l:cached)
-            return
-        endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    call s:send(l:ft, 'textDocument/hover', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 1)
+endfunction
+
+function! wplus#lsp#definition() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    let l:cached = s:lookup_cache(s:def_cache, l:uri, l:pos[1] - 1, l:pos[2] - 1)
+    if l:cached isnot v:null
+        call s:goto_location(l:cached)
+        return
     endif
-    
-    call s:send(l:ft, a:method, l:params, 0)
+    call s:send(l:ft, 'textDocument/definition', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 1)
+endfunction
+
+function! wplus#lsp#references() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    let l:cached = s:lookup_cache(s:ref_cache, l:uri, l:pos[1] - 1, l:pos[2] - 1)
+    if l:cached isnot v:null
+        call s:show_references(l:cached)
+        return
+    endif
+    call s:send(l:ft, 'textDocument/references', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}, 'context': {'includeDeclaration': v:true}}, 0, 1)
+endfunction
+
+function! wplus#lsp#completion() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    call s:send(l:ft, 'textDocument/completion', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}})
 endfunction
 
 function! wplus#lsp#rename() abort
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
-    let l:word = expand('<cword>')
-    if empty(l:word) | return | endif
-    let l:new_name = input('Rename ' . l:word . ' → ')
-    if empty(l:new_name) || l:new_name ==# l:word | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
     if empty(l:uri) | return | endif
-    let l:params = {
-        \ 'textDocument': {'uri': l:uri},
-        \ 'position': {'line': line('.') - 1, 'character': col('.') - 1},
-        \ 'newName': l:new_name,
-        \ }
-    call s:send(l:ft, 'textDocument/rename', l:params, 0)
+    let l:word = expand('<cword>')
+    let l:new_name = input('New name: ', l:word)
+    if empty(l:new_name) || l:new_name ==# l:word | return | endif
+    let l:pos = getcurpos()
+    call s:send(l:ft, 'textDocument/rename', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}, 'newName': l:new_name}, 0, 1)
 endfunction
 
 function! wplus#lsp#code_action() abort
@@ -634,44 +661,107 @@ function! wplus#lsp#code_action() abort
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
     if empty(l:uri) | return | endif
-    let l:lnum = line('.')
-    let l:diags = getbufvar(bufnr('%'), 'wplus_lsp_diags', {})
-    let l:diag_items = []
-    if has_key(l:diags, l:lnum)
-        let l:d = l:diags[l:lnum]
-        call add(l:diag_items, {
-            \ 'message': l:d.msg,
-            \ 'severity': l:d.sev,
-            \ 'range': {'start': {'line': l:lnum - 1, 'character': 0}, 'end': {'line': l:lnum - 1, 'character': 0}},
-            \ })
-    endif
-    let l:params = {
-        \ 'textDocument': {'uri': l:uri},
-        \ 'range': {
-        \   'start': {'line': l:lnum - 1, 'character': col('.') - 1},
-        \   'end': {'line': l:lnum - 1, 'character': col('.') - 1},
-        \ },
-        \ 'context': {'diagnostics': l:diag_items},
-        \ }
-    call s:send(l:ft, 'textDocument/codeAction', l:params, 0)
+    let l:pos = getcurpos()
+    let l:diags = get(b:, 'wplus_lsp_diags', {})
+    let l:line_diags = get(l:diags, l:pos[1], [])
+    call s:send(l:ft, 'textDocument/codeAction', {'textDocument': {'uri': l:uri}, 'range': {'start': {'line': l:pos[1] - 1, 'character': 0}, 'end': {'line': l:pos[1], 'character': 0}}, 'context': {'diagnostics': l:line_diags}}, 0, 1)
 endfunction
 
-function! s:goto_location(result) abort
-    let l:loc = type(a:result) == v:t_list ? get(a:result, 0) : a:result
-    if empty(l:loc) | return | endif
-    let l:uri = get(l:loc, 'uri', get(l:loc, 'targetUri', ''))
-    let l:range = get(l:loc, 'range', get(l:loc, 'targetSelectionRange', {}))
-    execute 'edit +' . (l:range.start.line + 1) . ' ' . fnameescape(s:decode_uri_path(l:uri))
+function! wplus#lsp#signature_help() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    call s:send(l:ft, 'textDocument/signatureHelp', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}})
+endfunction
+
+function! wplus#lsp#format(bufnr) abort
+    let l:buf = a:bufnr == 0 ? bufnr('%') : a:bufnr
+    let l:ft = getbufvar(l:buf, '&filetype', '')
+    if !s:supports(l:ft, 'textDocument/formatting') | return 0 | endif
+    let l:uri = s:get_buf_uri(l:buf)
+    if empty(l:uri) | return 0 | endif
+    let l:tabsize = getbufvar(l:buf, '&shiftwidth', 4)
+    if l:tabsize == 0 | let l:tabsize = getbufvar(l:buf, '&tabstop', 4) | endif
+    let l:insert_spaces = getbufvar(l:buf, '&expandtab', 1) ? v:true : v:false
+    return s:send(l:ft, 'textDocument/formatting', {
+        \ 'textDocument': {'uri': l:uri},
+        \ 'options': {'tabSize': l:tabsize, 'insertSpaces': l:insert_spaces}
+        \ }, 0, 1) > 0
+endfunction
+
+function! wplus#lsp#request_document_symbols(bufnr) abort
+    let l:buf = a:bufnr == 0 ? bufnr('%') : a:bufnr
+    let l:ft = getbufvar(l:buf, '&filetype', '')
+    if !s:supports(l:ft, 'textDocument/documentSymbol') | return | endif
+    let l:uri = s:get_buf_uri(l:buf)
+    if empty(l:uri) | return | endif
+    call s:send(l:ft, 'textDocument/documentSymbol', {'textDocument': {'uri': l:uri}})
+endfunction
+
+function! wplus#lsp#get_symbols(bufnr) abort
+    let l:buf = a:bufnr == 0 ? bufnr('%') : a:bufnr
+    let l:uri = s:get_buf_uri(l:buf)
+    return get(s:symbol_cache, l:uri, [])
+endfunction
+
+function! wplus#lsp#request_fold_ranges(...) abort
+    let l:buf = a:0 >= 1 && a:1 != 0 ? a:1 : bufnr('%')
+    let l:ft = getbufvar(l:buf, '&filetype', '')
+    if !s:supports(l:ft, 'textDocument/foldingRange') | return | endif
+    let l:uri = s:get_buf_uri(l:buf)
+    if empty(l:uri) | return | endif
+    call s:send(l:ft, 'textDocument/foldingRange', {'textDocument': {'uri': l:uri}})
 endfunction
 
 function! s:show_hover(result) abort
-    if empty(a:result) || empty(a:result.contents) | return | endif
+    if empty(a:result) | return | endif
     let l:contents = a:result.contents
-    let l:text = type(l:contents) == v:t_dict ? l:contents.value : (type(l:contents) == v:t_list ? join(map(copy(l:contents), 'type(v:val) == v:t_dict ? v:val.value : v:val'), "\n") : l:contents)
-    let l:lines = split(l:text, "\n")
+    let l:lines = []
+    if type(l:contents) == v:t_string
+        let l:lines = split(l:contents, "\n")
+    elseif type(l:contents) == v:t_dict
+        let l:lines = split(l:contents.value, "\n")
+    elseif type(l:contents) == v:t_list
+        for l:item in l:contents
+            let l:txt = type(l:item) == v:t_string ? l:item : l:item.value
+            call extend(l:lines, split(l:txt, "\n"))
+        endfor
+    endif
     if empty(l:lines) | return | endif
-    let l:winid = popup_atcursor(l:lines, {'title': ' ' . expand('<cword>') . ' ', 'padding': [1,2,1,2], 'border': [1,1,1,1], 'moved': 'any', 'maxwidth': float2nr(&columns * 0.6), 'maxheight': float2nr(&lines * 0.5), 'borderchars': ['─', '│', '─', '│', '┌', '┐', '┘', '└'], 'highlight': 'Normal', 'borderhighlight': ['Special']})
-    call setbufvar(winbufnr(l:winid), '&filetype', 'markdown')
+    call s:close_popup(s:hover_winid)
+    let s:hover_winid = popup_create(l:lines, wplus#util#popup_options({'line': 'cursor-1', 'col': 'cursor', 'moved': 'any'}))
+endfunction
+
+function! s:show_signature_help(result) abort
+    if empty(a:result) || empty(a:result.signatures) | return | endif
+    let l:idx = get(a:result, 'activeSignature', 0)
+    let l:sig = a:result.signatures[l:idx]
+    let l:lines = [l:sig.label]
+    if has_key(l:sig, 'documentation')
+        let l:doc = type(l:sig.documentation) == v:t_string ? l:sig.documentation : l:sig.documentation.value
+        call extend(l:lines, split(l:doc, "\n"))
+    endif
+    call s:close_popup(s:sig_winid)
+    let s:sig_winid = popup_create(l:lines, wplus#util#popup_options({'line': 'cursor+1', 'col': 'cursor', 'moved': 'any'}))
+endfunction
+
+function! s:close_popup(winid) abort
+    if a:winid != -1 && popup_getoptions(a:winid) != {}
+        call popup_close(a:winid)
+    endif
+endfunction
+
+function! s:goto_location(result) abort
+    if empty(a:result) | return | endif
+    let l:loc = type(a:result) == v:t_list ? a:result[0] : a:result
+    let l:uri = get(l:loc, 'uri', get(l:loc, 'targetUri', ''))
+    let l:range = get(l:loc, 'range', get(l:loc, 'targetSelectionRange', {}))
+    if empty(l:uri) || empty(l:range) | return | endif
+    let l:path = s:decode_uri_path(l:uri)
+    execute 'edit ' . fnameescape(l:path)
+    call cursor(l:range.start.line + 1, l:range.start.character + 1)
 endfunction
 
 function! s:show_references(result) abort
@@ -702,8 +792,6 @@ function! s:show_completion(result) abort
     call complete(l:start + 1, l:matches)
 endfunction
 
-" ── rename ────────────────────────────────────────────────────────────────
-
 function! s:apply_workspace_edit(edit) abort
     if empty(a:edit) | return | endif
     if has_key(a:edit, 'documentChanges')
@@ -720,16 +808,8 @@ function! s:apply_workspace_edit(edit) abort
 endfunction
 
 function! s:apply_text_edits(path, edits) abort
-    let l:abs = fnamemodify(a:path, ':p')
-    if bufnr(l:abs) == -1
-        silent execute 'badd ' . fnameescape(l:abs)
-    endif
-    let l:bufnr = bufnr(l:abs)
-    if !bufloaded(l:bufnr)
-        call bufload(l:bufnr)
-    endif
+    let l:bufnr = wplus#util#ensure_bufloaded(a:path)
 
-    " Reverse sort: bottom-to-top to preserve line numbers during edits
     let l:sorted = sort(copy(a:edits), {a, b ->
         \ a.range.start.line != b.range.start.line
         \   ? b.range.start.line - a.range.start.line
@@ -742,116 +822,126 @@ function! s:apply_text_edits(path, edits) abort
         let l:ec = l:e.range.end.character
 
         let l:start_line = get(getbufline(l:bufnr, l:sl), 0, '')
-        let l:end_line   = l:el ==# l:sl ? l:start_line : get(getbufline(l:bufnr, l:el), 0, '')
+        let l:end_line   = l:el == l:sl ? l:start_line : get(getbufline(l:bufnr, l:el), 0, '')
         let l:prefix = l:sc > 0 ? l:start_line[: l:sc - 1] : ''
         let l:suffix = l:end_line[l:ec : ]
 
         let l:replacement = split(l:prefix . l:e.newText . l:suffix, "\n", 1)
-        call append(l:el, l:replacement)
+
         call deletebufline(l:bufnr, l:sl, l:el)
+        call appendbufline(l:bufnr, l:sl - 1, l:replacement)
     endfor
-
-    call setbufvar(l:bufnr, '&modified', 1)
 endfunction
-
-" ── code action ───────────────────────────────────────────────────────────
 
 function! s:show_code_actions(result) abort
-    if empty(a:result)
-        call wplus#util#warn_msg('lsp', 'No code actions available')
-        return
-    endif
-    let s:pending_actions = a:result
-    let l:titles = map(copy(a:result), 'get(v:val, "title", "?")')
-    call wplus#finder#open(l:titles, function('s:execute_code_action'), 'Code Actions')
-endfunction
-
-function! s:execute_code_action(title) abort
-    for l:action in s:pending_actions
-        if get(l:action, 'title', '') ==# a:title
-            if has_key(l:action, 'edit')
-                call s:apply_workspace_edit(l:action.edit)
-            endif
-            if has_key(l:action, 'command')
-                let l:cmd = type(l:action.command) == v:t_dict
-                    \ ? l:action.command
-                    \ : {'command': l:action.command, 'arguments': get(l:action, 'arguments', [])}
-                let l:ft = &filetype
-                if has_key(s:servers, l:ft)
-                    call s:send(l:ft, 'workspace/executeCommand', l:cmd, 0)
-                endif
-            endif
-            return
-        endif
-    endfor
-endfunction
-
-" ── signature help ────────────────────────────────────────────────────────
-
-function! s:show_signature_help(result) abort
-    call s:close_signature_help()
     if empty(a:result) | return | endif
-    let l:sigs = get(a:result, 'signatures', [])
-    if empty(l:sigs) | return | endif
-    let l:idx = get(a:result, 'activeSignature', 0)
-    let l:sig = l:sigs[min([l:idx, len(l:sigs) - 1])]
-    let l:lines = [get(l:sig, 'label', '')]
-    let l:doc = get(l:sig, 'documentation', '')
-    if type(l:doc) == v:t_dict | let l:doc = get(l:doc, 'value', '') | endif
-    if !empty(l:doc)
-        let l:first = split(l:doc, "\n")[0]
-        if !empty(l:first) | call add(l:lines, l:first) | endif
-    endif
-    let s:sig_winid = popup_atcursor(l:lines, {
-        \ 'padding': [0,1,0,1],
-        \ 'border': [1,1,1,1],
-        \ 'moved': 'any',
-        \ 'highlight': 'Normal',
-        \ 'borderhighlight': ['Special'],
-        \ 'maxwidth': float2nr(&columns * 0.6),
+    let l:actions = a:result
+    let l:options = []
+    for l:a in l:actions
+        call add(l:options, type(l:a) == v:t_string ? l:a : l:a.title)
+    endfor
+    call popup_menu(l:options, {
+        \ 'callback': {id, idx -> idx > 0 ? s:execute_code_action(l:actions[idx - 1]) : 0},
+        \ 'title': ' Code Actions ',
         \ })
 endfunction
 
-function! s:close_signature_help() abort
-    if s:sig_winid != -1
-        silent! call popup_close(s:sig_winid)
-        let s:sig_winid = -1
+function! s:execute_code_action(action) abort
+    if type(a:action) == v:t_dict
+        if has_key(a:action, 'edit')
+            call s:apply_workspace_edit(a:action.edit)
+        endif
+        if has_key(a:action, 'command')
+            let l:cmd = type(a:action.command) == v:t_string ? a:action.command : a:action.command.command
+            call s:send(&filetype, 'workspace/executeCommand', {'command': l:cmd, 'arguments': get(a:action.command, 'arguments', [])})
+        endif
     endif
 endfunction
 
-function! s:on_buf_delete() abort
-    " Clean up any timers for this buffer
-    let l:buf = bufnr('%')
-    let l:timer_id = getbufvar(l:buf, 'wplus_lsp_timer', -1)
-    if l:timer_id != -1
-        silent! call timer_stop(l:timer_id)
-    endif
-endfunction
-
-function! s:cleanup_all() abort
-    " Stop all pending timers
-    for l:uri in keys(s:diag_timers)
-        silent! call timer_stop(s:diag_timers[l:uri])
-    endfor
-    let s:diag_timers = {}
-    let s:pending_actions = []
-    
-    " Clear caches to free memory
-    let s:def_cache = {}
-    let s:ref_cache = {}
-    let s:symbol_cache = {}
-    
-    " Close all LSP servers gracefully
-    for l:ft in keys(s:servers)
-        let l:server = s:servers[l:ft]
+function! wplus#lsp#stop_all() abort
+    for [l:ft, l:server] in items(s:servers)
         if job_status(l:server.job) ==# 'run'
-            call s:send(l:ft, 'shutdown', {}, 0)
-            silent! call job_stop(l:server.job)
+            call s:send(l:ft, 'shutdown', {})
+            call s:send(l:ft, 'exit', {}, 1)
+            let l:i = 0
+            while l:i < 10 && job_status(l:server.job) ==# 'run'
+                sleep 20m
+                let l:i += 1
+            endwhile
+            if job_status(l:server.job) ==# 'run'
+                silent! call job_stop(l:server.job)
+            endif
         endif
     endfor
     let s:servers = {}
 endfunction
 
-function! wplus#lsp#is_ready(ft) abort
-    return has_key(s:servers, a:ft) && job_status(s:servers[a:ft].job) ==# 'run'
+function! s:check_request_timeouts(timer) abort
+    let l:now = localtime()
+    for [l:ft, l:server] in items(s:servers)
+        for [l:id, l:req] in items(l:server.requests)
+            let l:at = type(l:req) == v:t_dict ? get(l:req, 'at', l:now) : l:now
+            if (l:now - l:at) >= g:wplus_lsp_request_timeout
+                call remove(l:server.requests, l:id)
+                let l:method = type(l:req) == v:t_dict ? get(l:req, 'method', '') : l:req
+                if type(l:req) == v:t_dict && get(l:req, 'is_user', 0)
+                    call wplus#util#warn_msg('lsp', 'LSP request timed out: ' . l:method)
+                endif
+            endif
+        endfor
+    endfor
+endfunction
+
+function! wplus#lsp#_test_apply_workspace_edit(edit) abort
+    call s:apply_workspace_edit(a:edit)
+endfunction
+
+function! wplus#lsp#_test_supports(ft, method) abort
+    return s:supports(a:ft, a:method)
+endfunction
+
+function! wplus#lsp#_test_set_caps(ft, caps) abort
+    if !has_key(s:servers, a:ft)
+        let s:servers[a:ft] = {'job': v:null, 'channel': v:null, 'last_id': 0, 'requests': {}, 'buffer': '', 'caps': a:caps, 'initialized': 1}
+    else
+        let s:servers[a:ft].caps = a:caps
+        let s:servers[a:ft].initialized = 1
+    endif
+endfunction
+
+function! wplus#lsp#setup() abort
+    call s:define_signs()
+
+    let s:timeout_timer = timer_start(5000, function('s:check_request_timeouts'), {'repeat': -1})
+
+    command! WlspHover          call wplus#lsp#hover()
+    command! WlspDefinition     call wplus#lsp#definition()
+    command! WlspReferences     call wplus#lsp#references()
+    command! WlspRename         call wplus#lsp#rename()
+    command! WlspCodeAction     call wplus#lsp#code_action()
+    command! WlspNextDiag       call wplus#lsp#next_diag()
+    command! WlspPrevDiag       call wplus#lsp#prev_diag()
+    command! WlspDiagPopup      call wplus#lsp#diag_popup()
+    command! WlspSignatureHelp  call wplus#lsp#signature_help()
+    command! WlspFormat         call wplus#lsp#format(0)
+
+    nnoremap <silent> K          :WlspHover<CR>
+    nnoremap <silent> gd         :WlspDefinition<CR>
+    nnoremap <silent> gr         :WlspReferences<CR>
+    nnoremap <silent> <leader>rn :WlspRename<CR>
+    nnoremap <silent> <leader>ca :WlspCodeAction<CR>
+    nnoremap <silent> ]d         :WlspNextDiag<CR>
+    nnoremap <silent> [d         :WlspPrevDiag<CR>
+    nnoremap <silent> <leader>d  :WlspDiagPopup<CR>
+    inoremap <silent> <C-s>      <C-o>:WlspSignatureHelp<CR>
+
+    augroup wplus_lsp
+        autocmd!
+        autocmd FileType * call s:start_server(&filetype)
+        autocmd BufReadPost * call s:did_open(&filetype)
+        autocmd TextChanged,TextChangedI * call s:did_change(&filetype, bufnr('%'))
+        autocmd BufWritePost * call s:did_save(&filetype)
+        autocmd BufUnload * call s:did_close(expand('<abuf>'))
+        autocmd VimLeavePre * call wplus#lsp#stop_all()
+    augroup END
 endfunction

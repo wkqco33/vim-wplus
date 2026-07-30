@@ -2,7 +2,7 @@
 
 > [← README](README.md) · [모듈 문서](docs/) · [단축키](docs/keymaps.md)
 
-vim-wplus는 **43개 모듈**로 구성된 의존성 없는 Vim 올인원 플러그인입니다.  
+vim-wplus는 모듈형 구성로 구성된 의존성 없는 Vim 올인원 플러그인입니다.  
 이 가이드는 설치·외부 도구·문제 해결·빠른 시작 설정을 다룹니다.
 
 ---
@@ -196,13 +196,13 @@ let mapleader = ' '   " Space를 leader로
 
 " 탐색
 nnoremap <leader>e  :WexplorerToggle<CR>
-nnoremap <leader>p  :WfindFiles<CR>
-nnoremap <leader>b  :WfindBuffers<CR>
+nnoremap <leader>ff  :WfindFiles<CR>
+nnoremap <leader>fb  :WfindBuffers<CR>
 nnoremap <leader>fh :Whistory<CR>
 
 " Harpoon
-nnoremap <leader>ha :WharoonAdd<CR>
-nnoremap <leader>hl :WharoonList<CR>
+nnoremap <leader>ha :WharpoonAdd<CR>
+nnoremap <leader>hl :WharpoonList<CR>
 nnoremap <leader>h1 :call wplus#harpoon#jump(1)<CR>
 nnoremap <leader>h2 :call wplus#harpoon#jump(2)<CR>
 
@@ -232,7 +232,6 @@ nnoremap <leader>fg :Wgrep <C-r><C-w><CR>
 
 " 버퍼·창
 nnoremap <leader>bd :Bdelete<CR>
-nnoremap <leader>u  :WundotreeToggle<CR>
 nnoremap <leader>tt :WplusTerminalToggle<CR>
 
 " 창 이동
@@ -316,7 +315,6 @@ let g:wplus_lsp_log_enabled = 1
 
 ```vim
 let g:wplus_finder_fuzzy_limit  = 5000   " finder 매칭 제한
-let g:wplus_scrollbar_min_lines = 200    " 짧은 파일 스크롤바 비활성화
 let g:wplus_ai_suggest_enabled  = 0      " AI 자동완성 비활성화
 let g:wplus_illuminate_delay    = 500    " 심볼 하이라이트 지연 증가
 ```
@@ -340,7 +338,6 @@ let g:wplus_illuminate_delay    = 500    " 심볼 하이라이트 지연 증가
 " 자주 비활성화하는 모듈 예시
 let g:wplus_blame_enabled      = 0   " 인라인 blame 끄기 (느린 환경)
 let g:wplus_indent_enabled     = 0   " 들여쓰기 가이드 끄기
-let g:wplus_scrollbar_enabled  = 0   " 스크롤바 끄기
 let g:wplus_ai_enabled         = 0   " AI 완전 비활성화
 let g:wplus_session_enabled    = 0   " 자동 세션 끄기
 let g:wplus_fold_enabled       = 0   " 자동 폴드 끄기
@@ -358,8 +355,8 @@ let g:wplus_fold_enabled       = 0   " 자동 폴드 끄기
 | [docs/modules/editing.md](docs/modules/editing.md) | commentary, surround, pairs, textobj … |
 | [docs/modules/navigation.md](docs/modules/navigation.md) | finder, explorer, harpoon, history … |
 | [docs/modules/git.md](docs/modules/git.md) | gitgutter, blame, diffview, conflict |
-| [docs/modules/ui.md](docs/modules/ui.md) | statusline, scrollbar, undotree … |
-| [docs/modules/code.md](docs/modules/code.md) | lsp, run, fold, snippet, marks … |
+| [docs/modules/ui.md](docs/modules/ui.md) | statusline, tabline, indent … |
+| [docs/modules/code.md](docs/modules/code.md) | lsp, run, fold, format, marks … |
 | [docs/ai.md](docs/ai.md) | AI 어시스턴트 심화 가이드 |
 | [docs/config.md](docs/config.md) | 전체 설정 레퍼런스 |
 | [docs/keymaps.md](docs/keymaps.md) | 기본 단축키 치트시트 |

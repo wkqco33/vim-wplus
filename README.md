@@ -1,6 +1,6 @@
-﻿# vim-wplus
+# vim-wplus
 
-외부 의존성 없는 Vim 올인원 플러그인 — **43개 모듈**로 구성된 완전한 Vim IDE.
+외부 의존성 없는 Vim 올인원 플러그인 — 모듈형 구성의 완전한 Vim IDE.
 
 **요구사항**: Vim 9.1+ (`+job +channel +popupwin +signs +textprop`)
 
@@ -38,8 +38,8 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 | [docs/modules/editing.md](docs/modules/editing.md) | 편집 강화 모듈 (commentary, surround, pairs …) |
 | [docs/modules/navigation.md](docs/modules/navigation.md) | 탐색·파인더 모듈 (finder, explorer, harpoon …) |
 | [docs/modules/git.md](docs/modules/git.md) | Git 연동 모듈 (gitgutter, blame, diffview …) |
-| [docs/modules/ui.md](docs/modules/ui.md) | UI·시각화 모듈 (statusline, scrollbar, indent …) |
-| [docs/modules/code.md](docs/modules/code.md) | 코드 도구 모듈 (lsp, run, fold, snippet …) |
+| [docs/modules/ui.md](docs/modules/ui.md) | UI·시각화 모듈 (statusline, tabline, indent …) |
+| [docs/modules/code.md](docs/modules/code.md) | 코드 도구 모듈 (lsp, run, fold, format …) |
 | [docs/ai.md](docs/ai.md) | AI 어시스턴트 심화 가이드 |
 | [docs/config.md](docs/config.md) | 전체 설정 레퍼런스 |
 | [docs/keymaps.md](docs/keymaps.md) | 기본 단축키 치트시트 |
@@ -57,8 +57,7 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 | `surround` | 괄호·따옴표 조작 | `ys`, `cs`, `ds` |
 | `pairs` | 자동 괄호 완성 | 입력 시 자동 |
 | `textobj` | 들여쓰기/인자 텍스트 오브젝트 | `ii`, `ia`, `aa` |
-| `repeat` | `.` 반복 확장 | `.` |
-| `multicursor` | 다중 커서 | `<C-n>`, `<C-a>` |
+| `multicursor` | 다중 커서 | `<C-n>` |
 | `register` | 레지스터 미리보기 | `"`, `@` |
 | `yankhighlight` | 복사 시각 피드백 | 자동 |
 
@@ -66,14 +65,13 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 
 | 모듈 | 기능 | 핵심 키 |
 |------|------|---------|
-| `finder` | 퍼지 파일/버퍼 파인더 | `<leader>p`, `<leader>b` |
+| `finder` | 퍼지 파일/버퍼 파인더 | `<leader>ff`, `<leader>fb` |
 | `explorer` | 사이드바 파일 탐색기 | `<leader>e` |
 | `harpoon` | 파일 북마크 (최대 4슬롯) | `<leader>ha`, `<leader>h1~4` |
 | `history` | 최근 파일 브라우저 | `<leader>fh` |
 | `altfile` | 헤더↔소스 전환 | `:A`, `:AV` |
 | `bufdelete` | 창 유지 버퍼 삭제 | `<leader>bd` |
 | `quickfix` | Quickfix 강화 | `<leader>xq`, `]q` |
-| `whichkey` | 키 힌트 팝업 | `<leader>` (자동) |
 
 ### 🔀 Git
 
@@ -92,8 +90,6 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 | `tabline` | 버퍼 탭라인 | 자동 |
 | `indent` | 들여쓰기 가이드 | 자동 |
 | `illuminate` | 심볼 하이라이트 | 자동 |
-| `undotree` | Undo 히스토리 | `<leader>u` |
-| `scrollbar` | 미니맵 스크롤바 | `<leader>sb` |
 | `colorscheme` | 배경 자동 감지 | 자동 |
 
 ### 🛠 코드 도구
@@ -102,8 +98,6 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 |------|------|---------|
 | `lsp` | 경량 LSP 클라이언트 | `gd`, `gr`, `K` |
 | `format` | 스마트 포매터 | `<M-F>` |
-| `completion` | 경량 자동완성 | `<C-Space>` |
-| `snippet` | 스니펫 엔진 | `<Tab>` 확장 |
 | `outline` | 코드 아웃라인 | `<leader>o` |
 | `fold` | 스마트 폴드 | `<leader>zz` |
 | `run` | 코드 실행/빌드/테스트 | `<leader>rr/rb/rt` |
@@ -114,12 +108,13 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 | `scratch` | 스크래치 버퍼 | `<leader>sc` |
 | `marks` | 마크 시각화 | `<leader>ml` |
 | `todo` | TODO 관리 | `<leader>ft` |
+| `health` | 플러그인·환경 진단 보고서 | `:WplusHealth` |
 
 ### 🤖 AI
 
 | 모듈 | 기능 | 핵심 키 |
 |------|------|---------|
-| `ai` | Ghost Text · 코드 리뷰 · 커밋 메시지 | `<leader>ar/ae`, `:WaiCommitMsg` |
+| `ai` | Ghost Text · 코드 리뷰 · 커밋 메시지 생성 · 요청 취소 | `<leader>am` (커밋), `<leader>ac` (취소), `<leader>ar/ae` |
 
 > AI 상세 설정 → **[docs/ai.md](docs/ai.md)**
 
@@ -157,5 +152,4 @@ let g:wplus_ai_enabled      = 0
 | `harpoon` | ThePrimeagen/harpoon |
 | `marks` | chentoast/marks.nvim |
 | `run` | skywind3000/asyncrun.vim |
-| `scrollbar` | lewis6991/satellite.nvim |
 | `fold` | kevinhwang91/nvim-ufo |

@@ -30,12 +30,6 @@ function! s:validate_config() abort
             echomsg '[wplus] Warning: wplus_explorer_max_depth must be a positive number, reset to 8'
         endif
     endif
-    if exists('g:wplus_undotree_width')
-        if type(g:wplus_undotree_width) != v:t_number || g:wplus_undotree_width < 1
-            let g:wplus_undotree_width = 30
-            echomsg '[wplus] Warning: wplus_undotree_width must be a positive number, reset to 30'
-        endif
-    endif
     if exists('g:wplus_blame_delay')
         if type(g:wplus_blame_delay) != v:t_number || g:wplus_blame_delay < 0
             let g:wplus_blame_delay = 500
@@ -52,12 +46,6 @@ function! s:validate_config() abort
         if type(g:wplus_yank_duration) != v:t_number || g:wplus_yank_duration < 0
             let g:wplus_yank_duration = 250
             echomsg '[wplus] Warning: wplus_yank_duration must be a non-negative number, reset to 250'
-        endif
-    endif
-    if exists('g:wplus_scroll_min_lines')
-        if type(g:wplus_scroll_min_lines) != v:t_number || g:wplus_scroll_min_lines < 1
-            let g:wplus_scroll_min_lines = 50
-            echomsg '[wplus] Warning: wplus_scroll_min_lines must be a positive number, reset to 50'
         endif
     endif
     if exists('g:wplus_harpoon_max_slots')
@@ -90,12 +78,6 @@ function! s:validate_config() abort
             echomsg '[wplus] Warning: wplus_fold_column must be a non-negative number, reset to 0'
         endif
     endif
-    if exists('g:wplus_completion_max_items')
-        if type(g:wplus_completion_max_items) != v:t_number || g:wplus_completion_max_items < 1
-            let g:wplus_completion_max_items = 200
-            echomsg '[wplus] Warning: wplus_completion_max_items must be a positive number, reset to 200'
-        endif
-    endif
 
     " Validate string settings
     if exists('g:wplus_indent_char')
@@ -118,7 +100,13 @@ function! s:validate_config() abort
     endif
 endfunction
 
-let s:modules = ['commentary', 'pairs', 'repeat', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'whichkey', 'undotree', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'colorscheme', 'snippet', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'completion', 'harpoon', 'marks', 'scratch', 'run', 'project', 'history', 'scrollbar', 'fold']
+let g:wplus_load_errors = get(g:, 'wplus_load_errors', [])
+
+" Modules are set up in this order; later entries win on any keymap collision.
+"
+" Not listed here, deliberately:
+"   repeat  - autoloaded shim only, has no setup(). See autoload/wplus/repeat.vim.
+let s:modules = ['theme', 'commentary', 'pairs', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'harpoon', 'marks', 'scratch', 'run', 'project', 'history', 'fold', 'health']
 
 " Validate user configuration
 call s:validate_config()
@@ -131,7 +119,9 @@ for s:module in s:modules
         try
             execute 'call wplus#' . s:module . '#setup()'
         catch
-            echomsg '[wplus] Failed to load module ' . s:module . ': ' . v:exception
+            let l:err = '[wplus] Failed to load module ' . s:module . ': ' . v:exception
+            call add(g:wplus_load_errors, l:err)
+            echomsg l:err
         endtry
     endif
 endfor

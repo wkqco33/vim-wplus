@@ -13,7 +13,6 @@
 let g:wplus_blame_enabled         = 0
 let g:wplus_indent_enabled        = 0
 let g:wplus_yankhighlight_enabled = 0
-let g:wplus_scrollbar_enabled     = 0
 let g:wplus_fold_enabled          = 0
 ```
 
@@ -81,15 +80,6 @@ let g:wplus_indent_ft_exclude = ['help', 'nerdtree', 'undotree', 'tagbar']
 let g:wplus_illuminate_delay    = 200     " 하이라이트 지연 (ms)
 let g:wplus_illuminate_ft_block = ['help', 'nerdtree']
 
-" ── undotree ─────────────────────────────────────────────────────────────
-let g:wplus_undotree_width = 30           " 사이드바 너비 (컬럼)
-
-" ── scrollbar ────────────────────────────────────────────────────────────
-let g:wplus_scrollbar_enabled   = 1
-let g:wplus_scrollbar_char      = '▐'    " 트랙 문자
-let g:wplus_scrollbar_thumb     = '█'    " 썸 문자
-let g:wplus_scrollbar_min_lines = 50     " 표시 최소 줄 수
-
 " ── colorscheme ──────────────────────────────────────────────────────────
 let g:wplus_colorscheme_auto_detect = 1
 ```
@@ -106,13 +96,6 @@ let g:wplus_lsp_cache_ttl    = 300        " definition/reference 캐시 TTL (초
 let g:wplus_lsp_sig_delay    = 100        " 시그니처 힌트 지연 (ms)
 let g:wplus_lsp_change_delay = 800        " 텍스트 변경 → didChange 지연 (ms)
 let g:wplus_lsp_diag_delay   = 300        " 진단 갱신 지연 (ms)
-
-" ── completion ───────────────────────────────────────────────────────────
-let g:wplus_completion_max_items = 200
-
-" ── snippet ──────────────────────────────────────────────────────────────
-let g:wplus_snippet_jump_key      = '<Tab>'
-let g:wplus_snippet_jump_back_key = '<S-Tab>'
 
 " ── fold ─────────────────────────────────────────────────────────────────
 let g:wplus_fold_method     = 'indent'    " 'indent' | 'lsp' | 'syntax'
@@ -133,8 +116,9 @@ let g:wplus_session_autosave  = 1
 let g:wplus_session_max_files = 50
 
 " ── project ──────────────────────────────────────────────────────────────
-let g:wplus_project_config  = '.wplus.vim'
-let g:wplus_project_verbose = 0
+let g:wplus_project_config    = '.wplus.vim'
+let g:wplus_project_verbose   = 0
+let g:wplus_project_trust_all = 0            " 1이면 보안 프롬프트 건너뛰고 모든 .wplus.vim 신뢰
 
 " ── scratch ──────────────────────────────────────────────────────────────
 let g:wplus_scratch_file   = expand('~/.vim/scratch.txt')

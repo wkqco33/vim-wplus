@@ -171,7 +171,12 @@ function! wplus#finder#setup() abort
     command! WfindBuffers call wplus#finder#buffers()
     command! WfindMRU     call wplus#finder#mru()
 
-    nnoremap <silent> <leader>p :WfindFiles<CR>
-    nnoremap <silent> <leader>b :WfindBuffers<CR>
-    nnoremap <silent> <leader>m :WfindMRU<CR>
+    " These live under the <leader>f "find" prefix rather than on bare
+    " <leader>p / <leader>b / <leader>m. A complete mapping that is also the
+    " prefix of a longer one costs a full 'timeoutlen' wait on every press, and
+    " each of those three collided with a longer mapping from another module
+    " (bufdelete/blame, project, marks).
+    nnoremap <silent> <leader>ff :WfindFiles<CR>
+    nnoremap <silent> <leader>fb :WfindBuffers<CR>
+    nnoremap <silent> <leader>fr :WfindMRU<CR>
 endfunction

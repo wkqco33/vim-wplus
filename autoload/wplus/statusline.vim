@@ -15,27 +15,13 @@ let s:mode_map = {
     \ 't':  'TERMINAL',
     \ }
 
-" ── highlight groups (initialised once at setup) ──────────────────────────
-function! s:init_highlights() abort
-    " Base colors pulled from gruvbox palette; gracefully degrade on 256-color
-    hi WplusSlNormal  cterm=bold ctermfg=0  ctermbg=214 gui=bold guifg=#282828 guibg=#fabd2f
-    hi WplusSlInsert  cterm=bold ctermfg=0  ctermbg=109 gui=bold guifg=#282828 guibg=#83a598
-    hi WplusSlVisual  cterm=bold ctermfg=0  ctermbg=175 gui=bold guifg=#282828 guibg=#d3869b
-    hi WplusSlReplace cterm=bold ctermfg=0  ctermbg=167 gui=bold guifg=#282828 guibg=#fb4934
-    hi WplusSlCommand cterm=bold ctermfg=0  ctermbg=142 gui=bold guifg=#282828 guibg=#b8bb26
-    hi WplusSlMid     ctermfg=223 ctermbg=239 guifg=#ebdbb2 guibg=#3c3836
-    hi WplusSlRight   ctermfg=246 ctermbg=237 guifg=#a89984 guibg=#3c3836
-    hi WplusSlNC      ctermfg=243 ctermbg=237 guifg=#928374 guibg=#3c3836
-    hi WplusSlErr     ctermfg=167 ctermbg=239 guifg=#fb4934 guibg=#3c3836
-    hi WplusSlWarn    ctermfg=214 ctermbg=239 guifg=#fabd2f guibg=#3c3836
-endfunction
 
 " ── helpers ───────────────────────────────────────────────────────────────
 
 function! s:mode_hl() abort
     let m = mode()
     if     m ==# 'i' || m ==# 'ic' || m ==# 'ix' | return 'WplusSlInsert'
-    elseif m =~# '^[vV\<C-v>]'                    | return 'WplusSlVisual'
+    elseif m =~# "^[vV\<C-v>]"                    | return 'WplusSlVisual'
     elseif m =~# '^[rR]'                           | return 'WplusSlReplace'
     elseif m ==# 'c'                               | return 'WplusSlCommand'
     endif
@@ -66,7 +52,6 @@ function! s:git_branch() abort
     if empty(lines) | return '' | endif
     let line = lines[0]
     let branch = line =~# '^ref: ' ? substitute(line, 'ref: refs/heads/', '', '') : line[:6]
-    let b:wplus_git_branch = branch
     return ' ' . branch
 endfunction
 
@@ -129,7 +114,6 @@ endfunction
 " ── setup ─────────────────────────────────────────────────────────────────
 
 function! wplus#statusline#setup() abort
-    call s:init_highlights()
     set laststatus=2
     set statusline=%!wplus#statusline#active()
     augroup wplus_statusline
@@ -137,7 +121,5 @@ function! wplus#statusline#setup() abort
         autocmd WinEnter,BufEnter * setlocal statusline=%!wplus#statusline#active()
         autocmd WinLeave           * setlocal statusline=%!wplus#statusline#inactive()
         autocmd User WplusGitGutterUpdate redrawstatus
-        " Refresh highlights when colorscheme changes
-        autocmd ColorScheme        * call s:init_highlights()
     augroup END
 endfunction

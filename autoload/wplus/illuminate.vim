@@ -13,11 +13,6 @@ let s:timer     = -1
 let s:last_word = ''
 let s:paused    = 0
 
-" ── highlight group ───────────────────────────────────────────────────────
-
-function! s:init_highlight() abort
-    hi default WplusIlluminate cterm=underline gui=underline guibg=#504945
-endfunction
 
 " ── clear matches in current window ──────────────────────────────────────
 
@@ -76,11 +71,9 @@ endfunction
 " ── setup ─────────────────────────────────────────────────────────────────
 
 function! wplus#illuminate#setup() abort
-    call s:init_highlight()
     augroup wplus_illuminate
         autocmd!
         autocmd CursorMoved,CursorMovedI * call s:trigger()
         autocmd BufLeave,WinLeave        * call s:clear()
-        autocmd ColorScheme              * call s:init_highlight()
     augroup END
 endfunction

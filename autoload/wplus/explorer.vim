@@ -96,7 +96,9 @@ function! s:init_buffer() abort
 
     nnoremap <buffer> <CR>  :call <SID>on_enter()<CR>
     nnoremap <buffer> a     :call <SID>on_add()<CR>
-    nnoremap <buffer> d     :call <SID>on_delete()<CR>
+    " dd, not d: a single keypress should not start a delete, and bare 'd' would
+    " also swallow every d{motion} inside the sidebar.
+    nnoremap <buffer> dd    :call <SID>on_delete()<CR>
     nnoremap <buffer> r     :call <SID>on_rename()<CR>
     nnoremap <buffer> q     :close<CR>
     nnoremap <buffer> R     :call <SID>refresh()<CR>
@@ -184,11 +186,26 @@ function! s:build_tree(path, level) abort
     endfor
 endfunction
 
+" The tree entry on a given line, or {} if the line does not hold one.
+"
+" Line 1 is the root header, so entry N lives on line N+2. Callers used to index
+" s:tree_data[lnum - 2] directly, which throws E684 on the trailing
+" "... truncated ..." line and on any line of a stale window whose tree data has
+" since shrunk.
+function! s:item_at(lnum) abort
+    let l:idx = a:lnum - 2
+    if l:idx < 0 || l:idx >= len(s:tree_data)
+        return {}
+    endif
+    return s:tree_data[l:idx]
+endfunction
+
 function! s:on_enter() abort
     let l:lnum = line('.')
     if l:lnum == 1 | return | endif
-    let l:item = s:tree_data[l:lnum - 2]
-    
+    let l:item = s:item_at(l:lnum)
+    if empty(l:item) | return | endif
+
     if l:item.is_dir
         if get(s:expanded, l:item.path, 0)
             unlet s:expanded[l:item.path]
@@ -205,7 +222,8 @@ endfunction
 
 function! s:on_add() abort
     let l:lnum = line('.')
-    let l:parent = l:lnum == 1 ? s:current_root : s:tree_data[l:lnum - 2].path
+    let l:item = s:item_at(l:lnum)
+    let l:parent = (l:lnum == 1 || empty(l:item)) ? s:current_root : l:item.path
     if !isdirectory(l:parent) | let l:parent = fnamemodify(l:parent, ':h') | endif
     
     let l:name = input('New file/dir: ')
@@ -223,18 +241,36 @@ endfunction
 function! s:on_delete() abort
     let l:lnum = line('.')
     if l:lnum == 1 | return | endif
-    let l:item = s:tree_data[l:lnum - 2]
-    if confirm("Delete " . l:item.name . "?", "&Yes\n&No") == 1
-        call delete(l:item.path, 'rf')
-        call s:invalidate_cache(fnamemodify(l:item.path, ':h'))
-        call s:refresh()
+    let l:item = s:item_at(l:lnum)
+    if empty(l:item) | return | endif
+
+    " A non-empty directory is deleted recursively and is not recoverable, so it
+    " takes more than a keypress: the name has to be typed. Plain files and empty
+    " directories keep the yes/no prompt, but defaulting to No.
+    let l:recursive = l:item.is_dir && !empty(glob(l:item.path . '/*', 1, 1))
+    if l:recursive
+        let l:answer = input(printf('Recursively delete "%s" and everything in it? Type the name to confirm: ', l:item.name))
+        if l:answer !=# l:item.name
+            call wplus#util#info_msg('explorer', 'Delete cancelled')
+            return
+        endif
+    elseif confirm('Delete ' . l:item.name . '?', "&No\n&Yes", 1) != 2
+        return
     endif
+
+    if delete(l:item.path, l:item.is_dir ? 'rf' : '') != 0
+        call wplus#util#error_msg('explorer', 'Failed to delete ' . l:item.name)
+        return
+    endif
+    call s:invalidate_cache(fnamemodify(l:item.path, ':h'))
+    call s:refresh()
 endfunction
 
 function! s:on_rename() abort
     let l:lnum = line('.')
     if l:lnum == 1 | return | endif
-    let l:item = s:tree_data[l:lnum - 2]
+    let l:item = s:item_at(l:lnum)
+    if empty(l:item) | return | endif
     let l:new_name = input('Rename to: ', l:item.name)
     if empty(l:new_name) || l:new_name == l:item.name | return | endif
     call rename(l:item.path, fnamemodify(l:item.path, ':h') . '/' . l:new_name)

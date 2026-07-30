@@ -1,4 +1,4 @@
-﻿*wplus.txt*  All-in-one Vim plugin (dependency-free)              vim-wplus
+*wplus.txt*  All-in-one Vim plugin (dependency-free)              vim-wplus
 
 Author:  wkqco33
 License: MIT
@@ -29,42 +29,37 @@ CONTENTS                                                      *wplus-contents*
   17. Alternate File ............... |wplus-altfile|
   18. Buffer Delete ................ |wplus-bufdelete|
   19. Quickfix ..................... |wplus-quickfix|
-  20. Which Key .................... |wplus-whichkey|
 
   GIT ~
-  21. Git Gutter ................... |wplus-gitgutter|
-  22. Git Blame .................... |wplus-blame|
-  23. Diff View .................... |wplus-diffview|
-  24. Conflict Resolver ............ |wplus-conflict|
+  20. Git Gutter ................... |wplus-gitgutter|
+  21. Git Blame .................... |wplus-blame|
+  22. Diff View .................... |wplus-diffview|
+  23. Conflict Resolver ............ |wplus-conflict|
 
   UI ~
-  25. Statusline ................... |wplus-statusline|
-  26. Tabline ...................... |wplus-tabline|
-  27. Indent Guide ................. |wplus-indent|
-  28. Illuminate ................... |wplus-illuminate|
-  29. Undo Tree .................... |wplus-undotree|
-  30. Scrollbar .................... |wplus-scrollbar|
-  31. Colorscheme .................. |wplus-colorscheme|
+  24. Statusline ................... |wplus-statusline|
+  25. Tabline ...................... |wplus-tabline|
+  26. Indent Guide ................. |wplus-indent|
+  27. Illuminate ................... |wplus-illuminate|
+  28. Colorscheme .................. |wplus-colorscheme|
 
   CODE TOOLS ~
-  32. LSP .......................... |wplus-lsp|
-  33. Format ....................... |wplus-format|
-  34. Completion ................... |wplus-completion|
-  35. Snippet ...................... |wplus-snippet|
-  36. Outline ...................... |wplus-outline|
-  37. Fold ......................... |wplus-fold|
-  38. Run .......................... |wplus-run|
-  39. Terminal ..................... |wplus-terminal|
-  40. Root ......................... |wplus-root|
-  41. Session ...................... |wplus-session|
-  42. Project ...................... |wplus-project|
-  43. Scratch ...................... |wplus-scratch|
-  44. Marks ........................ |wplus-marks|
-  45. TODO ......................... |wplus-todo|
-  46. Grep ......................... |wplus-grep|
+  29. LSP .......................... |wplus-lsp|
+  30. Format ....................... |wplus-format|
+  31. Outline ...................... |wplus-outline|
+  32. Fold ......................... |wplus-fold|
+  33. Run .......................... |wplus-run|
+  34. Terminal ..................... |wplus-terminal|
+  35. Root ......................... |wplus-root|
+  36. Session ...................... |wplus-session|
+  37. Project ...................... |wplus-project|
+  38. Scratch ...................... |wplus-scratch|
+  39. Marks ........................ |wplus-marks|
+  40. TODO ......................... |wplus-todo|
+  41. Grep ......................... |wplus-grep|
 
   AI ~
-  47. AI Assistant ................. |wplus-ai|
+  42. AI Assistant ................. |wplus-ai|
 
 ==============================================================================
 1. INTRODUCTION                                                  *wplus-intro*
@@ -79,34 +74,39 @@ Verify with: >
     :echo has('job') && has('channel') && has('popupwin') && has('signs') && has('textprop')
 <
 
+Run |:WplusHealth| to check your setup and diagnose environment issues.
+
 ==============================================================================
-2. MODULE LIST                                                  *wplus-modules*
+2. MODULE LIST                                                 *wplus-modules*
 
-43 modules organized by category:
+Modules organized by category.
 
-  EDITING (8) ~
+  EDITING ~
     commentary    surround      pairs         textobj
-    repeat        multicursor   register      yankhighlight
+    multicursor   register      yankhighlight
 
-  NAVIGATION (8) ~
+  NAVIGATION ~
     finder        explorer      harpoon       history
-    altfile       bufdelete     quickfix      whichkey
+    altfile       bufdelete     quickfix
 
-  GIT (4) ~
+  GIT ~
     gitgutter     blame         diffview      conflict
 
-  UI (7) ~
+  UI ~
     statusline    tabline       indent        illuminate
-    undotree      scrollbar     colorscheme
+    colorscheme
 
-  CODE TOOLS (15) ~
-    lsp           format        completion    snippet
-    outline       fold          run           terminal
-    root          session       project       scratch
-    marks         todo          grep
+  CODE TOOLS ~
+    lsp           format        outline       fold
+    run           terminal      root          session
+    project       scratch       marks         todo
+    grep
 
-  AI (1) ~
+  AI ~
     ai
+
+The 'repeat' module is autoload-only and has no setup(): it forwards repeatable
+operations to tpope/vim-repeat when that plugin is installed. See |wplus-repeat|.
 
 ==============================================================================
 3. INSTALLATION                                                *wplus-install*
@@ -123,7 +123,7 @@ Manual: >
 <
 
 ==============================================================================
-4. CONFIGURATION                                               *wplus-config*
+4. CONFIGURATION                                                *wplus-config*
 
 Disable individual modules (before plugin/wplus.vim loads): >
     let g:wplus_<module>_enabled = 0
@@ -137,7 +137,7 @@ See |wplus-<module>| sections below for per-module settings.
 Full reference: docs/config.md in the plugin directory.
 
 ==============================================================================
-5. COMMENTARY                                              *wplus-commentary*
+5. COMMENTARY                                               *wplus-commentary*
 
 Toggle comments for the current line, motion, or visual selection.
 Comment tokens are read from &commentstring automatically.
@@ -173,7 +173,7 @@ Automatically closes brackets and quotes as you type.
   )     if already present → skips (no duplicate)
 
 ==============================================================================
-8. TEXT OBJECTS                                                 *wplus-textobj*
+8. TEXT OBJECTS                                                *wplus-textobj*
 
 Indent block: >
     ii    inner indent block (same level lines)
@@ -186,31 +186,38 @@ Function argument: >
 Works with all operators: d, c, y, v, >, <, =, gq, ...
 
 ==============================================================================
-9. REPEAT                                                        *wplus-repeat*
+9. REPEAT                                                       *wplus-repeat*
 
-Extends the |.| command to repeat plugin operations (surround, commentary …).
-Compatible with tpope/vim-repeat if installed.
+Forwards repeatable plugin operations to tpope/vim-repeat. This module does
+NOT map |.| itself: doing that correctly requires tracking b:changedtick to
+distinguish "a plugin operation ran last" from "a normal edit ran last", which
+is exactly what vim-repeat already does.
 
-API for plugin authors: >
+Without vim-repeat installed, |.| keeps its native behaviour and repeating a
+surround or comment operation is not supported. That is deliberate — an earlier
+version mapped |.| unconditionally and never cleared its stored sequence, so a
+single `gcc` made every later |.| replay the comment toggle.
+
+API for plugin authors (no-op unless vim-repeat is present): >
     call wplus#repeat#set("\<Plug>MyAction", v:count)
 <
 
 ==============================================================================
-10. MULTI CURSOR                                             *wplus-multicursor*
+10. MULTI CURSOR                                           *wplus-multicursor*
 
 Select multiple occurrences of a word and edit them simultaneously.
 
 Mappings: >
     <C-n>    Add next match to selection
-    <C-x>    Skip current match, add next
-    <C-a>    Select all matches in buffer
+    <leader>vx    Skip current match, add next
+    <leader>va    Select all matches in buffer
     c        Replace all selected (prompts for new text)
     d        Delete all selected
     <Esc>    Exit multi-cursor mode
 <
 
 ==============================================================================
-11. REGISTER PREVIEW                                           *wplus-register*
+11. REGISTER PREVIEW                                          *wplus-register*
 
 Preview register contents in a popup before pasting.
 
@@ -220,7 +227,7 @@ Mappings: >
 <
 
 ==============================================================================
-12. YANK HIGHLIGHT                                        *wplus-yankhighlight*
+12. YANK HIGHLIGHT                                       *wplus-yankhighlight*
 
 Briefly highlights yanked text for visual feedback.
 
@@ -237,9 +244,9 @@ Customize highlight: >
 Fast fuzzy finder using Vim 9 matchfuzzy() and popup windows.
 
 Mappings: >
-    <leader>p    Find files
-    <leader>b    Find buffers
-    <leader>m    Find recent files (MRU)
+    <leader>ff    Find files
+    <leader>fb    Find buffers
+    <leader>fr    Find recent files (MRU)
 <
 Popup keys: >
     <C-n> / ↓    Next item
@@ -257,7 +264,7 @@ Configuration: >
 <
 
 ==============================================================================
-14. EXPLORER                                                   *wplus-explorer*
+14. EXPLORER                                                  *wplus-explorer*
 
 Sidebar file explorer.
 
@@ -267,7 +274,9 @@ Mappings: >
 Inside explorer: >
     <CR>    Open file or enter directory
     a       Create new file/directory  (append / for directory)
-    d       Delete
+    dd      Delete. Files and empty directories prompt yes/no (default No);
+            a non-empty directory requires typing its name to confirm, since
+            the delete is recursive and not recoverable.
     r       Rename
     R       Refresh
     q       Close
@@ -278,14 +287,14 @@ Configuration: >
 <
 
 ==============================================================================
-15. HARPOON                                                     *wplus-harpoon*
+15. HARPOON                                                    *wplus-harpoon*
 
 Quick file bookmarks with per-project persistence (~/.vim/harpoon/).
 
 Mappings: >
-    <leader>ha  /  :WharoonAdd       Add current file to next empty slot
-    <leader>hd  /  :WharoonRemove    Remove current file from its slot
-    <leader>hl  /  :WharoonList      Open slot list popup
+    <leader>ha  /  :WharpoonAdd       Add current file to next empty slot
+    <leader>hd  /  :WharpoonRemove    Remove current file from its slot
+    <leader>hl  /  :WharpoonList      Open slot list popup
     <leader>h1 … h4                  Jump to slot 1–4
 <
 Configuration: >
@@ -293,7 +302,7 @@ Configuration: >
 <
 
 ==============================================================================
-16. HISTORY                                                     *wplus-history*
+16. HISTORY                                                    *wplus-history*
 
 Session MRU + v:oldfiles merged into a finder popup.
 
@@ -307,7 +316,7 @@ Configuration: >
 <
 
 ==============================================================================
-17. ALTERNATE FILE                                              *wplus-altfile*
+17. ALTERNATE FILE                                             *wplus-altfile*
 
 Toggle between header and source files.
 
@@ -319,7 +328,7 @@ Commands: >
 Supported pairs: .h↔.c  .h↔.cpp  .hpp↔.cpp
 
 ==============================================================================
-18. BUFFER DELETE                                             *wplus-bufdelete*
+18. BUFFER DELETE                                            *wplus-bufdelete*
 
 Delete a buffer without closing its window.
 
@@ -330,7 +339,7 @@ Mappings / Commands: >
 <
 
 ==============================================================================
-19. QUICKFIX                                                   *wplus-quickfix*
+19. QUICKFIX                                                  *wplus-quickfix*
 
 Enhanced quickfix and location list navigation.
 
@@ -344,18 +353,7 @@ Mappings: >
 <
 
 ==============================================================================
-20. WHICH KEY                                                  *wplus-whichkey*
-
-After pressing <leader> and waiting timeoutlen ms, a popup lists registered
-key bindings.
-
-Register custom hints: >
-    call wplus#whichkey#register('w', 'save file')
-    call wplus#whichkey#register('q', 'quit')
-<
-
-==============================================================================
-21. GIT GUTTER                                                *wplus-gitgutter*
+20. GIT GUTTER                                               *wplus-gitgutter*
 
 Async sign-column diff markers.
 
@@ -375,7 +373,7 @@ Configuration: >
 <
 
 ==============================================================================
-22. GIT BLAME                                                    *wplus-blame*
+21. GIT BLAME                                                    *wplus-blame*
 
 Inline git blame as virtual text at the end of each line.
 
@@ -391,7 +389,7 @@ Configuration: >
 Template variables: <author>  <date>  <summary>  <hash>
 
 ==============================================================================
-23. DIFF VIEW                                                  *wplus-diffview*
+22. DIFF VIEW                                                 *wplus-diffview*
 
 Visual Git diff viewer with hunk navigation.
 
@@ -403,10 +401,14 @@ Mappings: >
 <
 
 ==============================================================================
-24. CONFLICT RESOLVER                                          *wplus-conflict*
+23. CONFLICT RESOLVER                                         *wplus-conflict*
 
 Detect and resolve Git merge conflicts visually.
 
+Mappings: >
+    ]x                  Jump to next conflict
+    [x                  Jump to previous conflict
+<
 Commands: >
     :WconflictNext      Jump to next conflict
     :WconflictPrev      Jump to previous conflict
@@ -414,12 +416,15 @@ Commands: >
     :WconflictTheirs    Accept theirs (incoming) version
     :WconflictBoth      Accept both versions
 <
-Configuration: >
-    let g:wplus_conflict_auto_highlight = 1
+Choosing a side rewrites the buffer, so those three ship without default keys.
+Bind them yourself if you want them: >
+    nmap <leader>co <Plug>WconflictOurs
+    nmap <leader>ct <Plug>WconflictTheirs
+    nmap <leader>cb <Plug>WconflictBoth
 <
 
 ==============================================================================
-25. STATUSLINE                                                *wplus-statusline*
+24. STATUSLINE                                              *wplus-statusline*
 
 Custom statusline showing:
   Mode | Git branch | Filename [flags] | → | LSP diagnostics | ft | enc | pos
@@ -427,7 +432,7 @@ Custom statusline showing:
 No configuration needed; activates automatically.
 
 ==============================================================================
-26. TABLINE                                                    *wplus-tabline*
+25. TABLINE                                                    *wplus-tabline*
 
 Buffer tabline at the top of the screen.
   • Lists all listed buffers with index numbers
@@ -435,7 +440,7 @@ Buffer tabline at the top of the screen.
   • Click to switch (mouse required)
 
 ==============================================================================
-27. INDENT GUIDE                                                *wplus-indent*
+26. INDENT GUIDE                                                *wplus-indent*
 
 Draws a guide character at each indent level (conceal-based).
 
@@ -445,7 +450,7 @@ Configuration: >
 <
 
 ==============================================================================
-28. ILLUMINATE                                               *wplus-illuminate*
+27. ILLUMINATE                                              *wplus-illuminate*
 
 Highlight all occurrences of the word under the cursor.
 
@@ -455,44 +460,7 @@ Configuration: >
 <
 
 ==============================================================================
-29. UNDO TREE                                                  *wplus-undotree*
-
-Sidebar showing the full undo history tree.
-
-Mappings: >
-    <leader>u  /  :WundotreeToggle    Toggle sidebar
-<
-Inside sidebar: >
-    j / k     Move to next / previous state
-    <CR>      Restore that state
-    q         Close
-<
-Configuration: >
-    let g:wplus_undotree_width = 30
-<
-
-==============================================================================
-30. SCROLLBAR                                                  *wplus-scrollbar*
-
-Text-based scrollbar in the sign column with LSP diagnostic overlay.
-
-  ▐  (grey)    Track (outside viewport)
-  █  (light)   Thumb (current viewport)
-  ●  (red)     LSP error position
-  ●  (yellow)  LSP warning position
-
-Mappings: >
-    <leader>sb  /  :WscrollbarToggle    Toggle scrollbar
-<
-Configuration: >
-    let g:wplus_scrollbar_enabled   = 1
-    let g:wplus_scrollbar_char      = '▐'
-    let g:wplus_scrollbar_thumb     = '█'
-    let g:wplus_scrollbar_min_lines = 50
-<
-
-==============================================================================
-31. COLORSCHEME                                              *wplus-colorscheme*
+28. COLORSCHEME                                            *wplus-colorscheme*
 
 Auto-detect terminal background brightness and adjust colorscheme.
 
@@ -501,7 +469,7 @@ Configuration: >
 <
 
 ==============================================================================
-32. LSP                                                           *wplus-lsp*
+29. LSP                                                            *wplus-lsp*
 
 Lightweight LSP client using Vim 9 job/channel.
 
@@ -527,7 +495,7 @@ Configuration: >
 <
 
 ==============================================================================
-33. FORMAT                                                      *wplus-format*
+30. FORMAT                                                      *wplus-format*
 
 Smart formatter with priority fallback:
   LSP formatter → external tool → ALE → gg=G
@@ -542,38 +510,7 @@ External tools per filetype:
   JS/TS/JSON → prettier      Shell → shfmt     Lua → stylua
 
 ==============================================================================
-34. COMPLETION                                               *wplus-completion*
-
-Lightweight auto-completion (file paths, buffer words, LSP suggestions).
-
-Mappings: >
-    <C-Space>    Trigger completion popup
-<
-Configuration: >
-    let g:wplus_completion_max_items = 200
-<
-
-==============================================================================
-35. SNIPPET                                                    *wplus-snippet*
-
-Snippet engine with tabstop placeholders.
-
-Placeholder syntax: >
-    ${1:default}    First tabstop
-    ${2:label}      Second tabstop
-    ${0}            Final cursor position
-<
-Mappings: >
-    <Tab>      Expand snippet / jump to next placeholder
-    <S-Tab>    Jump to previous placeholder
-<
-Configuration: >
-    let g:wplus_snippet_jump_key      = '<Tab>'
-    let g:wplus_snippet_jump_back_key = '<S-Tab>'
-<
-
-==============================================================================
-36. OUTLINE                                                    *wplus-outline*
+31. OUTLINE                                                    *wplus-outline*
 
 Sidebar showing functions, classes, structs, etc. from ctags.
 Requires universal-ctags (or Exuberant ctags).
@@ -588,7 +525,7 @@ Inside sidebar: >
 <
 
 ==============================================================================
-37. FOLD                                                          *wplus-fold*
+32. FOLD                                                          *wplus-fold*
 
 Smart fold management (indent-based by default; LSP foldingRange optional).
 
@@ -608,7 +545,7 @@ Configuration: >
 <
 
 ==============================================================================
-38. RUN                                                           *wplus-run*
+33. RUN                                                            *wplus-run*
 
 Filetype-aware code runner and build system launcher.
 
@@ -629,7 +566,7 @@ Configuration: >
 <
 
 ==============================================================================
-39. TERMINAL                                                   *wplus-terminal*
+34. TERMINAL                                                  *wplus-terminal*
 
 Toggle a terminal in a bottom split.
 
@@ -639,7 +576,7 @@ Mappings: >
 <
 
 ==============================================================================
-40. ROOT                                                          *wplus-root*
+35. ROOT                                                          *wplus-root*
 
 Auto-detect project root and set lcd when opening a file.
 Looks for: .git  go.mod  Makefile  package.json  Cargo.toml
@@ -647,7 +584,7 @@ Looks for: .git  go.mod  Makefile  package.json  Cargo.toml
 No configuration needed; required by run, grep, session, project, harpoon.
 
 ==============================================================================
-41. SESSION                                                     *wplus-session*
+36. SESSION                                                    *wplus-session*
 
 Per-project session management (save/restore buffers, folds, marks).
 
@@ -663,7 +600,7 @@ Configuration: >
 <
 
 ==============================================================================
-42. PROJECT                                                     *wplus-project*
+37. PROJECT                                                    *wplus-project*
 
 Per-project configuration via .wplus.vim in the project root.
 Auto-sourced once on first buffer entry per session.
@@ -677,12 +614,13 @@ Example .wplus.vim: >
     let g:wplus_run_commands = {'go': 'go run ./cmd/server.go'}
 <
 Configuration: >
-    let g:wplus_project_config  = '.wplus.vim'
-    let g:wplus_project_verbose = 0
+    let g:wplus_project_config    = '.wplus.vim'
+    let g:wplus_project_verbose   = 0
+    let g:wplus_project_trust_all = 0    " 1 = skip trust prompt
 <
 
 ==============================================================================
-43. SCRATCH                                                     *wplus-scratch*
+38. SCRATCH                                                    *wplus-scratch*
 
 Persistent scratch buffer backed by ~/.vim/scratch.txt.
 Auto-saved on hide; reloaded on show.
@@ -698,7 +636,7 @@ Configuration: >
 <
 
 ==============================================================================
-44. MARKS                                                        *wplus-marks*
+39. MARKS                                                        *wplus-marks*
 
 Visualize Vim marks (a–z) in the sign column as colored letters.
 
@@ -712,7 +650,7 @@ Configuration: >
 <
 
 ==============================================================================
-45. TODO                                                          *wplus-todo*
+40. TODO                                                          *wplus-todo*
 
 Collect TODO/FIXME/HACK comments and show them in quickfix or finder.
 
@@ -725,7 +663,7 @@ Configuration: >
 <
 
 ==============================================================================
-46. GREP                                                          *wplus-grep*
+41. GREP                                                          *wplus-grep*
 
 Fast project-wide search using ripgrep, git grep, or grep.
 
@@ -735,7 +673,7 @@ Commands / Mappings: >
 <
 
 ==============================================================================
-47. AI ASSISTANT                                                    *wplus-ai*
+42. AI ASSISTANT                                                    *wplus-ai*
 
 Integrated AI assistant supporting OpenAI, Claude, Azure OpenAI, and Ollama.
 
@@ -748,6 +686,7 @@ Commands: >
     :WaiCommitMsg        Generate commit message from staged diff
     :WaiFixDiag          Fix LSP diagnostic on current line
     :WaiToggleSuggest    Toggle Ghost Text auto-completion
+    :WaiCancel           Cancel all active AI requests (<leader>ac)
 <
 All commands show a preview popup — press Enter/a to apply, Esc to discard.
 
@@ -765,6 +704,16 @@ Ghost Text configuration: >
     let g:wplus_ai_suggest_max_lines = 3
 <
 See docs/ai.md for the full provider setup guide.
+
+==============================================================================
+43. HEALTH CHECK                                              *wplus-health*
+
+Run diagnostics report covering 7 key areas: Vim features, module loading,
+external tools, LSP status, AI configuration, keymap conflicts, and options.
+
+Commands: >
+    :WplusHealth    Run diagnostics and open report buffer
+<
 
 ==============================================================================
  vim:tw=78:ts=8:ft=help:norl:

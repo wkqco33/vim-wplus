@@ -10,9 +10,9 @@ Vim 9의 `matchfuzzy()`와 팝업 윈도우를 사용하여 파일, 버퍼, 최�
 
 | 키 | 동작 |
 |----|------|
-| `<leader>p` | 파일 찾기 |
-| `<leader>b` | 버퍼 찾기 |
-| `<leader>m` | 최근 파일 찾기 (MRU) |
+| `<leader>ff` | 파일 찾기 |
+| `<leader>fb` | 버퍼 찾기 |
+| `<leader>fr` | 최근 파일 찾기 (MRU) |
 
 **팝업 내 키:**
 
@@ -46,7 +46,7 @@ let g:wplus_finder_fuzzy_limit  = 10000  " 퍼지 매칭 최대 항목 수
 |----|------|
 | `<CR>` | 파일 열기 또는 디렉토리 이동 |
 | `a` | 새 파일/디렉토리 생성 (디렉토리는 이름 끝에 `/`) |
-| `d` | 삭제 |
+| `dd` | 삭제 (디렉터리는 이름 입력 확인) |
 | `r` | 이름 변경 |
 | `R` | 새로고침 |
 | `q` | 닫기 |
@@ -65,9 +65,9 @@ let g:wplus_explorer_max_depth   = 8     " 최대 재귀 깊이
 
 | 키 / 명령 | 동작 |
 |-----------|------|
-| `<leader>ha` / `:WharoonAdd` | 현재 파일을 다음 빈 슬롯에 추가 |
-| `<leader>hd` / `:WharoonRemove` | 현재 파일을 슬롯에서 제거 |
-| `<leader>hl` / `:WharoonList` | 슬롯 목록 팝업 |
+| `<leader>ha` / `:WharpoonAdd` | 현재 파일을 다음 빈 슬롯에 추가 |
+| `<leader>hd` / `:WharpoonRemove` | 현재 파일을 슬롯에서 제거 |
+| `<leader>hl` / `:WharpoonList` | 슬롯 목록 팝업 |
 | `<leader>h1` ~ `<leader>h4` | 해당 슬롯 파일로 즉시 이동 |
 
 ```vim
@@ -134,15 +134,3 @@ let g:wplus_history_project_only = 0   " 1이면 기본으로 프로젝트 내 �
 2. <leader>xr         — 치환 패턴 입력 → 모든 파일에 자동 적용
 ```
 
----
-
-## whichkey — 키 힌트 팝업
-
-`<leader>`를 누른 후 `timeoutlen` ms 이상 기다리면 등록된 키 매핑 목록이 팝업으로 표시됩니다.
-
-커스텀 설명 등록:
-
-```vim
-call wplus#whichkey#register('w', 'save file')
-call wplus#whichkey#register('q', 'quit')
-```
