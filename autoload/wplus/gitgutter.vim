@@ -20,11 +20,6 @@ function! s:define_signs() abort
     call sign_define('WplusGGDelete', {'text': g:wplus_gitgutter_sign_delete, 'texthl': 'WplusGGDelete'})
 endfunction
 
-function! s:init_highlights() abort
-    hi WplusGGAdd    ctermfg=142 guifg=#b8bb26
-    hi WplusGGChange ctermfg=214 guifg=#fabd2f
-    hi WplusGGDelete ctermfg=167 guifg=#fb4934
-endfunction
 
 " ── unified-diff parser → list of {lnum, type} ────────────────────────────
 
@@ -335,7 +330,6 @@ endfunction
 " ── setup ─────────────────────────────────────────────────────────────────
 
 function! wplus#gitgutter#setup() abort
-    call s:init_highlights()
     call s:define_signs()
 
     augroup wplus_gitgutter
@@ -343,7 +337,6 @@ function! wplus#gitgutter#setup() abort
         autocmd BufReadPost,BufWritePost,InsertLeave *
             \ call wplus#gitgutter#refresh(bufnr('%'))
         autocmd BufDelete * call s:on_buf_delete()
-        autocmd ColorScheme * call s:init_highlights()
         autocmd VimLeavePre * call s:cleanup_jobs()
     augroup END
 
