@@ -111,12 +111,7 @@ function! s:get_request_headers() abort
 endfunction
 
 function! s:channel_key(channel) abort
-    try
-        let l:info = ch_info(a:channel)
-        return string(get(l:info, 'id', a:channel))
-    catch
-        return string(a:channel)
-    endtry
+    return wplus#util#channel_key(a:channel)
 endfunction
 
 function! s:build_curl_command(payload, endpoint, headers, ...) abort

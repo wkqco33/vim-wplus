@@ -9,7 +9,6 @@ let s:pending_actions = []
 let s:sig_winid = -1
 let s:def_cache = {} " uri:line:col -> {result, timestamp} (with TTL)
 let s:ref_cache = {} " uri:line:col -> {result, timestamp} (with TTL)
-let s:symbol_cache = {} " uri -> {line_count, timestamp, symbols} (symbol info cache)
 let g:wplus_lsp_log_enabled  = get(g:, 'wplus_lsp_log_enabled',  0)
 let g:wplus_lsp_signcolumn   = get(g:, 'wplus_lsp_signcolumn',   'yes')
 let g:wplus_lsp_cache_ttl    = get(g:, 'wplus_lsp_cache_ttl',    300)
