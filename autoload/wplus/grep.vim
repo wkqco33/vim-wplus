@@ -67,7 +67,7 @@ function! wplus#grep#search_async(args) abort
     let l:cmd = []
     if executable('rg')
         let l:cmd = ['rg', '--vimgrep', '--smart-case', '--', a:args]
-    elseif executable('git') && isdirectory('.git')
+    elseif executable('git') && !empty(wplus#util#find_git_root(getcwd()))
         let l:cmd = ['git', 'grep', '-n', '--column', a:args]
     elseif executable('grep')
         let l:cmd = ['grep', '-RIn', a:args, '.']
@@ -103,7 +103,10 @@ endfunction
 function! wplus#grep#search_visual() abort
     let l:text = s:get_visual_text()
     if empty(l:text) | return | endif
-    call wplus#grep#search(shellescape(s:escape_regex(l:text)))
+    " No shellescape(): the pattern is passed as a job_start() list element, so
+    " it reaches the backend as a single argv entry with no shell in between.
+    " Escaping here made the quotes part of the search pattern itself.
+    call wplus#grep#search(s:escape_regex(l:text))
 endfunction
 
 function! wplus#grep#search_regex() abort
@@ -115,7 +118,8 @@ endfunction
 function! wplus#grep#search_word() abort
     let l:word = expand('<cword>')
     if empty(l:word) | return | endif
-    call wplus#grep#search(shellescape(l:word))
+    " See search_visual(): argv list form needs no shell quoting.
+    call wplus#grep#search(l:word)
 endfunction
 
 function! wplus#grep#setup() abort

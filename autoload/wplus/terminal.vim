@@ -11,7 +11,9 @@ function! wplus#terminal#toggle() abort
         if l:winid != -1
             " Terminal is visible, hide it
             if winnr('$') > 1
-                execute l:winid . 'hide'
+                " win_execute, not `execute l:winid . 'hide'`: that treats the
+                " window *ID* (e.g. 1000) as a line count and runs `1000hide`.
+                call win_execute(l:winid, 'hide')
             else
                 " Don't hide if it's the only window
                 echo "Terminal is the only window"

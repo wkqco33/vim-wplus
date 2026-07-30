@@ -272,7 +272,9 @@ Mappings: >
 Inside explorer: >
     <CR>    Open file or enter directory
     a       Create new file/directory  (append / for directory)
-    d       Delete
+    dd      Delete. Files and empty directories prompt yes/no (default No);
+            a non-empty directory requires typing its name to confirm, since
+            the delete is recursive and not recoverable.
     r       Rename
     R       Refresh
     q       Close
@@ -401,6 +403,10 @@ Mappings: >
 
 Detect and resolve Git merge conflicts visually.
 
+Mappings: >
+    ]x                  Jump to next conflict
+    [x                  Jump to previous conflict
+<
 Commands: >
     :WconflictNext      Jump to next conflict
     :WconflictPrev      Jump to previous conflict
@@ -408,8 +414,11 @@ Commands: >
     :WconflictTheirs    Accept theirs (incoming) version
     :WconflictBoth      Accept both versions
 <
-Configuration: >
-    let g:wplus_conflict_auto_highlight = 1
+Choosing a side rewrites the buffer, so those three ship without default keys.
+Bind them yourself if you want them: >
+    nmap <leader>co <Plug>WconflictOurs
+    nmap <leader>ct <Plug>WconflictTheirs
+    nmap <leader>cb <Plug>WconflictBoth
 <
 
 ==============================================================================

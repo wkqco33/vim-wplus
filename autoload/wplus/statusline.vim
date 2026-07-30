@@ -35,7 +35,7 @@ endfunction
 function! s:mode_hl() abort
     let m = mode()
     if     m ==# 'i' || m ==# 'ic' || m ==# 'ix' | return 'WplusSlInsert'
-    elseif m =~# '^[vV\<C-v>]'                    | return 'WplusSlVisual'
+    elseif m =~# "^[vV\<C-v>]"                    | return 'WplusSlVisual'
     elseif m =~# '^[rR]'                           | return 'WplusSlReplace'
     elseif m ==# 'c'                               | return 'WplusSlCommand'
     endif
