@@ -34,6 +34,7 @@ let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
 " Network timeouts (seconds). Commands wait longer; suggestions abort faster.
 let g:wplus_ai_timeout = get(g:, 'wplus_ai_timeout', 30)
 let g:wplus_ai_suggest_timeout = get(g:, 'wplus_ai_suggest_timeout', 10)
+let g:wplus_ai_commit_diff_max_bytes = get(g:, 'wplus_ai_commit_diff_max_bytes', 102400)
 
 let s:command_requests = {} " request_id -> {job, on_content, response_buffer, error_buffer}
 let s:suggest_request = {} " {request_id, job, channel_key, bufnr, lnum, line, col, fim, response_buffer}
@@ -253,16 +254,23 @@ function! s:channel_key(channel) abort
     return wplus#util#channel_key(a:channel)
 endfunction
 
-function! s:build_curl_command(payload, endpoint, headers, ...) abort
+function! s:build_curl_command(endpoint, headers, ...) abort
     let l:timeout = a:0 >= 1 ? a:1 : g:wplus_ai_timeout
     let l:cmd = ['curl', '-s', '-S', '--max-time', string(l:timeout),
-                \ '-X', 'POST', '-d', a:payload]
+                \ '-X', 'POST', '-d', '@-']
     call add(l:cmd, a:endpoint)
     for l:header in a:headers
         call insert(l:cmd, l:header, 2)
         call insert(l:cmd, '-H', 2)
     endfor
     return l:cmd
+endfunction
+
+" payload를 stdin으로 전송하고 stdin 닫기
+function! s:write_payload_stdin(job, payload) abort
+    let l:ch = job_getchannel(a:job)
+    call ch_sendraw(l:ch, a:payload)
+    call ch_close_in(l:ch)
 endfunction
 
 function! s:extract_response_content(json) abort
@@ -668,6 +676,11 @@ function! s:on_commit_diff(lines) abort
         call wplus#util#warn_msg('ai', 'no staged changes (git add first)')
         return
     endif
+    let l:max = g:wplus_ai_commit_diff_max_bytes
+    if len(l:diff) > l:max
+        call wplus#util#warn_msg('ai', 'diff too large (' . (len(l:diff)/1024) . 'KB), truncating to ' . (l:max/1024) . 'KB')
+        let l:diff = l:diff[:l:max - 1]
+    endif
     let l:prompt = "Write a concise git commit message in Korean for the following staged diff. "
         \ . "First line: a short imperative summary (max 50 chars). "
         \ . "Then a blank line and, only if needed, a short body explaining what changed. "
@@ -692,7 +705,7 @@ function! s:send_request(prompt, OnContent) abort
 
     let l:payload = s:build_request_payload(a:prompt)
     let l:request_id = reltimestr(reltime())
-    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers, g:wplus_ai_timeout)
+    let l:cmd = s:build_curl_command(l:endpoint, l:headers, g:wplus_ai_timeout)
 
     let s:command_requests[l:request_id] = {
         \ 'job': v:null,
@@ -702,6 +715,7 @@ function! s:send_request(prompt, OnContent) abort
         \ }
 
     let l:job = job_start(l:cmd, {
+        \ 'in_mode': 'raw',
         \ 'out_cb': function('s:on_response', [l:request_id]),
         \ 'close_cb': function('s:on_response_complete', [l:request_id]),
         \ 'err_cb': function('s:on_error', [l:request_id])
@@ -713,6 +727,7 @@ function! s:send_request(prompt, OnContent) abort
     endif
 
     let s:command_requests[l:request_id].job = l:job
+    call s:write_payload_stdin(l:job, l:payload)
     call wplus#util#info_msg('ai', 'sending request...')
 endfunction
 
@@ -1235,7 +1250,7 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
     let l:headers = s:get_request_headers()
     if empty(l:headers) | return | endif
 
-    let l:cmd = s:build_curl_command(l:payload, l:endpoint, l:headers, g:wplus_ai_suggest_timeout)
+    let l:cmd = s:build_curl_command(l:endpoint, l:headers, g:wplus_ai_suggest_timeout)
 
     if !empty(s:suggest_request)
         silent! call job_stop(s:suggest_request.job)
@@ -1245,6 +1260,7 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
     let s:suggest_request_id += 1
     let l:rid = s:suggest_request_id
     let l:job = job_start(l:cmd, {
+        \ 'in_mode': 'raw',
         \ 'out_mode': 'raw',
         \ 'out_cb': function('s:on_suggest_response', [l:rid]),
         \ 'close_cb': function('s:on_suggest_response_complete', [l:rid]),
@@ -1255,6 +1271,7 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
         return
     endif
 
+    call s:write_payload_stdin(l:job, l:payload)
     let s:suggest_request = {
         \ 'request_id': l:rid,
         \ 'job': l:job,
