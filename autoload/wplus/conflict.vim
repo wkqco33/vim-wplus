@@ -3,11 +3,28 @@
 if exists('g:autoloaded_wplus_conflict') | finish | endif
 let g:autoloaded_wplus_conflict = 1
 
-let s:conflicts = [] " [{lnum_start, lnum_ours, lnum_theirs, lnum_end, ours_lines, theirs_lines}...]
-let s:current_conflict = 0
+" Conflict state is per-buffer, not script-global.
+"
+" It used to live in s:conflicts / s:current_conflict while BufEnter rescanned
+" on every buffer switch. Entering another file therefore overwrote the state,
+" and resolve_ours()/resolve_theirs() would deletebufline() using line indices
+" that belonged to a different buffer's scan.
+"
+" b:wplus_conflicts       [{lnum_start, lnum_ours, lnum_theirs, lnum_end,
+"                           ours_lines, theirs_lines}, ...]
+" b:wplus_conflict_current index into the above
+
+function! s:list() abort
+    return get(b:, 'wplus_conflicts', [])
+endfunction
+
+function! s:current() abort
+    return get(b:, 'wplus_conflict_current', 0)
+endfunction
 
 function! s:find_conflicts() abort
-    let s:conflicts = []
+    let b:wplus_conflicts = []
+    let b:wplus_conflict_current = get(b:, 'wplus_conflict_current', 0)
     let l:bufnr = bufnr('%')
     let l:lines = getbufline(l:bufnr, 1, '$')
     let l:idx = 0
@@ -43,7 +60,7 @@ function! s:find_conflicts() abort
             
             " Found end
             let l:end = l:idx + 1
-            call add(s:conflicts, {
+            call add(b:wplus_conflicts, {
                 \ 'lnum_start': l:start,
                 \ 'lnum_ours': l:ours_start,
                 \ 'lnum_sep': l:sep_lnum,
@@ -59,13 +76,13 @@ function! s:find_conflicts() abort
         endif
     endwhile
     
-    return len(s:conflicts)
+    return len(s:list())
 endfunction
 
 function! wplus#conflict#resolve_ours() abort
-    if s:current_conflict >= len(s:conflicts) | return | endif
+    if s:current() >= len(s:list()) | return | endif
     
-    let l:conf = s:conflicts[s:current_conflict]
+    let l:conf = s:list()[s:current()]
     let l:bufnr = bufnr('%')
     
     " Keep ours, remove start marker and separator..end range.
@@ -78,9 +95,9 @@ function! wplus#conflict#resolve_ours() abort
 endfunction
 
 function! wplus#conflict#resolve_theirs() abort
-    if s:current_conflict >= len(s:conflicts) | return | endif
+    if s:current() >= len(s:list()) | return | endif
     
-    let l:conf = s:conflicts[s:current_conflict]
+    let l:conf = s:list()[s:current()]
     let l:bufnr = bufnr('%')
     
     " Remove start marker..separator, then remove the shifted end marker.
@@ -94,9 +111,9 @@ function! wplus#conflict#resolve_theirs() abort
 endfunction
 
 function! wplus#conflict#resolve_both() abort
-    if s:current_conflict >= len(s:conflicts) | return | endif
+    if s:current() >= len(s:list()) | return | endif
     
-    let l:conf = s:conflicts[s:current_conflict]
+    let l:conf = s:list()[s:current()]
     let l:bufnr = bufnr('%')
     
     " Remove markers from bottom to top so line numbers stay valid.
@@ -116,14 +133,15 @@ function! s:highlight_conflicts() abort
     catch
     endtry
     
-    if empty(s:conflicts) | return | endif
+    if empty(s:list()) | return | endif
     
-    for l:idx in range(len(s:conflicts))
-        let l:conf = s:conflicts[l:idx]
-        
-        " Add text markers for conflict locations
+    for l:conf in s:list()
+        " lnum_start is already the 1-based line of the <<<<<<< marker, so the
+        " previous `lnum_start - 1` annotated the line above it -- and for a
+        " conflict on line 1 that meant line 0, which throws and was swallowed by
+        " the catch below, so the marker simply never appeared.
         try
-            call prop_add(l:conf.lnum_start - 1, 1, {
+            call prop_add(l:conf.lnum_start, 1, {
                 \ 'type': 'WplusConflictMarker',
                 \ 'text': '<<< OURS'
                 \ })
@@ -133,24 +151,24 @@ function! s:highlight_conflicts() abort
 endfunction
 
 function! wplus#conflict#next() abort
-    if len(s:conflicts) == 0
+    if len(s:list()) == 0
         call wplus#util#info_msg('conflict', 'no conflicts found')
         return
     endif
     
-    let s:current_conflict = min([s:current_conflict + 1, len(s:conflicts) - 1])
-    let l:conf = s:conflicts[s:current_conflict]
+    let b:wplus_conflict_current = min([s:current() + 1, len(s:list()) - 1])
+    let l:conf = s:list()[s:current()]
     call cursor(l:conf.lnum_start, 1)
-    call wplus#util#info_msg('conflict', printf('conflict %d/%d', s:current_conflict + 1, len(s:conflicts)))
+    call wplus#util#info_msg('conflict', printf('conflict %d/%d', s:current() + 1, len(s:list())))
 endfunction
 
 function! wplus#conflict#prev() abort
-    if len(s:conflicts) == 0 | return | endif
+    if len(s:list()) == 0 | return | endif
     
-    let s:current_conflict = max([s:current_conflict - 1, 0])
-    let l:conf = s:conflicts[s:current_conflict]
+    let b:wplus_conflict_current = max([s:current() - 1, 0])
+    let l:conf = s:list()[s:current()]
     call cursor(l:conf.lnum_start, 1)
-    call wplus#util#info_msg('conflict', printf('conflict %d/%d', s:current_conflict + 1, len(s:conflicts)))
+    call wplus#util#info_msg('conflict', printf('conflict %d/%d', s:current() + 1, len(s:list())))
 endfunction
 
 function! wplus#conflict#setup() abort
@@ -183,4 +201,11 @@ function! wplus#conflict#setup() abort
     nnoremap <silent> <Plug>WconflictBoth   :WconflictBoth<CR>
     nnoremap <silent> <Plug>WconflictNext   :WconflictNext<CR>
     nnoremap <silent> <Plug>WconflictPrev   :WconflictPrev<CR>
+
+    " Default navigation keys. Only <Plug> mappings existed before, so the module
+    " was unreachable out of the box and every user had to bind it by hand.
+    " ]x / [x follow the ]h / ]e "next thing of this kind" convention; the
+    " resolve commands stay <Plug>-only since picking a side is destructive.
+    nmap <silent> ]x <Plug>WconflictNext
+    nmap <silent> [x <Plug>WconflictPrev
 endfunction

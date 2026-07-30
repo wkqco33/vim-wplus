@@ -268,7 +268,15 @@ function! wplus#gitgutter#preview_hunk() abort
         \ })
 endfunction
 
-function! wplus#gitgutter#stage_hunk() abort
+" Apply the hunk under the cursor to the index ('stage') or to the working tree
+" in reverse ('revert').
+"
+" These were two ~28-line functions differing only in the git flag and two
+" message strings.
+function! s:apply_hunk(mode) abort
+    let l:reverting = a:mode ==# 'revert'
+    let l:label = l:reverting ? 'Revert' : 'Stage'
+
     let l:bufnr = bufnr('%')
     let l:h = s:find_hunk_at(line('.'))
     if empty(l:h)
@@ -286,47 +294,42 @@ function! wplus#gitgutter#stage_hunk() abort
         call wplus#util#error_msg('gitgutter', 'No diff header available — save the file first')
         return
     endif
+
+    " Reverting rewrites the file on disk, so refuse while the buffer has
+    " unsaved changes. This used to run `edit!` afterwards, which reloaded the
+    " buffer and silently discarded every unsaved change -- not just the hunk
+    " being reverted.
+    if l:reverting && getbufvar(l:bufnr, '&modified')
+        call wplus#util#error_msg('gitgutter',
+            \ 'Buffer has unsaved changes — write or undo them before reverting a hunk')
+        return
+    endif
+
+    let l:flag = l:reverting ? '--reverse' : '--cached'
     let l:tmp = tempname()
     call writefile(l:header + l:h.lines, l:tmp)
-    let l:out = system('git -C ' . shellescape(l:root) . ' apply --cached ' . shellescape(l:tmp))
+    let l:out = system('git -C ' . shellescape(l:root) . ' apply ' . l:flag . ' ' . shellescape(l:tmp))
     call delete(l:tmp)
+
     if v:shell_error != 0
-        call wplus#util#error_msg('gitgutter', 'Stage failed: ' . trim(l:out))
-    else
-        call wplus#util#info_msg('gitgutter', 'Hunk staged')
-        call wplus#gitgutter#refresh(l:bufnr)
+        call wplus#util#error_msg('gitgutter', l:label . ' failed: ' . trim(l:out))
+        return
     endif
+
+    if l:reverting
+        " Safe now: the buffer is unmodified, so this only picks up git's change.
+        silent execute 'edit!'
+    endif
+    call wplus#util#info_msg('gitgutter', 'Hunk ' . (l:reverting ? 'reverted' : 'staged'))
+    call wplus#gitgutter#refresh(l:bufnr)
+endfunction
+
+function! wplus#gitgutter#stage_hunk() abort
+    call s:apply_hunk('stage')
 endfunction
 
 function! wplus#gitgutter#revert_hunk() abort
-    let l:bufnr = bufnr('%')
-    let l:h = s:find_hunk_at(line('.'))
-    if empty(l:h)
-        call wplus#util#warn_msg('gitgutter', 'No hunk at cursor')
-        return
-    endif
-    let l:file = fnamemodify(bufname(l:bufnr), ':p')
-    let l:root = wplus#util#find_git_root(fnamemodify(l:file, ':h'))
-    if empty(l:root)
-        call wplus#util#error_msg('gitgutter', 'Not in a git repository')
-        return
-    endif
-    let l:header = getbufvar(l:bufnr, 'wplus_gitgutter_diff_header', [])
-    if empty(l:header)
-        call wplus#util#error_msg('gitgutter', 'No diff header available — save the file first')
-        return
-    endif
-    let l:tmp = tempname()
-    call writefile(l:header + l:h.lines, l:tmp)
-    let l:out = system('git -C ' . shellescape(l:root) . ' apply --reverse ' . shellescape(l:tmp))
-    call delete(l:tmp)
-    if v:shell_error != 0
-        call wplus#util#error_msg('gitgutter', 'Revert failed: ' . trim(l:out))
-    else
-        silent execute 'edit!'
-        call wplus#util#info_msg('gitgutter', 'Hunk reverted')
-        call wplus#gitgutter#refresh(l:bufnr)
-    endif
+    call s:apply_hunk('revert')
 endfunction
 
 " ── setup ─────────────────────────────────────────────────────────────────

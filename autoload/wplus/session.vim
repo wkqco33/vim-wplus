@@ -56,7 +56,15 @@ function! s:close_plugin_windows() abort
         let l:bt = getwinvar(l:winnr, '&buftype')
         let l:ft = getwinvar(l:winnr, '&filetype')
         if l:ft =~# '^\(tagbar\|nerdtree\|netrw\)$' || l:bt ==# 'nofile' || l:bt ==# 'terminal'
-            execute l:winnr . 'windo close'
+            " :windo accepts no range, so `execute l:winnr . 'windo close'` threw
+            " E481 on every VimLeavePre that had a sidebar open -- uncaught, and
+            " right in the middle of session saving.
+            try
+                execute l:winnr . 'wincmd w'
+                close
+            catch
+                " last window, or already gone -- nothing to close
+            endtry
             break
         endif
     endfor
