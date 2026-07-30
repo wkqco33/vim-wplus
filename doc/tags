@@ -1,4 +1,3 @@
-!_TAG_FILE_ENCODING	utf-8	//
 wplus-ai	wplus.txt	/*wplus-ai*
 wplus-altfile	wplus.txt	/*wplus-altfile*
 wplus-blame	wplus.txt	/*wplus-blame*
@@ -16,6 +15,7 @@ wplus-format	wplus.txt	/*wplus-format*
 wplus-gitgutter	wplus.txt	/*wplus-gitgutter*
 wplus-grep	wplus.txt	/*wplus-grep*
 wplus-harpoon	wplus.txt	/*wplus-harpoon*
+wplus-health	wplus.txt	/*wplus-health*
 wplus-history	wplus.txt	/*wplus-history*
 wplus-illuminate	wplus.txt	/*wplus-illuminate*
 wplus-indent	wplus.txt	/*wplus-indent*
@@ -42,3 +42,4 @@ wplus-terminal	wplus.txt	/*wplus-terminal*
 wplus-textobj	wplus.txt	/*wplus-textobj*
 wplus-todo	wplus.txt	/*wplus-todo*
 wplus-yankhighlight	wplus.txt	/*wplus-yankhighlight*
+wplus.txt	wplus.txt	/*wplus.txt*
