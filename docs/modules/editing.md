@@ -71,18 +71,6 @@ function(arg1, arg2, arg3)
 
 ---
 
-## repeat — `.` 반복 지원
-
-vim-wplus 내부 명령들이 `.`으로 반복 가능하도록 `vim-repeat` API 호환 레이어를 제공합니다.
-
-다른 플러그인에서도 사용 가능:
-
-```vim
-call wplus#repeat#set("\<Plug>MyAction", v:count)
-```
-
----
-
 ## multicursor — 다중 커서
 
 | 키 | 모드 | 동작 |

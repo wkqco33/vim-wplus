@@ -73,50 +73,6 @@ let g:wplus_lsp_cache_ttl    = 300  " 캐시 유효시간 (초)
 
 ---
 
-## completion — 경량 자동완성
-
-파일 경로, 현재 열린 버퍼의 단어, LSP 완성 목록을 팝업으로 제공합니다.
-
-| 키 | 동작 |
-|----|------|
-| `<C-Space>` | 자동완성 팝업 트리거 |
-
----
-
-## snippet — 스니펫 엔진
-
-코드 템플릿을 빠르게 확장합니다.
-
-**플레이스홀더 문법:**
-
-```
-${1:default}  — 첫 번째 필드 (Tab으로 이동)
-${2:second}   — 두 번째 필드
-${0:end}      — 스니펫 종료 지점
-```
-
-**기본 스니펫 (Go):**
-
-```go
-func[Tab]  →  func ${1:name}(${2:params}) ${3:return} {
-if[Tab]    →  if ${1:condition} {
-for[Tab]   →  for ${1:i} := 0; ${1:i} < ${2:n}; ${1:i}++ {
-```
-
-**기본 스니펫 (Python):**
-
-```python
-def[Tab]    →  def ${1:name}(${2:args}):
-class[Tab]  →  class ${1:Name}${2:(Base)}:
-```
-
-```vim
-let g:wplus_snippet_jump_key      = '<Tab>'
-let g:wplus_snippet_jump_back_key = '<S-Tab>'
-```
-
----
-
 ## outline — 코드 아웃라인
 
 ctags를 사용하여 현재 파일 내 클래스·함수·구조체 등을 사이드바에 표시합니다.  

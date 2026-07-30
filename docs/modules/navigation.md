@@ -134,15 +134,3 @@ let g:wplus_history_project_only = 0   " 1이면 기본으로 프로젝트 내 �
 2. <leader>xr         — 치환 패턴 입력 → 모든 파일에 자동 적용
 ```
 
----
-
-## whichkey — 키 힌트 팝업
-
-`<leader>`를 누른 후 `timeoutlen` ms 이상 기다리면 등록된 키 매핑 목록이 팝업으로 표시됩니다.
-
-커스텀 설명 등록:
-
-```vim
-call wplus#whichkey#register('w', 'save file')
-call wplus#whichkey#register('q', 'quit')
-```
