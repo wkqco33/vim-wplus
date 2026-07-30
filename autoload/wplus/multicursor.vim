@@ -232,9 +232,17 @@ endfunction
 function! wplus#multicursor#setup() abort
     call s:init_highlights()
 
-    nnoremap <silent> <C-n> :<C-u>call wplus#multicursor#add_next()<CR>
-    nnoremap <silent> <C-x> :<C-u>call wplus#multicursor#skip()<CR>
-    nnoremap <silent> <C-a> :<C-u>call wplus#multicursor#select_all()<CR>
+    command! WmulticursorAddNext   call wplus#multicursor#add_next()
+    command! WmulticursorSkip      call wplus#multicursor#skip()
+    command! WmulticursorSelectAll call wplus#multicursor#select_all()
+
+    " skip and select-all used to sit on <C-x> and <C-a>, which are Vim's
+    " decrement/increment-number commands. Taking those globally is not a
+    " trade worth making for a module that is only active on demand, so they
+    " live under the <leader>v ("visual multi") prefix instead.
+    nnoremap <silent> <C-n>       :<C-u>call wplus#multicursor#add_next()<CR>
+    nnoremap <silent> <leader>vx  :<C-u>call wplus#multicursor#skip()<CR>
+    nnoremap <silent> <leader>va  :<C-u>call wplus#multicursor#select_all()<CR>
 
     augroup wplus_multicursor
         autocmd!

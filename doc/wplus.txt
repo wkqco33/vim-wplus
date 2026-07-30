@@ -207,8 +207,8 @@ Select multiple occurrences of a word and edit them simultaneously.
 
 Mappings: >
     <C-n>    Add next match to selection
-    <C-x>    Skip current match, add next
-    <C-a>    Select all matches in buffer
+    <leader>vx    Skip current match, add next
+    <leader>va    Select all matches in buffer
     c        Replace all selected (prompts for new text)
     d        Delete all selected
     <Esc>    Exit multi-cursor mode
@@ -242,9 +242,9 @@ Customize highlight: >
 Fast fuzzy finder using Vim 9 matchfuzzy() and popup windows.
 
 Mappings: >
-    <leader>p    Find files
-    <leader>b    Find buffers
-    <leader>m    Find recent files (MRU)
+    <leader>ff    Find files
+    <leader>fb    Find buffers
+    <leader>fr    Find recent files (MRU)
 <
 Popup keys: >
     <C-n> / ↓    Next item
@@ -288,9 +288,9 @@ Configuration: >
 Quick file bookmarks with per-project persistence (~/.vim/harpoon/).
 
 Mappings: >
-    <leader>ha  /  :WharoonAdd       Add current file to next empty slot
-    <leader>hd  /  :WharoonRemove    Remove current file from its slot
-    <leader>hl  /  :WharoonList      Open slot list popup
+    <leader>ha  /  :WharpoonAdd       Add current file to next empty slot
+    <leader>hd  /  :WharpoonRemove    Remove current file from its slot
+    <leader>hl  /  :WharpoonList      Open slot list popup
     <leader>h1 … h4                  Jump to slot 1–4
 <
 Configuration: >
