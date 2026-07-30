@@ -668,7 +668,7 @@ function! s:on_commit_diff(lines) abort
         call wplus#util#warn_msg('ai', 'no staged changes (git add first)')
         return
     endif
-    let l:prompt = "Write a concise git commit message for the following staged diff. "
+    let l:prompt = "Write a concise git commit message in Korean for the following staged diff. "
         \ . "First line: a short imperative summary (max 50 chars). "
         \ . "Then a blank line and, only if needed, a short body explaining what changed. "
         \ . "No markdown fences.\n\ndiff:\n" . l:diff
