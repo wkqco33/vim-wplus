@@ -100,11 +100,13 @@ function! s:validate_config() abort
     endif
 endfunction
 
+let g:wplus_load_errors = get(g:, 'wplus_load_errors', [])
+
 " Modules are set up in this order; later entries win on any keymap collision.
 "
 " Not listed here, deliberately:
 "   repeat  - autoloaded shim only, has no setup(). See autoload/wplus/repeat.vim.
-let s:modules = ['theme', 'commentary', 'pairs', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'harpoon', 'marks', 'scratch', 'run', 'project', 'history', 'fold']
+let s:modules = ['theme', 'commentary', 'pairs', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'harpoon', 'marks', 'scratch', 'run', 'project', 'history', 'fold', 'health']
 
 " Validate user configuration
 call s:validate_config()
@@ -117,7 +119,9 @@ for s:module in s:modules
         try
             execute 'call wplus#' . s:module . '#setup()'
         catch
-            echomsg '[wplus] Failed to load module ' . s:module . ': ' . v:exception
+            let l:err = '[wplus] Failed to load module ' . s:module . ': ' . v:exception
+            call add(g:wplus_load_errors, l:err)
+            echomsg l:err
         endtry
     endif
 endfor
