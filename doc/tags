@@ -1,50 +1,44 @@
-﻿!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
-wplus-ai	wplus.txt	/47\.\ AI\ ASSISTANT\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-ai\*/
-wplus-altfile	wplus.txt	/17\.\ ALTERNATE\ FILE\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-altfile\*/
-wplus-blame	wplus.txt	/22\.\ GIT\ BLAME\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-blame\*/
-wplus-bufdelete	wplus.txt	/18\.\ BUFFER\ DELETE\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-bufdelete\*/
-wplus-colorscheme	wplus.txt	/31\.\ COLORSCHEME\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-colorscheme\*/
-wplus-commentary	wplus.txt	/5\.\ COMMENTARY\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-commentary\*/
-wplus-completion	wplus.txt	/34\.\ COMPLETION\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-completion\*/
-wplus-config	wplus.txt	/4\.\ CONFIGURATION\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-config\*/
-wplus-conflict	wplus.txt	/24\.\ CONFLICT\ RESOLVER\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-conflict\*/
-wplus-contents	wplus.txt	/CONTENTS\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-contents\*/
-wplus-diffview	wplus.txt	/23\.\ DIFF\ VIEW\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-diffview\*/
-wplus-explorer	wplus.txt	/14\.\ EXPLORER\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-explorer\*/
-wplus-finder	wplus.txt	/13\.\ FINDER\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-finder\*/
-wplus-fold	wplus.txt	/37\.\ FOLD\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-fold\*/
-wplus-format	wplus.txt	/33\.\ FORMAT\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-format\*/
-wplus-gitgutter	wplus.txt	/21\.\ GIT\ GUTTER\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-gitgutter\*/
-wplus-grep	wplus.txt	/46\.\ GREP\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-grep\*/
-wplus-harpoon	wplus.txt	/15\.\ HARPOON\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-harpoon\*/
-wplus-history	wplus.txt	/16\.\ HISTORY\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-history\*/
-wplus-illuminate	wplus.txt	/28\.\ ILLUMINATE\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-illuminate\*/
-wplus-indent	wplus.txt	/27\.\ INDENT\ GUIDE\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-indent\*/
-wplus-install	wplus.txt	/3\.\ INSTALLATION\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-install\*/
-wplus-intro	wplus.txt	/1\.\ INTRODUCTION\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-intro\*/
-wplus-lsp	wplus.txt	/32\.\ LSP\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-lsp\*/
-wplus-marks	wplus.txt	/44\.\ MARKS\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-marks\*/
-wplus-modules	wplus.txt	/2\.\ MODULE\ LIST\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-modules\*/
-wplus-multicursor	wplus.txt	/10\.\ MULTI\ CURSOR\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-multicursor\*/
-wplus-outline	wplus.txt	/36\.\ OUTLINE\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-outline\*/
-wplus-pairs	wplus.txt	/7\.\ AUTO\ PAIRS\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-pairs\*/
-wplus-project	wplus.txt	/42\.\ PROJECT\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-project\*/
-wplus-quickfix	wplus.txt	/19\.\ QUICKFIX\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-quickfix\*/
-wplus-register	wplus.txt	/11\.\ REGISTER\ PREVIEW\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-register\*/
-wplus-repeat	wplus.txt	/9\.\ REPEAT\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-repeat\*/
-wplus-root	wplus.txt	/40\.\ ROOT\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-root\*/
-wplus-run	wplus.txt	/38\.\ RUN\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-run\*/
-wplus-scratch	wplus.txt	/43\.\ SCRATCH\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-scratch\*/
-wplus-scrollbar	wplus.txt	/30\.\ SCROLLBAR\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-scrollbar\*/
-wplus-session	wplus.txt	/41\.\ SESSION\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-session\*/
-wplus-snippet	wplus.txt	/35\.\ SNIPPET\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-snippet\*/
-wplus-statusline	wplus.txt	/25\.\ STATUSLINE\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-statusline\*/
-wplus-surround	wplus.txt	/6\.\ SURROUND\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-surround\*/
-wplus-tabline	wplus.txt	/26\.\ TABLINE\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-tabline\*/
-wplus-terminal	wplus.txt	/39\.\ TERMINAL\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-terminal\*/
-wplus-textobj	wplus.txt	/8\.\ TEXT\ OBJECTS\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-textobj\*/
-wplus-todo	wplus.txt	/45\.\ TODO\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-todo\*/
-wplus-undotree	wplus.txt	/29\.\ UNDO\ TREE\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-undotree\*/
-wplus-whichkey	wplus.txt	/20\.\ WHICH\ KEY\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-whichkey\*/
-wplus-yankhighlight	wplus.txt	/12\.\ YANK\ HIGHLIGHT\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \*wplus-yankhighlight\*/
-wplus.txt	wplus.txt	/\*wplus\.txt\*\ \ All-in-one\ Vim\ plugin\ \(dependency-free\)\ \ \ \ \ \ \ \ \ \ \ \ \ \ vim-wplus/
+!_TAG_FILE_ENCODING	utf-8	//
+wplus-ai	wplus.txt	/*wplus-ai*
+wplus-altfile	wplus.txt	/*wplus-altfile*
+wplus-blame	wplus.txt	/*wplus-blame*
+wplus-bufdelete	wplus.txt	/*wplus-bufdelete*
+wplus-colorscheme	wplus.txt	/*wplus-colorscheme*
+wplus-commentary	wplus.txt	/*wplus-commentary*
+wplus-config	wplus.txt	/*wplus-config*
+wplus-conflict	wplus.txt	/*wplus-conflict*
+wplus-contents	wplus.txt	/*wplus-contents*
+wplus-diffview	wplus.txt	/*wplus-diffview*
+wplus-explorer	wplus.txt	/*wplus-explorer*
+wplus-finder	wplus.txt	/*wplus-finder*
+wplus-fold	wplus.txt	/*wplus-fold*
+wplus-format	wplus.txt	/*wplus-format*
+wplus-gitgutter	wplus.txt	/*wplus-gitgutter*
+wplus-grep	wplus.txt	/*wplus-grep*
+wplus-harpoon	wplus.txt	/*wplus-harpoon*
+wplus-history	wplus.txt	/*wplus-history*
+wplus-illuminate	wplus.txt	/*wplus-illuminate*
+wplus-indent	wplus.txt	/*wplus-indent*
+wplus-install	wplus.txt	/*wplus-install*
+wplus-intro	wplus.txt	/*wplus-intro*
+wplus-lsp	wplus.txt	/*wplus-lsp*
+wplus-marks	wplus.txt	/*wplus-marks*
+wplus-modules	wplus.txt	/*wplus-modules*
+wplus-multicursor	wplus.txt	/*wplus-multicursor*
+wplus-outline	wplus.txt	/*wplus-outline*
+wplus-pairs	wplus.txt	/*wplus-pairs*
+wplus-project	wplus.txt	/*wplus-project*
+wplus-quickfix	wplus.txt	/*wplus-quickfix*
+wplus-register	wplus.txt	/*wplus-register*
+wplus-repeat	wplus.txt	/*wplus-repeat*
+wplus-root	wplus.txt	/*wplus-root*
+wplus-run	wplus.txt	/*wplus-run*
+wplus-scratch	wplus.txt	/*wplus-scratch*
+wplus-session	wplus.txt	/*wplus-session*
+wplus-statusline	wplus.txt	/*wplus-statusline*
+wplus-surround	wplus.txt	/*wplus-surround*
+wplus-tabline	wplus.txt	/*wplus-tabline*
+wplus-terminal	wplus.txt	/*wplus-terminal*
+wplus-textobj	wplus.txt	/*wplus-textobj*
+wplus-todo	wplus.txt	/*wplus-todo*
+wplus-yankhighlight	wplus.txt	/*wplus-yankhighlight*

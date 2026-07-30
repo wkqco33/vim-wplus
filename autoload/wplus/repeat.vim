@@ -1,32 +1,22 @@
-" wplus/repeat.vim — make plugin operations repeatable with '.'
-" Compatible with tpope/vim-repeat API: repeat#set(seq, count)
+" wplus/repeat.vim — forward repeatable operations to tpope/vim-repeat
+"
+" This module deliberately does NOT map '.'. It used to, and the mapping was
+" unconditional and never cleared its stored sequence: after a single `gcc`,
+" every subsequent '.' in the session replayed the comment toggle instead of
+" the user's actual last change.
+"
+" Doing this correctly requires tracking b:changedtick to tell "the plugin ran
+" last" from "a normal edit ran last" -- which is what vim-repeat already does.
+" So we forward to it when present and otherwise leave '.' alone. Native '.'
+" handling nothing is strictly better than '.' handling the wrong thing.
 
 if exists('g:autoloaded_wplus_repeat') | finish | endif
 let g:autoloaded_wplus_repeat = 1
 
-let s:seq   = ''
-let s:count = 1
-
-function! wplus#repeat#setup() abort
-    " Override the . command to replay our stored sequence when set
-    nnoremap <silent> . :<C-u>call wplus#repeat#run(v:count)<CR>
-endfunction
-
-" Called by plugin operations to register a repeatable sequence.
+" Register a repeatable sequence. Called by commentary and surround.
+" No-op unless tpope/vim-repeat is installed.
+"
 " Usage: call wplus#repeat#set("\<Plug>MyMap", v:count1)
 function! wplus#repeat#set(seq, count) abort
-    let s:seq   = a:seq
-    let s:count = a:count
-    " Also register with vim-repeat if it happens to be installed
     silent! call repeat#set(a:seq, a:count)
-endfunction
-
-function! wplus#repeat#run(count) abort
-    if empty(s:seq)
-        " Fall back to built-in '.' behaviour
-        normal! .
-        return
-    endif
-    let cnt = a:count > 0 ? a:count : s:count
-    execute 'normal ' . cnt . s:seq
 endfunction
