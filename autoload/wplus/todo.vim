@@ -94,20 +94,21 @@ function! s:parse_grep_line(line) abort
 endfunction
 
 function! s:get_todos() abort
-    " Try ripgrep first, fallback to git grep, then plain grep/findstr
-    if executable('rg')
-        let l:cmd = 'rg --vimgrep --smart-case "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"'
-        let l:items = systemlist(l:cmd)
-    elseif executable('git') && isdirectory('.git')
-        let l:cmd = 'git grep -n "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"'
-        let l:items = systemlist(l:cmd)
-    elseif executable('grep')
+    let l:b = wplus#grep#backend()
+    if empty(l:b)
+        call wplus#util#warn_msg('todo', 'no grep backend found — install ripgrep (rg) for TODO search')
+        return []
+    endif
+
+    if l:b.name ==# 'rg'
+        let l:items = systemlist('rg --vimgrep --smart-case "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"')
+    elseif l:b.name ==# 'git'
+        let l:items = systemlist(['git', 'grep', '-n', '-E', '\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b'])
+    elseif l:b.name ==# 'grep'
         let l:items = systemlist('grep -rn "TODO\|FIXME\|XXX\|NOTE\|BUG\|HACK\|WARN" .')
-    elseif has('win32')
-        " findstr has no regex alternation; space-separated words are OR'd.
+    elseif l:b.name ==# 'findstr'
         let l:items = systemlist('findstr /S /N /I "TODO FIXME XXX NOTE BUG HACK WARN" *')
     else
-        call wplus#util#warn_msg('todo', 'no grep backend found — install ripgrep (rg) for TODO search')
         let l:items = []
     endif
     return filter(l:items, '!empty(v:val)')

@@ -13,13 +13,11 @@ let g:wplus_blame_enabled_flag = get(g:, 'wplus_blame_enabled_flag', 1)  " runti
 
 let s:prop_type = 'WplusBlameProp'
 let s:timer     = -1
-let s:job       = v:null
-let s:last_job_data = {} " {bufnr, lnum, lines} for current job
+let s:blame_jobs = {} " channel_key -> {bufnr, lnum, lines}
 
 " ── highlight & prop type ─────────────────────────────────────────────────
 
 function! s:init() abort
-    hi default WplusBlameText ctermfg=243 guifg=#7c6f64 gui=italic
     " Register text-property type (idempotent)
     if empty(prop_type_get(s:prop_type))
         call prop_type_add(s:prop_type, {'highlight': 'WplusBlameText', 'after': 1})
@@ -46,7 +44,6 @@ endfunction
 " ── git blame callback ────────────────────────────────────────────────────
 
 function! s:on_blame(bufnr, lnum, lines, chan) abort
-    let s:job = v:null
     if !bufloaded(a:bufnr) | return | endif
     if empty(a:lines) | return | endif
 
@@ -96,10 +93,6 @@ function! s:trigger() abort
     if s:timer != -1
         call timer_stop(s:timer)
     endif
-    if s:job isnot v:null
-        try | call job_stop(s:job) | catch | endtry
-        let s:job = v:null
-    endif
     call s:clear_all(bufnr)
 
     let lines = []
@@ -109,23 +102,26 @@ endfunction
 
 function! s:start_job(bufnr, lnum, root, file, lines) abort
     let s:timer = -1
-    " Store job data for close_cb to access
-    let s:last_job_data = {'bufnr': a:bufnr, 'lnum': a:lnum, 'lines': a:lines}
-    let s:job = job_start(
+    let l:job = job_start(
                 \ ['git', '-C', a:root, 'blame', '--porcelain', '-L',
                 \   a:lnum . ',' . a:lnum, wplus#util#relpath(a:root, a:file)], {
                 \ 'out_cb':  {_, l -> add(a:lines, l)},
                 \ 'close_cb': function('s:on_blame_complete'),
                 \ 'err_cb':  {_ch, _msg -> 0},
                 \ })
+    if l:job isnot v:null
+        let l:key = wplus#util#channel_key(l:job)
+        let s:blame_jobs[l:key] = {'bufnr': a:bufnr, 'lnum': a:lnum, 'lines': a:lines}
+    endif
 endfunction
 
 function! s:on_blame_complete(channel) abort
-    if empty(s:last_job_data)
+    let l:key = wplus#util#channel_key(a:channel)
+    if !has_key(s:blame_jobs, l:key)
         return
     endif
-    call s:on_blame(s:last_job_data.bufnr, s:last_job_data.lnum, s:last_job_data.lines, a:channel)
-    let s:last_job_data = {}
+    let l:data = remove(s:blame_jobs, l:key)
+    call s:on_blame(l:data.bufnr, l:data.lnum, l:data.lines, a:channel)
 endfunction
 
 " ── public toggle ─────────────────────────────────────────────────────────
@@ -151,7 +147,6 @@ function! wplus#blame#setup() abort
         autocmd BufLeave    * call s:clear_all(bufnr('%'))
         autocmd BufDelete   * call s:on_buf_delete()
         autocmd InsertEnter * call s:clear_all(bufnr('%'))
-        autocmd ColorScheme * call s:init()
     augroup END
 
     " :BlamerToggle compat alias + <leader>bl

@@ -50,58 +50,11 @@ let g:wplus_illuminate_ft_block = ['help', 'nerdtree']
 
 ---
 
-## undotree — Undo 히스토리
+## theme — 테마 및 통합 하이라이트 관리
 
-| 키 | 동작 |
-|----|------|
-| `<leader>u` | 사이드바 토글 |
-
-**사이드바 내 키:**
-
-| 키 | 동작 |
-|----|------|
-| `j` / `k` | 이전/다음 undo 상태로 이동 |
-| `<CR>` | 해당 상태로 undo/redo |
-| `q` | 닫기 |
+`&background` (dark/light)를 자동으로 감지하여 모든 `Wplus*` 하이라이트 그룹의 팔레트를 조율합니다.
+사용자가 정의한 `highlight` 설정 및 `:colorscheme` 변경 시에도 하이라이트가 안전하게 유지됩니다.
 
 ```vim
-let g:wplus_undotree_width = 30   " 사이드바 너비
-```
-
----
-
-## scrollbar — 미니맵 스크롤바
-
-Sign 컬럼에 텍스트 기반 스크롤바를 렌더링합니다. LSP 진단 위치를 `●`로 오버레이합니다.
-
-| 키 / 명령 | 동작 |
-|-----------|------|
-| `<leader>sb` / `:WscrollbarToggle` | 스크롤바 켜기/끄기 |
-
-**기호 의미:**
-
-| 기호 | 색상 | 의미 |
-|------|------|------|
-| `▐` | 회색 | 트랙 (현재 뷰 밖) |
-| `█` | 밝은 회색 | 썸 (현재 뷰포트) |
-| `●` | 빨간색 | LSP 에러 위치 |
-| `●` | 노란색 | LSP 경고 위치 |
-
-파일 길이가 `wplus_scrollbar_min_lines` 미만이면 자동으로 숨겨집니다.
-
-```vim
-let g:wplus_scrollbar_enabled   = 1    " 기본 활성화
-let g:wplus_scrollbar_char      = '▐'  " 트랙 문자
-let g:wplus_scrollbar_thumb     = '█'  " 썸 문자
-let g:wplus_scrollbar_min_lines = 50   " 표시 최소 줄 수
-```
-
----
-
-## colorscheme — 배경색 자동 감지
-
-터미널의 밝기(dark/light)를 자동으로 감지하여 컬러스킴을 조정합니다.
-
-```vim
-let g:wplus_colorscheme_auto_detect = 1
+let g:wplus_theme_auto = 1
 ```

@@ -1,5 +1,5 @@
 " ============================================================
-" vim-wplus 설정 가이드 (31개 모듈, OpenAI/Claude/Azure/Ollama 지원)
+" vim-wplus 설정 가이드 (OpenAI/Claude/Azure/Ollama 지원)
 " 완전한 Vim IDE 구성 예시
 " ============================================================
 
@@ -10,7 +10,7 @@ let mapleader = " "
 " ── vim-plug 플러그인 관리 ──────────────────────────────────
 call plug#begin('~/.vim/plugged')
 
-" 메인 플러그인 (wplus - 31개 모듈 포함)
+" 메인 플러그인 (wplus)
 Plug '/path/to/vim-wplus'
 
 " UI / 필수 도구
@@ -28,8 +28,6 @@ Plug 'sheerun/vim-polyglot'
 " - dense-analysis/ale        -> wplus LSP/format
 " - tpope/vim-commentary      -> wplus commentary
 " - airblade/vim-gitgutter     -> wplus gitgutter
-" - mbbill/undotree           -> wplus undotree
-" - vim-snipmate              -> wplus snippet
 
 call plug#end()
 
@@ -67,7 +65,7 @@ set background=dark
 silent! colorscheme gruvbox
 
 " ──────────────────────────────────────────────────────────
-" wplus 설정 가이드 (31개 모듈)
+" wplus 설정 가이드
 " ──────────────────────────────────────────────────────────
 
 " ═ 핵심 기능 ═
@@ -189,32 +187,14 @@ let g:wplus_ai_suggest_max_lines = 3             " 제안 표시할 최대 줄 �
 " let g:wplus_ai_suggest_debug = 1               " 표시 실패 원인 로그 확인
 
 " Ghost Text 키 매핑
-inoremap <expr> <Tab> wplus#ai#accept_suggestion()
+" <Tab> 은 매핑하지 않는다. lsp 모듈이 버퍼 로컬로
+"   AI 제안 → 팝업메뉴 → 들여쓰기 → LSP 완성
+" 순서를 이미 체이닝하므로, 전역 inoremap <Tab> 은 그 체인을 무력화한다.
 nnoremap <Leader>ai :WaiToggleSuggest<CR>
 
 "
 " ┌─────────────────────────────────────────────────────────┐
-" │ 2. Snippet Engine (스니펫 엔진)                         │
-" └─────────────────────────────────────────────────────────┘
-" 
-" 기본 스니펫:
-"   Python: def[Tab], class[Tab], if[Tab], for[Tab]
-"   Go:     func[Tab], if[Tab], for[Tab]
-"   C/C++:  for[Tab], while[Tab], switch[Tab]
-" 
-" 플레이스홀더 문법:
-"   ${1:default} - 선택 가능한 필드
-"   ${0:marker}  - 스니펫 끝점
-"
-
-let g:wplus_snippet_enabled = 1
-let g:wplus_snippet_placeholder_marker = '${}'
-let g:wplus_snippet_jump_key = '<Tab>'
-let g:wplus_snippet_jump_back_key = '<S-Tab>'
-
-"
-" ┌─────────────────────────────────────────────────────────┐
-" │ 3. Git Conflict Resolver (충돌 해결기)                 │
+" │ 2. Git Conflict Resolver (충돌 해결기)                 │
 " └─────────────────────────────────────────────────────────┘
 " 
 " 명령어:
@@ -230,7 +210,7 @@ let g:wplus_conflict_auto_highlight = 1
 
 "
 " ┌─────────────────────────────────────────────────────────┐
-" │ 4. TODO Manager (TODO 관리자)                          │
+" │ 3. TODO Manager (TODO 관리자)                          │
 " └─────────────────────────────────────────────────────────┘
 " 
 " 명령어:
@@ -245,29 +225,19 @@ let g:wplus_todo_grep_backend = 'rg'      " rg, git grep, grep
 
 "
 " ┌─────────────────────────────────────────────────────────┐
-" │ 5. Colorscheme Auto-detect (배경색 자동 감지)          │
+" │ 4. Theme (하이라이트 및 테마 관리)                     │
 " └─────────────────────────────────────────────────────────┘
 " 
-" 터미널의 배경색(밝음/어두움)을 자동으로 감지하여
-" 컬러스킴을 조정합니다.
-"
 
-let g:wplus_colorscheme_auto_detect = 1
+let g:wplus_theme = 'default'
 
 "
 " ┌─────────────────────────────────────────────────────────┐
-" │ 6. Advanced Search (고급 검색)                          │
+" │ 5. Project Trust (프로젝트 설정 보안)                   │
 " └─────────────────────────────────────────────────────────┘
 " 
-" 명령어:
-"   :WgrepRx   - 정규표현식 검색
-"   :WgrepWord - 단어 검색 (대소문자 구분)
-"   :Wgrep     - 기본 검색 (with history)
-" 
-" 검색 히스토리: 최대 100개 저장
-"
-
-let g:wplus_search_history_max = 100
+" 1이면 .wplus.vim 로드 시 보안 프롬프트 건너뛰고 바로 로드
+" let g:wplus_project_trust_all = 0
 
 " ─────────────────────────────────────────────────────────
 " ═ 기타 모듈 설정 ═
@@ -279,8 +249,6 @@ let g:wplus_surround_enabled = 1
 " Pairs (쌍 이동)
 let g:wplus_pairs_enabled = 1
 
-" Repeat (반복 기능)
-let g:wplus_repeat_enabled = 1
 
 " Commentary (주석 토글)
 let g:wplus_commentary_enabled = 1
@@ -307,10 +275,12 @@ nnoremap <leader>fw :WgrepWord<CR>            " 단어 검색 (엄격)
 " K    - 호버 정보
 " <F2> - 이름 변경 (플러그인에서 설정)
 
-" 3. AI Assistant
-nnoremap <leader>ac :WaiComment<CR>           " 주석 생성
-nnoremap <leader>ao :WaiComplete<CR>          " 코드 완성
-vnoremap <leader>ar :WaiRefactor<CR>          " 리팩토링
+" 3. AI Assistant & Health
+nnoremap <leader>am :WaiCommitMsg<CR>         " AI 커밋 메시지 생성
+nnoremap <leader>ac :WaiCancel<CR>            " AI 진행 중 요청 취소
+nnoremap <leader>ai :WaiToggleSuggest<CR>     " Ghost Text 토글
+nnoremap <leader>hc :WplusHealth<CR>          " 진단 보고서 실행
+vnoremap <leader>ar :WaiRefactor<CR>          " 리팩토링 제안
 
 " 4. Git 기능
 nnoremap <leader>bl :BlamerToggle<CR>         " Git Blame 토글

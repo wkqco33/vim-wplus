@@ -1,0 +1,20 @@
+" Minimal vimrc for the wplus test suite.
+" Deliberately excludes the user's own config so tests see only the plugin.
+
+set nocompatible
+set noswapfile
+set nobackup
+set noundofile
+set viminfo=
+set shortmess+=A
+set belloff=all
+
+" The repo root is two levels up from this file (test/vimrc -> repo).
+let s:repo = fnamemodify(resolve(expand('<sfile>:p')), ':h:h')
+execute 'set runtimepath^=' . fnameescape(s:repo)
+
+" Keep the leader predictable: several modules and their docs assume Space.
+let g:mapleader = ' '
+
+filetype plugin indent on
+syntax enable

@@ -38,6 +38,7 @@ inoremap <expr> <Tab> wplus#ai#accept_suggestion()
 | `:WaiCommitMsg` | Normal | 스테이징된 변경으로 커밋 메시지 생성 |
 | `:WaiFixDiag` | Normal | 현재 줄 LSP 진단 자동 수정 |
 | `:WaiToggleSuggest` | Normal | Ghost Text 자동완성 토글 |
+| `:WaiCancel` | Normal | 진행 중인 AI 요청 모두 취소 (`<leader>ac`) |
 
 ---
 
