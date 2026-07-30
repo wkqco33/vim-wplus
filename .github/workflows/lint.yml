@@ -27,14 +27,33 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install vim
         run: sudo apt-get update && sudo apt-get install -y vim
-      - name: Source all modules
+      - name: Assert vim version
+        # plugin/wplus.vim requires 9.1+; without this the other jobs would
+        # silently pass on an older vim that never reaches the failing code.
         run: |
-          vim -u NONE -i NONE -n -es -c 'set rtp+='"$(pwd)" -c 'set cpo&vim' \
-            -c 'let s:errors = []' \
-            -c 'for s:f in glob("autoload/**/*.vim", 0, 1) + ["plugin/wplus.vim"] | try | execute "source" s:f | catch | call add(s:errors, s:f . ": " . v:exception) | endtry | endfor' \
-            -c 'call writefile(s:errors, "/tmp/source_errors.txt")' \
-            -c 'qa!' 2>&1 || true
-          if [ -s /tmp/source_errors.txt ]; then
-            echo "Source errors:"; cat /tmp/source_errors.txt
+          vim --version | head -1
+          vim -u NONE -i NONE -n -es -c 'if v:version < 901 | cquit | endif' -c 'qa!'
+      - name: Load every module
+        # Sources each file *and* calls its setup(), so a broken setup() fails
+        # here rather than shipping. See test/load_check.vim.
+        run: |
+          rm -f load_errors.txt
+          vim -Nu NONE -i NONE -n -es -S test/load_check.vim -c 'qa!'
+          if [ ! -f load_errors.txt ]; then
+            echo "vim exited before writing results -- treating as failure"
             exit 1
           fi
+          if [ -s load_errors.txt ]; then
+            echo "Load errors:"; cat load_errors.txt
+            exit 1
+          fi
+
+  test:
+    name: test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install vim
+        run: sudo apt-get update && sudo apt-get install -y vim
+      - name: Run tests
+        run: ./test/run.sh

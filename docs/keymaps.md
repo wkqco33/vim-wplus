@@ -72,9 +72,6 @@
 | `<leader>ca` | lsp | Code Action |
 | `]e` / `[e` | lsp | 다음/이전 진단 |
 | `<leader>E` | lsp | 현재 줄 진단 팝업 |
-| `<C-Space>` | completion | 자동완성 팝업 |
-| `<Tab>` | snippet | 스니펫 확장 / 다음 플레이스홀더 |
-| `<S-Tab>` | snippet | 이전 플레이스홀더 |
 | `<leader>o` | outline | 코드 아웃라인 토글 |
 | `<leader>fg` | grep | 커서 단어로 프로젝트 검색 |
 | `:Wgrep {pat}` | grep | 패턴 검색 |
@@ -126,8 +123,6 @@
 
 | 키 / 명령 | 모듈 | 동작 |
 |-----------|------|------|
-| `<leader>u` | undotree | Undo 사이드바 토글 |
-| `<leader>sb` | scrollbar | 스크롤바 토글 |
 | `<leader>zz` | fold | 폴드 토글 |
 | `<leader>za` | fold | 모든 폴드 열기 |
 | `<leader>zc` | fold | 모든 폴드 닫기 |
