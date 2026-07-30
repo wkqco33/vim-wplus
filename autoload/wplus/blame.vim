@@ -19,7 +19,6 @@ let s:last_job_data = {} " {bufnr, lnum, lines} for current job
 " ── highlight & prop type ─────────────────────────────────────────────────
 
 function! s:init() abort
-    hi default WplusBlameText ctermfg=243 guifg=#7c6f64 gui=italic
     " Register text-property type (idempotent)
     if empty(prop_type_get(s:prop_type))
         call prop_type_add(s:prop_type, {'highlight': 'WplusBlameText', 'after': 1})
@@ -151,7 +150,6 @@ function! wplus#blame#setup() abort
         autocmd BufLeave    * call s:clear_all(bufnr('%'))
         autocmd BufDelete   * call s:on_buf_delete()
         autocmd InsertEnter * call s:clear_all(bufnr('%'))
-        autocmd ColorScheme * call s:init()
     augroup END
 
     " :BlamerToggle compat alias + <leader>bl

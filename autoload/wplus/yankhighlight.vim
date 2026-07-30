@@ -60,13 +60,4 @@ function! s:clear() abort
     let s:timer = -1
 endfunction
 
-" Highlight group (links to Visual by default, customizable)
-function! wplus#yankhighlight#init_hl() abort
-    highlight default WplusYankHL ctermbg=214 ctermfg=0 guibg=#fabd2f guifg=#282828
-endfunction
 
-augroup wplus_yankhighlight_hl
-    autocmd!
-    autocmd ColorScheme * call wplus#yankhighlight#init_hl()
-augroup END
-call wplus#yankhighlight#init_hl()

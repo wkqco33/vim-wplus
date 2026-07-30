@@ -4,13 +4,6 @@
 if exists('g:autoloaded_wplus_tabline') | finish | endif
 let g:autoloaded_wplus_tabline = 1
 
-function! s:init_highlights() abort
-    hi WplusTabSel     cterm=bold ctermfg=0  ctermbg=214 gui=bold guifg=#282828 guibg=#fabd2f
-    hi WplusTabNormal  ctermfg=243 ctermbg=237 guifg=#928374 guibg=#3c3836
-    hi WplusTabFill    ctermfg=243 ctermbg=237 guifg=#928374 guibg=#3c3836
-    hi WplusTabModSel  cterm=bold ctermfg=0  ctermbg=167 gui=bold guifg=#282828 guibg=#fb4934
-    hi WplusTabModNorm ctermfg=167 ctermbg=237 guifg=#fb4934 guibg=#3c3836
-endfunction
 
 function! wplus#tabline#render() abort
     let current = bufnr('%')
@@ -41,12 +34,10 @@ function! wplus#tabline#click(bufnum, ...) abort
 endfunction
 
 function! wplus#tabline#setup() abort
-    call s:init_highlights()
     set showtabline=2
     set tabline=%!wplus#tabline#render()
     augroup wplus_tabline
         autocmd!
         autocmd BufAdd,BufDelete,BufEnter,BufWipeout * set tabline=%!wplus#tabline#render()
-        autocmd ColorScheme * call s:init_highlights()
     augroup END
 endfunction
