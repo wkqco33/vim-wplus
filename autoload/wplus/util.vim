@@ -51,6 +51,17 @@ endfunction
 
 let s:git_root_cache = {}
 
+function! wplus#util#clear_git_root_cache() abort
+    let s:git_root_cache = {}
+endfunction
+
+function! wplus#util#channel_key(ch_or_job) abort
+    if type(a:ch_or_job) == v:t_job
+        return string(job_getchannel(a:ch_or_job))
+    endif
+    return string(a:ch_or_job)
+endfunction
+
 function! wplus#util#find_git_root(dir) abort
     if a:dir =~# '^\\\\' || a:dir =~# '^//' | return '' | endif
     if has_key(s:git_root_cache, a:dir) | return s:git_root_cache[a:dir] | endif
@@ -67,3 +78,8 @@ function! wplus#util#find_git_root(dir) abort
     let s:git_root_cache[a:dir] = ''
     return ''
 endfunction
+
+augroup WplusUtil
+    autocmd!
+    autocmd DirChanged * call wplus#util#clear_git_root_cache()
+augroup END

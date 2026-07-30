@@ -52,7 +52,6 @@ function! s:git_branch() abort
     if empty(lines) | return '' | endif
     let line = lines[0]
     let branch = line =~# '^ref: ' ? substitute(line, 'ref: refs/heads/', '', '') : line[:6]
-    let b:wplus_git_branch = branch
     return ' ' . branch
 endfunction
 

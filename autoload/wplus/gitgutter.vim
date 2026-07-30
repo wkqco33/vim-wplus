@@ -93,15 +93,6 @@ endfunction
 
 " ── async refresh ─────────────────────────────────────────────────────────
 
-function! s:channel_key(channel) abort
-    try
-        let l:info = ch_info(a:channel)
-        return string(get(l:info, 'id', a:channel))
-    catch
-        return string(a:channel)
-    endtry
-endfunction
-
 function! wplus#gitgutter#refresh(bufnr) abort
     let bufnr = a:bufnr == 0 ? bufnr('%') : a:bufnr
     let file  = bufname(bufnr)
@@ -133,14 +124,14 @@ function! wplus#gitgutter#refresh(bufnr) abort
 
     let s:pending[bufnr] = job
     " Store data for close_cb to access
-    let s:job_data[s:channel_key(job_getchannel(job))] = {'bufnr': bufnr, 'lines': lines}
+    let s:job_data[wplus#util#channel_key(job_getchannel(job))] = {'bufnr': bufnr, 'lines': lines}
     " Also capture branch name while we're here
     call s:update_branch(bufnr, root)
 endfunction
 
 function! s:on_diff_complete(channel) abort
     " Find job data for this channel
-    let l:key = s:channel_key(a:channel)
+    let l:key = wplus#util#channel_key(a:channel)
     if has_key(s:job_data, l:key)
         let data = remove(s:job_data, l:key)
         call s:on_diff_done(data.bufnr, data.lines, a:channel)
@@ -194,6 +185,9 @@ function! s:update_branch(bufnr, root) abort
         \ 'close_cb': {_ -> s:set_branch(a:bufnr, lines)},
         \ 'err_cb':  {_ch, _msg -> 0},
         \ })
+    if job isnot v:null
+        let s:pending['branch_' . a:bufnr] = job
+    endif
 endfunction
 
 function! s:set_branch(bufnr, lines) abort
