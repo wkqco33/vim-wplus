@@ -565,16 +565,12 @@ function! wplus#lsp#diag_popup() abort
     endif
     let l:msgs = map(copy(l:diags[l:lnum]), 'v:val.msg')
     let l:style = s:diag_style(l:diags[l:lnum][0].sev)
-    call popup_create(l:msgs, {
+    call popup_create(l:msgs, wplus#util#popup_options({
         \ 'line':     'cursor+1',
         \ 'col':      'cursor',
         \ 'moved':    'any',
-        \ 'border':   [1, 1, 1, 1],
         \ 'borderhighlight': [l:style.hl],
-        \ 'padding':  [0, 1, 0, 1],
-        \ 'wrap':     1,
-        \ 'maxwidth': 80,
-        \ })
+        \ }))
 endfunction
 
 function! s:make_cache_key(uri, lnum, col) abort
@@ -735,7 +731,7 @@ function! s:show_hover(result) abort
     endif
     if empty(l:lines) | return | endif
     call s:close_popup(s:hover_winid)
-    let s:hover_winid = popup_create(l:lines, {'line': 'cursor-1', 'col': 'cursor', 'moved': 'any', 'border': [1, 1, 1, 1], 'padding': [0, 1, 0, 1], 'wrap': 1, 'maxwidth': 80})
+    let s:hover_winid = popup_create(l:lines, wplus#util#popup_options({'line': 'cursor-1', 'col': 'cursor', 'moved': 'any'}))
 endfunction
 
 function! s:show_signature_help(result) abort
@@ -748,7 +744,7 @@ function! s:show_signature_help(result) abort
         call extend(l:lines, split(l:doc, "\n"))
     endif
     call s:close_popup(s:sig_winid)
-    let s:sig_winid = popup_create(l:lines, {'line': 'cursor+1', 'col': 'cursor', 'moved': 'any', 'border': [1, 1, 1, 1], 'padding': [0, 1, 0, 1], 'maxwidth': 80})
+    let s:sig_winid = popup_create(l:lines, wplus#util#popup_options({'line': 'cursor+1', 'col': 'cursor', 'moved': 'any'}))
 endfunction
 
 function! s:close_popup(winid) abort
@@ -812,14 +808,7 @@ function! s:apply_workspace_edit(edit) abort
 endfunction
 
 function! s:apply_text_edits(path, edits) abort
-    let l:abs = fnamemodify(a:path, ':p')
-    if bufnr(l:abs) == -1
-        silent execute 'badd ' . fnameescape(l:abs)
-    endif
-    let l:bufnr = bufnr(l:abs)
-    if !bufloaded(l:bufnr)
-        call bufload(l:bufnr)
-    endif
+    let l:bufnr = wplus#util#ensure_bufloaded(a:path)
 
     let l:sorted = sort(copy(a:edits), {a, b ->
         \ a.range.start.line != b.range.start.line
