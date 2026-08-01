@@ -160,31 +160,32 @@ let g:wplus_ai_max_tokens = 2000
 " Ollama 설치 후 `ollama pull <model>` 로 모델을 받아두어야 함
 " native /api/chat 엔드포인트를 사용한다
 " let g:wplus_ai_provider = 'ollama'
-" let g:wplus_ai_model = 'llama3'           " llama3, codellama, qwen3.5:4b-mlx 등
+" let g:wplus_ai_model = 'deepseek-v4-flash:cloud' " deepseek-v4-flash:cloud, qwen2.5-coder:7b 등
 " let g:wplus_ai_ollama_host = 'http://localhost:11434'  " 기본값
-" thinking 모델(qwen3 등)은 추론 토큰 때문에 느리므로 기본으로 추론을 끈다.
-" let g:wplus_ai_ollama_think = 0           " 기본 0(끔)
-" 모델을 메모리에 유지하는 시간. 큰 모델은 재로딩이 느리므로 길게 둔다.
-" '-1'=무한 유지, '0'=즉시 해제, '30m'=30분(기본)
-" let g:wplus_ai_ollama_keep_alive = '30m'
+" thinking 모델(qwen3, deepseek-r1 등)은 추론 토큰 때문에 느리므로 기본으로 추론을 끈다.
+" let g:wplus_ai_ollama_think = 0           " 기본 0(끔, 속도 극대화)
+" 모델을 메모리에 유지하는 시간. '5m'=5분 유지, '30m'=30분, '0'=즉시 해제
+" let g:wplus_ai_ollama_keep_alive = '5m'
 "
-" ── 자동완성 품질 강화 ──
-" 1) 코드 전용 모델 권장(가장 큰 차이): qwen2.5-coder 는 FIM 을 지원해
-"    prefix/suffix 사이를 정확히 채운다. `ollama pull qwen2.5-coder:7b`
-" let g:wplus_ai_model = 'qwen2.5-coder:7b'
-" let g:wplus_ai_ollama_fim = 1             " FIM 사용(미지원 모델은 자동 폴백)
-" 2) 샘플링 튜닝: 코드 완성은 낮은 온도가 더 정확하다(기본 0.2)
+" ── 모델 성능 및 자동완성 호환성 강화 ──
+" 1) FIM (Fill-In-Middle) 옵션: 원격/클라우드 모델에서 무응답(404/400)이 발생하는 경우 0(비활성화) 설정 권장
+" let g:wplus_ai_ollama_fim = 0
+" 2) 샘플링 튜닝: 기본 온도로 안정적인 응답 유도
+" let g:wplus_ai_temperature = 0.5
 " let g:wplus_ai_suggest_temperature = 0.2
-" let g:wplus_ai_ollama_options = {'repeat_penalty': 1.1, 'top_p': 0.9}
+" let g:wplus_ai_ollama_options = {}
 
-" Ghost Text 자동완성 설정
+" Ghost Text 자동완성 및 네트워크 설정
 " InsertMode에서 자동으로 AI 제안을 Ghost Text로 표시
 let g:wplus_ai_suggest_enabled = 1               " 자동완성 활성화 여부
-let g:wplus_ai_suggest_delay = 500               " 제안까지의 대기 시간 (ms)
+let g:wplus_ai_suggest_delay = 500               " 제안 대기시간 (ms, 연속 요청 스팸 방지)
 let g:wplus_ai_suggest_context_lines = 50        " prefix 수집 라인 수
 let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
-let g:wplus_ai_suggest_max_lines = 3             " 제안 표시할 최대 줄 수 (장황한 스트리밍 방지)
-" let g:wplus_ai_suggest_debug = 1               " 표시 실패 원인 로그 확인
+let g:wplus_ai_suggest_max_lines = 5             " 제안 표시할 최대 줄 수
+let g:wplus_ai_suggest_max_tokens = 300          " 제안 토큰 수 제한
+let g:wplus_ai_suggest_timeout = 15              " 클라우드 모델 응답 대기를 위한 타임아웃(15초)
+let g:wplus_ai_timeout = 60                      " 일반 AI 명령 타임아웃(60초)
+" let g:wplus_ai_suggest_debug = 1               " 문제 발생시 :messages 확인용 디버그 활성화
 
 " Ghost Text 키 매핑
 " <Tab> 은 매핑하지 않는다. lsp 모듈이 버퍼 로컬로
