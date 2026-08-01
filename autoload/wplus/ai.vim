@@ -34,7 +34,7 @@ let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
 " Network timeouts (seconds). Commands wait longer; suggestions abort faster.
 let g:wplus_ai_timeout = get(g:, 'wplus_ai_timeout', 30)
 let g:wplus_ai_suggest_timeout = get(g:, 'wplus_ai_suggest_timeout', 10)
-let g:wplus_ai_commit_diff_max_bytes = get(g:, 'wplus_ai_commit_diff_max_bytes', 102400)
+let g:wplus_ai_commit_diff_max_bytes = get(g:, 'wplus_ai_commit_diff_max_bytes', 32768)
 
 let s:command_requests = {} " request_id -> {job, on_content, response_buffer, error_buffer}
 let s:suggest_request = {} " {request_id, job, channel_key, bufnr, lnum, line, col, fim, response_buffer}
@@ -266,10 +266,36 @@ function! s:build_curl_command(endpoint, headers, ...) abort
     return l:cmd
 endfunction
 
-" payload를 stdin으로 전송하고 stdin 닫기
+" payload를 stdin으로 chunk단위로 안전하게 전송하고 stdin 닫기 (E631 파이프 버퍼 오버플로우 방지)
 function! s:write_payload_stdin(job, payload) abort
     let l:ch = job_getchannel(a:job)
-    call ch_sendraw(l:ch, a:payload)
+    if type(l:ch) != v:t_channel || ch_status(l:ch) !=# 'open'
+        return
+    endif
+    let l:len = len(a:payload)
+    let l:chunk_size = 4096
+    let l:offset = 0
+    while l:offset < l:len
+        let l:end = min([l:offset + l:chunk_size - 1, l:len - 1])
+        let l:chunk = a:payload[l:offset : l:end]
+        let l:retries = 0
+        let l:written = 0
+        while l:retries < 50
+            try
+                call ch_sendraw(l:ch, l:chunk)
+                let l:written = 1
+                break
+            catch /E631/
+                let l:retries += 1
+                execute 'sleep 2m'
+            endtry
+        endwhile
+        if !l:written
+            call wplus#util#error_msg('ai', 'channel write failed: pipe buffer full or process closed stdin')
+            break
+        endif
+        let l:offset += l:chunk_size
+    endwhile
     call ch_close_in(l:ch)
 endfunction
 
@@ -1308,4 +1334,8 @@ endfunction
 
 function! wplus#ai#_test_get_api_endpoint(...) abort
     return call('s:get_api_endpoint', a:000)
+endfunction
+
+function! wplus#ai#_test_write_payload_stdin(job, payload) abort
+    call s:write_payload_stdin(a:job, a:payload)
 endfunction
