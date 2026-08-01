@@ -145,6 +145,7 @@ let g:wplus_ai_api_key     = ''           " API 키 (환경변수 권장: $OPENA
 let g:wplus_ai_model       = ''           " 모델명 (필수)
 let g:wplus_ai_temperature = 0.7
 let g:wplus_ai_max_tokens  = 2000
+let g:wplus_ai_commit_diff_max_bytes = 32768  " 커밋 메시지 diff 최대 바이트 (32KB)
 let g:wplus_ai_timeout     = 30           " 명령어 타임아웃 (초)
 
 " ── Azure ────────────────────────────────────────────────────────────────
