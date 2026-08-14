@@ -433,9 +433,11 @@ function! s:is_sensitive_context(text) abort
         endif
         if l:line =~? '\capi[_-]\?key\s*[=:]' || l:line =~? '\csecret[_-]\?key\s*[=:]' || l:line =~? '\cpassword\s*[=:]'
             let l:value = substitute(matchstr(l:line, '[=:].*$'), '^[=:]\s*', '', '')
-            " Empty values, environment-variable references, and documented
-            " placeholders are not secrets and must not block commit diffs.
-            if strlen(l:value) >= 12 && l:value !~# '^\$' && l:value !~? 'your-\|example\|placeholder\|secret-api-key\|not-a-real-key\|allowed-by-explicit-override\|sk-\.\.\.'
+            " A credential keyword is only a real secret when the right-hand side
+            " is a literal value. References such as settings.API_KEY,
+            " os.environ["X"], get_secret() or $VAR are common in real code and
+            " must not block commit diffs.
+            if s:value_is_literal_secret(l:value)
                 return 1
             endif
         endif
@@ -443,10 +445,47 @@ function! s:is_sensitive_context(text) abort
             return 1
         endif
         if l:line =~? '\caws_access_key_id\s*[=:]' || l:line =~? '\caws_secret_access_key\s*[=:]'
-            return 1
+            let l:value = substitute(matchstr(l:line, '[=:].*$'), '^[=:]\s*', '', '')
+            if s:value_is_literal_secret(l:value)
+                return 1
+            endif
         endif
     endfor
     return 0
+endfunction
+
+" Return true only when the right-hand side of a credential assignment is a
+" literal secret value rather than a reference to a secret/config stored
+" elsewhere. References (dotted member access, subscript/env lookups, function
+" calls, shell variables, documented placeholders) are common in real code and
+" must not be treated as leaked secrets.
+function! s:value_is_literal_secret(value) abort
+    if strlen(a:value) < 12
+        return 0
+    endif
+    " Documented / example / placeholder values.
+    if a:value =~? 'your-\|example\|placeholder\|secret-api-key\|not-a-real-key\|allowed-by-explicit-override\|sk-\.\.\.'
+        return 0
+    endif
+    " Shell / environment variable references ($VAR).
+    if a:value =~# '^\$'
+        return 0
+    endif
+    " Variable/function references: dotted member access (cfg.password,
+    " settings.API_KEY), subscript/env lookups (os.environ["X"]), and function
+    " calls (get_password_from_vault(), secrets.token_hex(32)).
+    if a:value =~# '\.' || a:value =~# '\[' || a:value =~# '\c^[a-z_][a-z0-9_]*(\s*'
+        return 0
+    endif
+    " A bare identifier that looks like a variable/constant name (snake_case or
+    " ALL_CAPS) is a reference, not a literal secret. Genuine literals almost
+    " always contain mixed case/digits/symbols or a leading non-letter.
+    if a:value =~# '^[A-Za-z_][A-Za-z0-9_]*$'
+        if a:value =~# '_' || a:value =~# '^[A-Z][A-Z0-9]*$'
+            return 0
+        endif
+    endif
+    return 1
 endfunction
 
 function! s:reject_sensitive_context(text) abort
