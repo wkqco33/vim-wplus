@@ -66,7 +66,8 @@ function! s:decode_uri_path(uri) abort
     return l:path
 endfunction
 
-function! s:supports(ft, method) abort
+function! s:supports(ft, method, ...) abort
+    let l:silent = a:0 > 0 ? a:1 : 0
     if !has_key(s:servers, a:ft) | return 0 | endif
     let l:s = s:servers[a:ft]
     if !get(l:s, 'initialized', 0) | return 1 | endif
@@ -100,7 +101,7 @@ function! s:supports(ft, method) abort
         endif
         if !l:ok
             let l:wkey = a:ft . ':' . a:method
-            if !has_key(s:warned_caps, l:wkey)
+            if !l:silent && !has_key(s:warned_caps, l:wkey)
                 let s:warned_caps[l:wkey] = 1
                 call wplus#util#warn_msg('lsp', 'LSP server for ' . a:ft . ' does not support ' . a:method)
             endif
@@ -454,6 +455,9 @@ function! wplus#lsp#request_inlay_hints() abort
     if !get(g:, 'wplus_lsp_inlay_hints', 1) | return | endif
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
+    " Inlay hints are optional; do not warn on automatic refresh when the
+    " server omitted textDocument/inlayHint from its capabilities.
+    if !s:supports(l:ft, 'textDocument/inlayHint', 1) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
     if empty(l:uri) | return | endif
     let l:params = {
