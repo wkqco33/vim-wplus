@@ -34,10 +34,16 @@ function! s:write_trust_store(store) abort
     let l:file = get(g:, 'wplus_project_trust_file', expand('~/.vim/wplus-trust.json'))
     let l:dir = fnamemodify(l:file, ':h')
     if !isdirectory(l:dir)
-        call mkdir(l:dir, 'p')
+        call mkdir(l:dir, 'p', 0700)
     endif
+    let l:tmp = tempname()
     let l:json = json_encode(a:store)
-    call writefile([l:json], l:file)
+    if writefile([l:json], l:tmp) != 0
+        return
+    endif
+    if exists('*setfperm') | call setfperm(l:tmp, 'rw-------') | endif
+    call rename(l:tmp, l:file)
+    if exists('*setfperm') | call setfperm(l:file, 'rw-------') | endif
 endfunction
 
 function! s:calc_hash(filepath) abort
@@ -75,7 +81,13 @@ function! s:prompt_trust(cfg) abort
     endif
 endfunction
 
-function! s:do_source(root, cfg) abort
+function! s:do_source(root, cfg, expected_hash) abort
+    " Re-hash immediately before source to close the review/source TOCTOU gap.
+    if empty(a:expected_hash) || s:calc_hash(a:cfg) !=# a:expected_hash
+        let s:loaded_configs[a:root] = 0
+        call wplus#util#warn_msg('project', 'config changed after trust decision; not loaded')
+        return
+    endif
     let s:loaded_configs[a:root] = 1
     try
         execute 'source ' . fnameescape(a:cfg)
@@ -95,7 +107,7 @@ function! s:load_config(root) abort
     if !filereadable(l:cfg) | return | endif
 
     " Delay until VimEnter if startup isn't complete
-    if v:vim_did_enter == 0
+    if v:vim_did_enter == 0 && !exists('g:wplus_test_trust_choice')
         if index(s:trust_queue, a:root) == -1
             call add(s:trust_queue, a:root)
         endif
@@ -103,14 +115,14 @@ function! s:load_config(root) abort
     endif
 
     if g:wplus_project_trust_all
-        call s:do_source(a:root, l:cfg)
+        call s:do_source(a:root, l:cfg, s:calc_hash(l:cfg))
         return
     endif
 
     let l:hash = s:calc_hash(l:cfg)
     let l:store = s:read_trust_store()
     if get(l:store, a:root, '') ==# l:hash && !empty(l:hash)
-        call s:do_source(a:root, l:cfg)
+        call s:do_source(a:root, l:cfg, l:hash)
         return
     endif
 
@@ -119,9 +131,9 @@ function! s:load_config(root) abort
     if l:choice ==# 'T'
         let l:store[a:root] = l:hash
         call s:write_trust_store(l:store)
-        call s:do_source(a:root, l:cfg)
+        call s:do_source(a:root, l:cfg, l:hash)
     elseif l:choice ==# 't'
-        call s:do_source(a:root, l:cfg)
+        call s:do_source(a:root, l:cfg, l:hash)
     else
         call wplus#util#warn_msg('project', 'skipped untrusted config: ' . fnamemodify(l:cfg, ':~:.'))
     endif

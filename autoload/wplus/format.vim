@@ -28,6 +28,8 @@ let s:fmts = {
     \ 'dart':       { 'cmd': 'dart format --line-length 120', 'check': 'dart', 'tmpfile': 1 },
     \ }
 
+let g:wplus_format_on_save = get(g:, 'wplus_format_on_save', 0)
+
 " ── public API ───────────────────────────────────────────────────────────
 
 function! wplus#format#run() abort
@@ -52,6 +54,11 @@ function! wplus#format#range() abort
 endfunction
 
 function! wplus#format#setup() abort
+    augroup WplusFormat
+        autocmd!
+        autocmd BufWritePre * if get(g:, 'wplus_format_on_save', 0) && &buftype ==# '' && &modifiable | call wplus#format#run() | endif
+    augroup END
+
     nnoremap <silent> <M-F> :call wplus#format#run()<CR>
     nnoremap <silent> <leader>i :call wplus#format#run()<CR>
     inoremap <silent> <M-F> <Esc>:call wplus#format#run()<CR>

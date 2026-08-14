@@ -35,6 +35,15 @@ let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
 let g:wplus_ai_timeout = get(g:, 'wplus_ai_timeout', 30)
 let g:wplus_ai_suggest_timeout = get(g:, 'wplus_ai_suggest_timeout', 10)
 let g:wplus_ai_commit_diff_max_bytes = get(g:, 'wplus_ai_commit_diff_max_bytes', 32768)
+let g:wplus_ai_response_max_bytes = get(g:, 'wplus_ai_response_max_bytes', 1048576)
+" Synchronous ch_sendraw() cannot safely drain very large child stdout while
+" writing. Reject oversized requests before starting curl rather than hanging.
+let g:wplus_ai_request_max_bytes = get(g:, 'wplus_ai_request_max_bytes', 262144)
+let g:wplus_ai_block_sensitive_context = get(g:, 'wplus_ai_block_sensitive_context', 1)
+let g:wplus_ai_sensitive_files = get(g:, 'wplus_ai_sensitive_files', [
+    \ '.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx',
+    \ '*credential*', '*secret*', '*password*', '*token*',
+    \ ])
 
 let s:command_requests = {} " request_id -> {job, on_content, response_buffer, error_buffer}
 let s:suggest_request = {} " {request_id, job, channel_key, bufnr, lnum, line, col, fim, response_buffer}
@@ -254,16 +263,41 @@ function! s:channel_key(channel) abort
     return wplus#util#channel_key(a:channel)
 endfunction
 
+" Store headers in a private curl config file instead of argv. This prevents
+" API keys from appearing in /proc/<pid>/cmdline and process listings.
+function! s:write_curl_config(headers) abort
+    let l:file = tempname()
+    let l:lines = []
+    for l:header in a:headers
+        " curl config syntax accepts one header per line. Escape backslashes
+        " and quotes so provider values cannot change the config structure.
+        let l:value = substitute(substitute(l:header, '\\', '\\\\', 'g'), '"', '\\"', 'g')
+        call add(l:lines, 'header = "' . l:value . '"')
+    endfor
+    if writefile(l:lines, l:file) != 0
+        return ''
+    endif
+    if exists('*setfperm')
+        call setfperm(l:file, 'rw-------')
+    endif
+    return l:file
+endfunction
+
 function! s:build_curl_command(endpoint, headers, ...) abort
     let l:timeout = a:0 >= 1 ? a:1 : g:wplus_ai_timeout
-    let l:cmd = ['curl', '-s', '-S', '--max-time', string(l:timeout),
-                \ '-X', 'POST', '-d', '@-']
-    call add(l:cmd, a:endpoint)
-    for l:header in a:headers
-        call insert(l:cmd, l:header, 2)
-        call insert(l:cmd, '-H', 2)
-    endfor
-    return l:cmd
+    let l:config = s:write_curl_config(a:headers)
+    if empty(l:config)
+        return {'cmd': [], 'config': ''}
+    endif
+    return {'cmd': ['curl', '-s', '-S', '--max-time', string(l:timeout),
+                \ '--config', l:config, '-X', 'POST', '-d', '@-', a:endpoint],
+                \ 'config': l:config}
+endfunction
+
+function! s:cleanup_curl_config(file) abort
+    if !empty(a:file)
+        silent! call delete(a:file)
+    endif
 endfunction
 
 " payload를 stdin으로 chunk단위로 안전하게 전송하고 stdin 닫기 (E631 파이프 버퍼 오버플로우 방지)
@@ -347,8 +381,22 @@ function! s:extract_response_content(json) abort
 endfunction
 
 " Clean suggest response content by removing think/thought tags and markdown code blocks
+" Remove control characters before AI output is displayed or inserted. Keep
+" newline and tab because they are meaningful in source code. AI output is
+" untrusted input and must never be allowed to contain terminal/Vim controls.
+function! s:sanitize_ai_text(content) abort
+    let l:out = []
+    for l:ch in split(a:content, '\zs')
+        let l:n = char2nr(l:ch)
+        if l:n == 9 || l:n == 10 || (l:n > 31 && l:n != 127)
+            call add(l:out, l:ch)
+        endif
+    endfor
+    return join(l:out, '')
+endfunction
+
 function! s:clean_suggest_content(content) abort
-    let l:txt = a:content
+    let l:txt = s:sanitize_ai_text(a:content)
     " Remove completed <think>...</think> and <thought>...</thought> tags
     let l:txt = substitute(l:txt, '<\%(think\|thought\)\_.\{-}</\%(think\|thought\)>', '', 'g')
     " Remove unclosed <think> or <thought> tags to the end
@@ -357,6 +405,56 @@ function! s:clean_suggest_content(content) abort
     let l:txt = substitute(l:txt, '```.*\n', '', 'g')
     let l:txt = substitute(l:txt, '```', '', 'g')
     return trim(l:txt)
+endfunction
+
+" Return true for files or content that should not be sent automatically to an
+" AI provider. This is deliberately fail-closed for common credential files
+" and strong secret assignments, while avoiding broad matches such as the word
+" token in normal prose.
+function! s:is_sensitive_context(text) abort
+    if !get(g:, 'wplus_ai_block_sensitive_context', 1)
+        return 0
+    endif
+    if get(g:, 'wplus_ai_allow_sensitive_context', 0)
+        return 0
+    endif
+    let l:name = expand('%:t')
+    for l:pattern in get(g:, 'wplus_ai_sensitive_files', [])
+        if exists('*glob2regpat') && l:name =~# glob2regpat(l:pattern)
+            return 1
+        elseif l:name ==# l:pattern
+            return 1
+        endif
+    endfor
+    for l:line in split(a:text, "\n", 1)
+        " Match assignments, not option names or documentation references.
+        if l:line =~? '-----BEGIN.*PRIVATE KEY-----' && a:text =~? '-----END.*PRIVATE KEY-----'
+            return 1
+        endif
+        if l:line =~? '\capi[_-]\?key\s*[=:]' || l:line =~? '\csecret[_-]\?key\s*[=:]' || l:line =~? '\cpassword\s*[=:]'
+            let l:value = substitute(matchstr(l:line, '[=:].*$'), '^[=:]\s*', '', '')
+            " Empty values, environment-variable references, and documented
+            " placeholders are not secrets and must not block commit diffs.
+            if strlen(l:value) >= 12 && l:value !~# '^\$' && l:value !~? 'your-\|example\|placeholder\|secret-api-key\|not-a-real-key\|allowed-by-explicit-override\|sk-\.\.\.'
+                return 1
+            endif
+        endif
+        if l:line =~? '\cauthorization:\s*bearer\s\+\S\{16,}' || l:line =~? '\cbearer\s\+[A-Za-z0-9._~-]\{16,}'
+            return 1
+        endif
+        if l:line =~? '\caws_access_key_id\s*[=:]' || l:line =~? '\caws_secret_access_key\s*[=:]'
+            return 1
+        endif
+    endfor
+    return 0
+endfunction
+
+function! s:reject_sensitive_context(text) abort
+    if s:is_sensitive_context(a:text)
+        call wplus#util#warn_msg('ai', 'request blocked: sensitive file or credential-like content detected')
+        return 1
+    endif
+    return 0
 endfunction
 
 function! s:extract_error_message(json) abort
@@ -452,9 +550,18 @@ function! s:build_request_payload(prompt) abort
 endfunction
 
 function! s:on_response(request_id, channel, msg) abort
-    if has_key(s:command_requests, a:request_id)
-        let s:command_requests[a:request_id].response_buffer .= a:msg
+    if !has_key(s:command_requests, a:request_id)
+        return
     endif
+    let l:req = s:command_requests[a:request_id]
+    if strlen(l:req.response_buffer) + strlen(a:msg) > g:wplus_ai_response_max_bytes
+        let l:req.error_buffer .= 'AI response exceeded g:wplus_ai_response_max_bytes'
+        let s:command_requests[a:request_id] = l:req
+        silent! call job_stop(l:req.job)
+        return
+    endif
+    let l:req.response_buffer .= a:msg
+    let s:command_requests[a:request_id] = l:req
 endfunction
 
 function! s:on_response_complete(request_id, channel) abort
@@ -462,6 +569,7 @@ function! s:on_response_complete(request_id, channel) abort
         return
     endif
     let l:request = remove(s:command_requests, a:request_id)
+    call s:cleanup_curl_config(get(l:request, 'curl_config', ''))
 
     let l:response = trim(l:request.response_buffer)
     let l:err_buf = trim(get(l:request, 'error_buffer', ''))
@@ -487,7 +595,7 @@ function! s:on_response_complete(request_id, channel) abort
     endtry
 
     " Extract content based on provider
-    let l:content = s:extract_response_content(l:json)
+    let l:content = s:sanitize_ai_text(s:extract_response_content(l:json))
     if empty(l:content)
         let l:error_msg = s:extract_error_message(l:json)
         if !empty(l:error_msg)
@@ -720,6 +828,10 @@ function! s:send_request(prompt, OnContent) abort
         return
     endif
 
+    if s:reject_sensitive_context(a:prompt)
+        return
+    endif
+
     if empty(g:wplus_ai_model)
         call wplus#util#error_msg('ai', 'model not configured (g:wplus_ai_model)')
         return
@@ -730,14 +842,24 @@ function! s:send_request(prompt, OnContent) abort
     if empty(l:headers) | return | endif
 
     let l:payload = s:build_request_payload(a:prompt)
+    if strlen(l:payload) > g:wplus_ai_request_max_bytes
+        call wplus#util#error_msg('ai', 'request exceeds g:wplus_ai_request_max_bytes')
+        return
+    endif
     let l:request_id = reltimestr(reltime())
-    let l:cmd = s:build_curl_command(l:endpoint, l:headers, g:wplus_ai_timeout)
+    let l:transport = s:build_curl_command(l:endpoint, l:headers, g:wplus_ai_timeout)
+    if empty(l:transport.cmd)
+        call wplus#util#error_msg('ai', 'failed to create private curl config')
+        return
+    endif
+    let l:cmd = l:transport.cmd
 
     let s:command_requests[l:request_id] = {
         \ 'job': v:null,
         \ 'on_content': a:OnContent,
         \ 'response_buffer': '',
         \ 'error_buffer': '',
+        \ 'curl_config': l:transport.config,
         \ }
 
     let l:job = job_start(l:cmd, {
@@ -748,6 +870,7 @@ function! s:send_request(prompt, OnContent) abort
         \ })
     if type(l:job) != v:t_job
         call remove(s:command_requests, l:request_id)
+        call s:cleanup_curl_config(l:transport.config)
         call wplus#util#error_msg('ai', 'failed to start request')
         return
     endif
@@ -830,8 +953,8 @@ endfunction
 function! wplus#ai#setup() abort
     augroup WplusAI
         autocmd!
-        autocmd VimLeavePre * for req in values(s:command_requests) | silent! call job_stop(req.job) | endfor
-        autocmd VimLeavePre * if !empty(s:suggest_request) | silent! call job_stop(s:suggest_request.job) | endif
+        autocmd VimLeavePre * for req in values(s:command_requests) | silent! call job_stop(req.job) | call s:cleanup_curl_config(get(req, 'curl_config', '')) | endfor
+        autocmd VimLeavePre * if !empty(s:suggest_request) | silent! call job_stop(s:suggest_request.job) | call s:cleanup_curl_config(get(s:suggest_request, 'curl_config', '')) | endif
         " Invalidate context cache on buffer changes so symbols/scope stay fresh.
         autocmd BufEnter,FileType,BufWritePost * call wplus#ai#context#invalidate(bufnr('%'))
     augroup END
@@ -966,6 +1089,7 @@ function! s:dismiss_suggestion() abort
 
     if !empty(s:suggest_request) && has_key(s:suggest_request, 'job')
         silent! call job_stop(s:suggest_request.job)
+        call s:cleanup_curl_config(get(s:suggest_request, 'curl_config', ''))
         let s:suggest_request = {}
     endif
 
@@ -974,21 +1098,37 @@ function! s:dismiss_suggestion() abort
     endif
 endfunction
 
-" Accept current suggestion. Returns a string suitable for <expr> mappings.
-" Multi-line suggestions are joined with \<CR>" so Vim inserts every line.
+" Insert trusted, sanitized text at the current cursor without feeding it back
+" through Vim's key parser. Command variants use this helper; expression
+" mappings return plain text directly to Vim.
+function! s:insert_text_at_cursor(content) abort
+    let l:lines = split(s:sanitize_ai_text(a:content), "\n", 1)
+    if empty(l:lines) | return | endif
+    let l:lnum = line('.')
+    let l:byte = col('.') - 1
+    let l:current = getline(l:lnum)
+    let l:prefix = strpart(l:current, 0, l:byte)
+    let l:suffix = strpart(l:current, l:byte)
+    let l:replacement = copy(l:lines)
+    let l:replacement[0] = l:prefix . l:replacement[0]
+    let l:replacement[-1] .= l:suffix
+    call setline(l:lnum, l:replacement[0])
+    if len(l:replacement) > 1
+        call appendbufline(bufnr('%'), l:lnum, l:replacement[1:])
+    endif
+    call cursor(l:lnum + len(l:replacement) - 1, strlen(l:replacement[-1]) + 1)
+endfunction
+
+" Accept current suggestion. Returns plain text suitable for <expr> mappings.
 function! wplus#ai#accept_suggestion() abort
     if empty(s:suggest_content)
         " No suggestion, insert normal tab
         return "\<Tab>"
     endif
 
-    let l:content = s:suggest_content
+    let l:content = s:sanitize_ai_text(s:suggest_content)
     call s:dismiss_suggestion()
     call s:suggest_debug('suggestion accepted')
-    if mode() =~# 'i'
-        call feedkeys(l:content, 'n')
-        return ''
-    endif
     return substitute(l:content, '\n', "\<CR>", 'g')
 endfunction
 
@@ -997,14 +1137,13 @@ function! wplus#ai#accept_suggestion_insert() abort
     if empty(s:suggest_content)
         return
     endif
-    let l:content = s:suggest_content
+    let l:content = s:sanitize_ai_text(s:suggest_content)
     call s:dismiss_suggestion()
-    let l:lines = split(l:content, "\n", 1)
     if mode() =~# 'i'
-        call feedkeys(join(l:lines, "\<CR>"), 'n')
+        call s:insert_text_at_cursor(l:content)
     else
         " Best-effort in normal mode: append after cursor line
-        call append(line('.'), l:lines)
+        call append(line('.'), split(l:content, "\n", 1))
     endif
     call s:suggest_debug('suggestion accepted (insert)')
 endfunction
@@ -1032,8 +1171,8 @@ function! wplus#ai#accept_word_suggestion() abort
         call s:dismiss_suggestion()
         return ''
     endif
-    let l:word = l:match[1]
-    let l:rest = l:match[3]
+    let l:word = s:sanitize_ai_text(l:match[1])
+    let l:rest = s:sanitize_ai_text(l:match[3])
     if empty(l:rest)
         call s:dismiss_suggestion()
     else
@@ -1042,21 +1181,17 @@ function! wplus#ai#accept_word_suggestion() abort
         call s:show_suggestion()
     endif
     call s:suggest_debug('accepted word: ' . l:word)
-    if mode() =~# 'i'
-        call feedkeys(l:word, 'n')
-        return ''
-    endif
     return substitute(l:word, '\n', "\<CR>", 'g')
 endfunction
 
-" Command variant of accept-word: inserts at cursor via feedkeys.
+" Command variant of accept-word: inserts via the buffer API.
 function! wplus#ai#accept_suggestion_insert_word() abort
     if empty(s:suggest_content)
         return
     endif
     let l:word = wplus#ai#accept_word_suggestion()
     if !empty(l:word) && mode() =~# 'i'
-        call feedkeys(l:word, 'n')
+        call s:insert_text_at_cursor(l:word)
     endif
 endfunction
 
@@ -1094,7 +1229,11 @@ function! s:on_suggest_timer(timer) abort
     
     let l:prefix = wplus#ai#context#get_prefix(s:suggest_line, s:suggest_col, g:wplus_ai_suggest_context_lines)
     let l:suffix = wplus#ai#context#get_suffix(s:suggest_line, s:suggest_col, g:wplus_ai_suggest_suffix_lines)
-    
+
+    if s:reject_sensitive_context(l:prefix . "\n" . l:suffix)
+        return
+    endif
+
     " Don't suggest if prefix is empty or only whitespace
     if empty(trim(l:prefix)) && empty(trim(l:suffix))
         call s:suggest_debug('skipped empty context')
@@ -1179,6 +1318,12 @@ function! s:on_suggest_response(request_id, channel, msg) abort
     if empty(s:suggest_request) || get(s:suggest_request, 'request_id', -1) != a:request_id
         return
     endif
+    if strlen(s:suggest_request.response_buffer) + strlen(a:msg) > g:wplus_ai_response_max_bytes
+        call s:report_suggest_error('AI response exceeded g:wplus_ai_response_max_bytes')
+        silent! call job_stop(s:suggest_request.job)
+        let s:suggest_request = {}
+        return
+    endif
     let s:suggest_request.response_buffer .= a:msg
 endfunction
 
@@ -1189,6 +1334,7 @@ function! s:on_suggest_response_complete(request_id, channel) abort
     endif
     let l:request = s:suggest_request
     let s:suggest_request = {}
+    call s:cleanup_curl_config(get(l:request, 'curl_config', ''))
 
     let l:response = l:request.response_buffer
 
@@ -1276,7 +1422,17 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
     let l:headers = s:get_request_headers()
     if empty(l:headers) | return | endif
 
-    let l:cmd = s:build_curl_command(l:endpoint, l:headers, g:wplus_ai_suggest_timeout)
+    if strlen(l:payload) > g:wplus_ai_request_max_bytes
+        call s:report_suggest_error('suggestion context exceeds g:wplus_ai_request_max_bytes')
+        return
+    endif
+
+    let l:transport = s:build_curl_command(l:endpoint, l:headers, g:wplus_ai_suggest_timeout)
+    if empty(l:transport.cmd)
+        call s:report_suggest_error('failed to create private curl config')
+        return
+    endif
+    let l:cmd = l:transport.cmd
 
     if !empty(s:suggest_request)
         silent! call job_stop(s:suggest_request.job)
@@ -1307,7 +1463,8 @@ function! s:send_suggest_request(prefix, suffix, prompt) abort
         \ 'line': s:suggest_line,
         \ 'col': s:suggest_col,
         \ 'fim': l:is_fim,
-        \ 'response_buffer': ''
+        \ 'response_buffer': '',
+        \ 'curl_config': l:transport.config
         \ }
     call s:suggest_debug('sent suggestion request' . (l:is_fim ? ' (FIM)' : ''))
 endfunction
@@ -1317,6 +1474,7 @@ function! wplus#ai#cancel() abort
         if has_key(l:req, 'job') && type(l:req.job) == v:t_job
             try | call job_stop(l:req.job) | catch | endtry
         endif
+        call s:cleanup_curl_config(get(l:req, 'curl_config', ''))
     endfor
     let s:command_requests = {}
 
@@ -1338,4 +1496,12 @@ endfunction
 
 function! wplus#ai#_test_write_payload_stdin(job, payload) abort
     call s:write_payload_stdin(a:job, a:payload)
+endfunction
+
+function! wplus#ai#_test_sanitize_text(text) abort
+    return s:sanitize_ai_text(a:text)
+endfunction
+
+function! wplus#ai#_test_is_sensitive(text) abort
+    return s:is_sensitive_context(a:text)
 endfunction

@@ -21,8 +21,8 @@ let s:default_run = {
     \ 'r':          'Rscript %s',
     \ 'go':         'go run %s',
     \ 'rust':       'rustc %s && ./%r',
-    \ 'c':          'cc %s -o /tmp/wplus_run_out && /tmp/wplus_run_out',
-    \ 'cpp':        'c++ %s -o /tmp/wplus_run_out && /tmp/wplus_run_out',
+    \ 'c':          'cc %s -o %o && %o',
+    \ 'cpp':        'c++ %s -o %o && %o',
     \ }
 
 " Default build commands per marker file (project-root based).
@@ -46,6 +46,14 @@ function! s:expand_cmd(tpl, file) abort
     let l:stem = fnamemodify(a:file, ':t:r')   " filename without extension
     let l:cmd = substitute(a:tpl, '%s', shellescape(a:file), 'g')
     let l:cmd = substitute(l:cmd, '%r', shellescape(l:stem), 'g')
+    if l:cmd =~# '%o'
+        let l:output = tempname()
+        let l:quoted = shellescape(l:output)
+        let l:cmd = substitute(l:cmd, '%o', l:quoted, 'g')
+        " Ensure compiler artifacts do not persist and do not collide between
+        " concurrent Vim instances. The status is preserved for quickfix mode.
+        let l:cmd .= '; l:status=$?; rm -f ' . l:quoted . '; exit $l:status'
+    endif
     return l:cmd
 endfunction
 

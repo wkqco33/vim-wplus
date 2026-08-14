@@ -186,6 +186,10 @@ let g:wplus_ai_suggest_max_tokens = 300          " 제안 토큰 수 제한
 let g:wplus_ai_suggest_timeout = 15              " 클라우드 모델 응답 대기를 위한 타임아웃(15초)
 let g:wplus_ai_timeout = 60                      " 일반 AI 명령 타임아웃(60초)
 " let g:wplus_ai_suggest_debug = 1               " 문제 발생시 :messages 확인용 디버그 활성화
+let g:wplus_ai_response_max_bytes = 1048576       " AI 응답 최대 크기
+let g:wplus_ai_block_sensitive_context = 1        " 민감 파일/비밀 패턴 전송 차단
+let g:wplus_ai_sensitive_files = ['.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', '*credential*', '*secret*', '*password*', '*token*']
+" let g:wplus_ai_allow_sensitive_context = 1     " 위험: 민감 컨텍스트 전송 허용
 
 " Ghost Text 키 매핑
 " <Tab> 은 매핑하지 않는다. lsp 모듈이 버퍼 로컬로

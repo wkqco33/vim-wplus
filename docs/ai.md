@@ -187,6 +187,9 @@ Ghost Text와 명령어는 다음 컨텍스트를 자동으로 수집합니다:
 
 - `WaiFixDiag`는 `lsp.vim`이 해당 파일타입에 대해 LSP 서버가 실행 중이어야 합니다.
 - `WaiCommitMsg`는 git 저장소 안에서 실행해야 하며 스테이징된 변경이 있어야 합니다 (`git add` 먼저).
+- `.env`, 인증서, 키/credential 파일 및 credential-like 패턴이 포함된 컨텍스트는 기본적으로 AI 전송이 차단됩니다.
+- `ollama` provider라도 `*-cloud` 모델은 원격 서비스로 코드가 전송될 수 있습니다. 민감한 프로젝트에서는 로컬 모델을 사용하거나 자동 제안을 끄십시오.
+- 응답에는 제어문자를 허용하지 않으며, 최대 응답 크기(`g:wplus_ai_response_max_bytes`)를 초과하면 요청을 중단합니다.
 - API 키는 `.vimrc`에 직접 쓰지 않고 환경 변수를 읽어오는 방식을 권장합니다:
 
 ```vim
