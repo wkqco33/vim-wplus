@@ -120,16 +120,16 @@ function! s:build_ollama_payload_spec(spec) abort
         call add(l:msgs, {'role': 'system', 'content': a:spec.system})
     endif
     call add(l:msgs, {'role': 'user', 'content': a:spec.user})
-    let l:options = {
-        \ 'num_predict': a:spec.max_tokens,
-        \ 'temperature': a:spec.temperature,
-        \ }
+    " Must honor g:wplus_ai_ollama_think (default 0) here too, otherwise
+    " thinking models (e.g. deepseek-v4-flash:0731-cloud) burn all tokens on
+    " chain-of-thought and return empty content, so ghost text never renders.
     let l:body = {
         \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'codellama',
-        \ 'messages': l:msgs,
-        \ 'options': l:options,
+        \ 'think': g:wplus_ai_ollama_think ? v:true : v:false,
         \ 'stream': v:false,
-        \ 'keep_alive': '5m',
+        \ 'keep_alive': g:wplus_ai_ollama_keep_alive,
+        \ 'messages': l:msgs,
+        \ 'options': s:ollama_options(a:spec.max_tokens, a:spec.temperature),
         \ }
     return json_encode(l:body)
 endfunction
