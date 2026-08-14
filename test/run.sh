@@ -50,7 +50,10 @@ for file in "${files[@]}"; do
     # Source the test file, then explicitly invoke every global Test_* function.
     # Previously files were only sourced, so assertions inside functions never
     # ran and the suite could pass vacuously.
-    mapfile -t tests < <(sed -n 's/^function! \(Test_[A-Za-z0-9_]*\)().*/\1/p' "$file")
+    tests=()
+    while IFS= read -r fn; do
+        tests+=("$fn")
+    done < <(sed -n 's/^function! \(Test_[A-Za-z0-9_]*\)().*/\1/p' "$file")
     runner="$out/$name.runner.vim"
     {
         printf 'let v:errors = []\n'
