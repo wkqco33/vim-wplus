@@ -8,6 +8,9 @@ let g:wplus_finder_height_ratio = get(g:, 'wplus_finder_height_ratio', 0.4)
 let g:wplus_finder_fuzzy_limit  = get(g:, 'wplus_finder_fuzzy_limit', 10000)
 
 let s:prompt = '> '
+let s:file_job = v:null
+let s:file_job_items = []
+
 let s:state = {
     \ 'winid': -1,
     \ 'bufnr': -1,
@@ -142,16 +145,49 @@ endfunction
 
 " ── Sources ────────────────────────────────────────────────────────────────
 
+function! s:on_file_job_output(channel, lines) abort
+    if type(a:lines) == v:t_list
+        call extend(s:file_job_items, a:lines)
+    else
+        call add(s:file_job_items, a:lines)
+    endif
+endfunction
+
+function! s:on_file_job_close(job, status) abort
+    let l:items = filter(copy(s:file_job_items), '!empty(v:val)')
+    let s:file_job = v:null
+    let s:file_job_items = []
+    if a:status != 0
+        call wplus#util#warn_msg('finder', 'file search failed (exit ' . a:status . ')')
+        return
+    endif
+    call wplus#finder#open(l:items, 'edit', 'Find Files')
+endfunction
+
 function! wplus#finder#files() abort
+    if type(s:file_job) == v:t_job && job_status(s:file_job) ==# 'run'
+        call job_stop(s:file_job)
+    endif
+    let s:file_job_items = []
     if executable('rg')
-        let l:items = systemlist('rg --files')
+        let l:cmd = ['rg', '--files']
     elseif executable('git')
-        let l:items = systemlist('git ls-files')
+        let l:cmd = ['git', 'ls-files']
     else
         let l:items = glob('**/*', 0, 1)
         call filter(l:items, '!isdirectory(v:val)')
+        call wplus#finder#open(l:items, 'edit', 'Find Files')
+        return
     endif
-    call wplus#finder#open(l:items, 'edit', 'Find Files')
+    let s:file_job = job_start(l:cmd, {
+        \ 'out_mode': 'nl',
+        \ 'out_cb': function('s:on_file_job_output'),
+        \ 'close_cb': function('s:on_file_job_close'),
+        \ })
+    if type(s:file_job) != v:t_job
+        let s:file_job = v:null
+        call wplus#util#error_msg('finder', 'failed to start file search')
+    endif
 endfunction
 
 function! wplus#finder#buffers() abort
@@ -167,6 +203,11 @@ function! wplus#finder#mru() abort
 endfunction
 
 function! wplus#finder#setup() abort
+    augroup WplusFinder
+        autocmd!
+        autocmd VimLeavePre * if type(s:file_job) == v:t_job | silent! call job_stop(s:file_job) | endif
+    augroup END
+
     command! WfindFiles   call wplus#finder#files()
     command! WfindBuffers call wplus#finder#buffers()
     command! WfindMRU     call wplus#finder#mru()

@@ -15,6 +15,7 @@ function! Test_project_trust_prompt_skips_by_default() abort
 
     call wplus#project#setup()
     execute 'edit' fnameescape(l:dummy_file)
+    silent doautocmd VimEnter
 
     call assert_false(exists('g:wplus_test_pwned'), '.wplus.vim should not execute when skipped')
 
@@ -39,6 +40,7 @@ function! Test_project_trust_once() abort
 
     call wplus#project#setup()
     execute 'edit' fnameescape(l:dummy_file)
+    silent doautocmd VimEnter
 
     call assert_true(get(g:, 'wplus_test_pwned_once', 0) == 1, '.wplus.vim should execute when trusted once')
     call assert_false(filereadable(g:wplus_project_trust_file), 'Trust once should not persist hash to file')
@@ -64,6 +66,7 @@ function! Test_project_trust_always() abort
 
     call wplus#project#setup()
     execute 'edit' fnameescape(l:dummy_file)
+    silent doautocmd VimEnter
 
     call assert_true(get(g:, 'wplus_test_pwned_always', 0) == 1, '.wplus.vim should execute when trusted always')
     call assert_true(filereadable(g:wplus_project_trust_file), 'Trust always should create trust store file')

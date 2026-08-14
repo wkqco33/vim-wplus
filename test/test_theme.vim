@@ -62,6 +62,7 @@ function! Test_theme_groups_exist_after_colorscheme() abort
 endfunction
 
 function! Test_theme_user_override_preserved() abort
+    set termguicolors
     call wplus#theme#setup()
     highlight WplusGGAdd guifg=#ff0000
     call wplus#theme#apply()

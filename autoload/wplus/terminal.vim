@@ -4,6 +4,22 @@ if exists('g:autoloaded_wplus_terminal') | finish | endif
 let g:autoloaded_wplus_terminal = 1
 
 let s:term_buf = -1
+let g:wplus_terminal_height = get(g:, 'wplus_terminal_height', 15)
+let g:wplus_terminal_position = get(g:, 'wplus_terminal_position', 'bottom')
+
+function! s:open_terminal_window() abort
+    let l:size = max([1, get(g:, 'wplus_terminal_height', 15)])
+    let l:position = get(g:, 'wplus_terminal_position', 'bottom')
+    if l:position ==# 'top'
+        execute 'topleft ' . l:size . 'split'
+    elseif l:position ==# 'left'
+        execute 'topleft ' . l:size . 'vsplit'
+    elseif l:position ==# 'right'
+        execute 'botright ' . l:size . 'vsplit'
+    else
+        execute 'botright ' . l:size . 'split'
+    endif
+endfunction
 
 function! wplus#terminal#toggle() abort
     if s:term_buf != -1 && bufexists(s:term_buf)
@@ -20,13 +36,13 @@ function! wplus#terminal#toggle() abort
             endif
         else
             " Terminal exists but is hidden, show it
-            execute 'botright 10split'
+            call s:open_terminal_window()
             execute 'buffer' s:term_buf
             startinsert
         endif
     else
         " Create new terminal
-        execute 'botright 10split'
+        call s:open_terminal_window()
         if has('nvim')
             terminal
         else

@@ -20,6 +20,15 @@ let g:wplus_lsp_sig_delay       = get(g:, 'wplus_lsp_sig_delay',       100)
 let g:wplus_lsp_change_delay    = get(g:, 'wplus_lsp_change_delay',    800)
 let g:wplus_lsp_diag_delay      = get(g:, 'wplus_lsp_diag_delay',      300)
 let g:wplus_lsp_request_timeout = get(g:, 'wplus_lsp_request_timeout', 10)
+let g:wplus_lsp_definition_split = get(g:, 'wplus_lsp_definition_split', 0)
+let g:wplus_lsp_servers = get(g:, 'wplus_lsp_servers', {
+    \ 'go': ['gopls'],
+    \ 'c': ['clangd'],
+    \ 'cpp': ['clangd'],
+    \ 'python': ['pyright-langserver', '--stdio'],
+    \ 'dart': ['dart', 'language-server', '--protocol=lsp'],
+    \ 'rust': ['rust-analyzer'],
+    \ })
 let s:CONTENT_LENGTH_PREFIX     = 'Content-Length: '
 let s:timeout_timer             = -1
 
@@ -147,13 +156,32 @@ function! s:did_save(ft) abort
     call wplus#lsp#request_inlay_hints()
 endfunction
 
+function! s:job_running(job) abort
+    return type(a:job) == v:t_job && job_status(a:job) ==# 'run'
+endfunction
+
+function! s:project_root() abort
+    let l:root = exists('*wplus#root#find_root') ? wplus#root#find_root() : ''
+    return empty(l:root) ? getcwd() : resolve(fnamemodify(l:root, ':p'))
+endfunction
+
 function! s:start_server(ft) abort
-    if has_key(s:servers, a:ft) && job_status(s:servers[a:ft].job) ==# 'run' | call s:did_open(a:ft) | return | endif
-    let l:cmds = {'go': ['gopls'], 'c': ['clangd'], 'cpp': ['clangd'], 'python': ['pyright-langserver', '--stdio'], 'dart': ['dart', 'language-server', '--protocol=lsp'], 'rust': ['rust-analyzer']}
-    if !has_key(l:cmds, a:ft) || !executable(l:cmds[a:ft][0]) | return | endif
-    let l:job = job_start(l:cmds[a:ft], {'in_mode': 'raw', 'out_mode': 'raw', 'out_cb': {c, m -> s:on_stdout(a:ft, c, m)}, 'err_cb': {c, m -> s:log(a:ft, 'STDERR', m)}})
+    let l:root = s:project_root()
+    if has_key(s:servers, a:ft) && s:job_running(s:servers[a:ft].job)
+        if get(s:servers[a:ft], 'root', '') ==# l:root
+            call s:did_open(a:ft)
+            return
+        endif
+        " Never reuse a language server from another project root.
+        call wplus#lsp#stop(a:ft)
+    endif
+    let l:configured = get(g:wplus_lsp_servers, a:ft, [])
+    let l:cmd = type(l:configured) == v:t_dict ? get(l:configured, 'cmd', []) : l:configured
+    if type(l:cmd) != v:t_list || empty(l:cmd) || !executable(l:cmd[0]) | return | endif
+    let l:job = job_start(l:cmd, {'in_mode': 'raw', 'out_mode': 'raw', 'out_cb': {c, m -> s:on_stdout(a:ft, c, m)}, 'err_cb': {c, m -> s:log(a:ft, 'STDERR', m)}})
     let s:servers[a:ft] = {
         \ 'job': l:job,
+        \ 'root': l:root,
         \ 'channel': job_getchannel(l:job),
         \ 'last_id': 0,
         \ 'requests': {},
@@ -163,7 +191,7 @@ function! s:start_server(ft) abort
         \ }
     call s:send(a:ft, 'initialize', {
         \ 'processId': getpid(),
-        \ 'rootUri': s:get_uri(getcwd()),
+        \ 'rootUri': s:get_uri(l:root),
         \ 'capabilities': {'textDocument': {
         \   'synchronization': {'didChange': 1, 'willSave': v:true, 'didSave': v:true},
         \   'hover': {'contentFormat': ['plaintext', 'markdown']},
@@ -193,13 +221,23 @@ function! s:send(ft, method, params, ...) abort
     endif
 
     let l:s = s:servers[a:ft]
-    if job_status(l:s.job) !=# 'run' | return 0 | endif
+    if !s:job_running(l:s.job) | return 0 | endif
 
     let l:req = {'jsonrpc': '2.0', 'method': a:method, 'params': a:params}
     if !l:is_notify
         let l:s.last_id += 1
         let l:req.id = l:s.last_id
-        let l:s.requests[l:req.id] = {'method': a:method, 'at': localtime(), 'is_user': l:is_user}
+        let l:req_uri = get(get(a:params, 'textDocument', {}), 'uri', '')
+        let l:s.requests[l:req.id] = {
+            \ 'method': a:method,
+            \ 'at': localtime(),
+            \ 'is_user': l:is_user,
+            \ 'uri': l:req_uri,
+            \ 'bufnr': bufnr('%'),
+            \ 'changedtick': b:changedtick,
+            \ 'lnum': line('.'),
+            \ 'col': col('.'),
+            \ }
     endif
 
     let l:payload = json_encode(l:req)
@@ -263,7 +301,26 @@ function! s:handle_notification(ft, resp) abort
     endif
 endfunction
 
-function! s:handle_request_result(ft, method, result) abort
+function! s:request_is_current(req, method) abort
+    if a:method !~# '^textDocument/' | return 1 | endif
+    if type(a:req) != v:t_dict | return 1 | endif
+    let l:buf = get(a:req, 'bufnr', -1)
+    let l:uri = get(a:req, 'uri', '')
+    if l:buf <= 0 || !bufloaded(l:buf) || empty(l:uri)
+        return 0
+    endif
+    if s:get_buf_uri(l:buf) !=# l:uri || getbufvar(l:buf, 'changedtick', -1) != get(a:req, 'changedtick', -2)
+        return 0
+    endif
+    if get(a:req, 'is_user', 0) && a:method =~# '^textDocument/\%(hover\|completion\|signatureHelp\|definition\|references\)$'
+        return bufnr('%') == l:buf && line('.') == get(a:req, 'lnum', -1) && col('.') == get(a:req, 'col', -1)
+    endif
+    return 1
+endfunction
+
+function! s:handle_request_result(ft, method, result, ...) abort
+    let l:req = a:0 ? a:1 : {}
+    let l:req_uri = type(l:req) == v:t_dict ? get(l:req, 'uri', '') : ''
     if a:method ==# 'initialize'
         let s:servers[a:ft].caps = get(a:result, 'capabilities', {})
         let s:servers[a:ft].initialized = 1
@@ -286,9 +343,13 @@ function! s:handle_request_result(ft, method, result) abort
     elseif a:method ==# 'textDocument/inlayHint'
         call s:show_inlay_hints(a:result)
     elseif a:method ==# 'textDocument/formatting'
-        if !empty(a:result)
-            let l:uri = s:get_buf_uri(bufnr('%'))
-            call s:apply_text_edits(s:decode_uri_path(l:uri), a:result)
+        if !empty(a:result) && !empty(l:req_uri)
+            let l:buf = get(l:req, 'bufnr', -1)
+            if l:buf > 0 && bufloaded(l:buf) && getbufvar(l:buf, 'changedtick', -1) == get(l:req, 'changedtick', -2)
+                call s:apply_text_edits(s:decode_uri_path(l:req_uri), a:result)
+            elseif get(l:req, 'is_user', 0)
+                call wplus#util#warn_msg('lsp', 'format result discarded: buffer changed or unloaded')
+            endif
         endif
     elseif a:method ==# 'textDocument/documentSymbol'
         let l:uri = s:get_buf_uri(bufnr('%'))
@@ -329,6 +390,13 @@ function! s:handle_response(ft, resp) abort
         return
     endif
 
+    if !s:request_is_current(l:req_info, l:method)
+        if l:is_user
+            call wplus#util#warn_msg('lsp', 'stale response discarded: ' . l:method)
+        endif
+        return
+    endif
+
     let l:result = get(a:resp, 'result', {})
 
     if (l:method ==# 'textDocument/definition' || l:method ==# 'textDocument/references') && !empty(l:result)
@@ -339,7 +407,7 @@ function! s:handle_response(ft, resp) abort
         endif
     endif
 
-    call s:handle_request_result(a:ft, l:method, l:result)
+    call s:handle_request_result(a:ft, l:method, l:result, l:req_info)
 endfunction
 
 function! s:diag_style(sev) abort
@@ -361,10 +429,18 @@ function! s:define_signs() abort
     call sign_define('WplusLspHint',  {'text': 'H', 'texthl': 'None'})
 
     if has('textprop')
-        silent! call prop_type_add('WplusLspDiagErr',  {'highlight': 'WplusDiagError'})
-        silent! call prop_type_add('WplusLspDiagWarn', {'highlight': 'WplusDiagWarn'})
-        silent! call prop_type_add('WplusLspDiagInfo', {'highlight': 'WplusDiagInfo'})
-        silent! call prop_type_add('WplusLspDiagHint', {'highlight': 'WplusDiagHint'})
+        if empty(prop_type_get('WplusLspDiagErr'))
+            call prop_type_add('WplusLspDiagErr', {'highlight': 'WplusDiagError'})
+        endif
+        if empty(prop_type_get('WplusLspDiagWarn'))
+            call prop_type_add('WplusLspDiagWarn', {'highlight': 'WplusDiagWarn'})
+        endif
+        if empty(prop_type_get('WplusLspDiagInfo'))
+            call prop_type_add('WplusLspDiagInfo', {'highlight': 'WplusDiagInfo'})
+        endif
+        if empty(prop_type_get('WplusLspDiagHint'))
+            call prop_type_add('WplusLspDiagHint', {'highlight': 'WplusDiagHint'})
+        endif
         if empty(prop_type_get('WplusLspInlay'))
             silent! call prop_type_add('WplusLspInlay', {'highlight': 'WplusDiagHint'})
         endif
@@ -760,7 +836,16 @@ function! s:goto_location(result) abort
     let l:range = get(l:loc, 'range', get(l:loc, 'targetSelectionRange', {}))
     if empty(l:uri) || empty(l:range) | return | endif
     let l:path = s:decode_uri_path(l:uri)
-    execute 'edit ' . fnameescape(l:path)
+    let l:split = get(g:, 'wplus_lsp_definition_split', 0)
+    if l:split == 1
+        execute 'split ' . fnameescape(l:path)
+    elseif l:split == 2
+        execute 'vsplit ' . fnameescape(l:path)
+    elseif l:split == 3
+        execute 'tabedit ' . fnameescape(l:path)
+    else
+        execute 'edit ' . fnameescape(l:path)
+    endif
     call cursor(l:range.start.line + 1, l:range.start.character + 1)
 endfunction
 
@@ -858,17 +943,28 @@ function! s:execute_code_action(action) abort
     endif
 endfunction
 
+function! wplus#lsp#stop(ft) abort
+    if !has_key(s:servers, a:ft) | return | endif
+    let l:server = s:servers[a:ft]
+    if s:job_running(l:server.job)
+        call s:send(a:ft, 'shutdown', {})
+        call s:send(a:ft, 'exit', {}, 1)
+        silent! call job_stop(l:server.job)
+    endif
+    call remove(s:servers, a:ft)
+endfunction
+
 function! wplus#lsp#stop_all() abort
     for [l:ft, l:server] in items(s:servers)
-        if job_status(l:server.job) ==# 'run'
+        if s:job_running(l:server.job)
             call s:send(l:ft, 'shutdown', {})
             call s:send(l:ft, 'exit', {}, 1)
             let l:i = 0
-            while l:i < 10 && job_status(l:server.job) ==# 'run'
+            while l:i < 10 && s:job_running(l:server.job)
                 sleep 20m
                 let l:i += 1
             endwhile
-            if job_status(l:server.job) ==# 'run'
+            if s:job_running(l:server.job)
                 silent! call job_stop(l:server.job)
             endif
         endif

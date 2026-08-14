@@ -47,11 +47,22 @@ for file in "${files[@]}"; do
     # -es: silent-ex mode, scriptable and non-interactive.
     # The trailing writefile always runs, so an empty file means "passed"
     # and a missing file means Vim died before finishing.
-    "$VIM" -Nu "$here/vimrc" -i NONE -n -es \
-        -c "let v:errors = []" \
-        -S "$file" \
-        -c "call writefile(v:errors, '$errfile')" \
-        -c "qa!" </dev/null >"$out/$name.stdout" 2>"$out/$name.stderr"
+    # Source the test file, then explicitly invoke every global Test_* function.
+    # Previously files were only sourced, so assertions inside functions never
+    # ran and the suite could pass vacuously.
+    mapfile -t tests < <(sed -n 's/^function! \(Test_[A-Za-z0-9_]*\)().*/\1/p' "$file")
+    runner="$out/$name.runner.vim"
+    {
+        printf 'let v:errors = []\n'
+        printf 'source %s\n' "$(printf '%s' "$file" | sed 's/ /\\ /g')"
+        for test_fn in "${tests[@]}"; do
+            printf 'call %s()\n' "$test_fn"
+        done
+        printf "call writefile(v:errors, '%s')\n" "$(printf '%s' "$errfile" | sed "s/'/''/g")"
+        printf 'qa!\n'
+    } > "$runner"
+    "$VIM" -Nu "$here/vimrc" -i NONE -n -es -S "$runner" \
+        </dev/null >"$out/$name.stdout" 2>"$out/$name.stderr"
     status=$?
 
     if [ ! -s "$errfile" ] && [ "$status" -ne 0 ]; then

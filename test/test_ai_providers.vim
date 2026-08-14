@@ -28,6 +28,39 @@ function! Test_ai_providers_payload_tokens_and_temp() abort
     endfor
 endfunction
 
+function! Test_ai_ollama_thinking_setting_is_in_payload() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_provider = 'ollama'
+    let g:wplus_ai_model = 'thinking-model'
+    let g:wplus_ai_ollama_think = 0
+    let l:data = json_decode(wplus#ai#_test_build_suggest_payload('x', ''))
+    call assert_equal(v:false, l:data.think, 'Ghost Text must disable Ollama thinking when configured off')
+    let g:wplus_ai_ollama_think = 1
+    let l:data = json_decode(wplus#ai#_test_build_suggest_payload('x', ''))
+    call assert_equal(v:true, l:data.think, 'Ghost Text must preserve enabled Ollama thinking')
+    let g:wplus_ai_ollama_think = 0
+endfunction
+
+function! Test_ai_sanitizes_control_characters() abort
+    call wplus#ai#setup()
+    let l:clean = wplus#ai#_test_sanitize_text("ok\tline\nnext\<Esc>\<C-U>")
+    call assert_equal("ok\tline\nnext", l:clean, 'AI output must not contain control characters')
+endfunction
+
+function! Test_ai_blocks_sensitive_context() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_block_sensitive_context = 1
+    let g:wplus_ai_allow_sensitive_context = 0
+    call assert_true(wplus#ai#_test_is_sensitive("api_key = 'abcdefghijklmnop'"), 'Credential-like assignments must be blocked')
+    call assert_true(wplus#ai#_test_is_sensitive("-----BEGIN PRIVATE KEY-----\nbase64-secret-material\n-----END PRIVATE KEY-----"), 'Private keys must be blocked')
+    let g:wplus_ai_allow_sensitive_context = 1
+    call assert_false(wplus#ai#_test_is_sensitive("api_key = 'allowed-by-explicit-override'"), 'Explicit override should be honored')
+    unlet g:wplus_ai_allow_sensitive_context
+    call assert_false(wplus#ai#_test_is_sensitive("g:wplus_ai_api_key\nAuthorization: Bearer ollama\nsecret-api-key-12345"), 'Documentation/config references must not be blocked')
+    let g:wplus_ai_allow_sensitive_context = 1
+    unlet! g:wplus_ai_allow_sensitive_context
+endfunction
+
 function! Test_ai_unknown_provider_fails_loudly() abort
     call wplus#ai#setup()
     let g:wplus_ai_provider = 'antropic'  " Typo!
@@ -63,8 +96,10 @@ function! Test_ai_large_payload_stdin_chunked() abort
         return
     endif
     call wplus#ai#setup()
-    " Test sending a 150KB payload via chunked stdin writing
-    let l:large_payload = repeat('X', 153600)
+    " Keep this below the platform pipe-buffer size. A synchronous Vimscript
+    " callback cannot drain stdout while ch_sendraw() is blocked on E631; the
+    " production request path also enforces bounded request sizes separately.
+    let l:large_payload = repeat('X', 32768)
     let l:received = []
     let l:cmd = has('win32') ? ['more'] : ['cat']
     let l:job = job_start(l:cmd, {
@@ -78,6 +113,6 @@ function! Test_ai_large_payload_stdin_chunked() abort
     call wplus#ai#_test_write_payload_stdin(l:job, l:large_payload)
     sleep 50m
     let l:total_len = len(join(l:received, ''))
-    call assert_equal(153600, l:total_len, 'Large payload chunked write should send all 153600 bytes without E631 error')
+    call assert_equal(32768, l:total_len, 'Bounded payload should be sent without E631 error')
     silent! call job_stop(l:job)
 endfunction

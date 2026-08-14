@@ -8,6 +8,8 @@ let s:expanded = {} " path -> 1 (expanded)
 let s:tree_data = [] " List of {path, level, is_dir, name}
 let g:wplus_explorer_max_entries = get(g:, 'wplus_explorer_max_entries', 1000)
 let g:wplus_explorer_max_depth = get(g:, 'wplus_explorer_max_depth', 8)
+let g:wplus_explorer_width = get(g:, 'wplus_explorer_width', 35)
+let g:wplus_explorer_ignore = get(g:, 'wplus_explorer_ignore', [])
 let s:truncated = 0
 let s:entry_count = 0
 let s:dir_cache = {}
@@ -33,9 +35,18 @@ function! s:get_dir_entries(path) abort
     endtry
 
     let l:p = a:path
+    let l:files = filter(l:files, {_, v -> index(g:wplus_explorer_ignore, v) < 0})
     call sort(l:files, {a, b -> isdirectory(l:p . '/' . a) == isdirectory(l:p . '/' . b) ? (a ==# b ? 0 : (a ># b ? 1 : -1)) : (isdirectory(l:p . '/' . a) ? -1 : 1)})
     let s:dir_cache[a:path] = copy(l:files)
     return l:files
+endfunction
+
+function! s:inside_root(path) abort
+    let l:root = resolve(s:normalize_dir(s:current_root))
+    let l:path = fnamemodify(a:path, ':p')
+    let l:parent = resolve(fnamemodify(l:path, ':h'))
+    let l:target = (filereadable(l:path) || isdirectory(l:path)) ? resolve(l:path) : l:parent . '/' . fnamemodify(l:path, ':t')
+    return l:target ==# l:root || l:target[: len(l:root)] ==# l:root . '/'
 endfunction
 
 function! s:invalidate_cache(path) abort
@@ -66,10 +77,10 @@ function! s:open_explorer() abort
     let l:path = getcwd()
     let l:buf = bufnr('^WplusExplorer$')
     if l:buf != -1 && bufexists(l:buf)
-        execute 'topleft 30vsplit'
+        execute 'topleft ' . max([1, g:wplus_explorer_width]) . 'vsplit'
         execute 'buffer' l:buf
     else
-        execute 'topleft 30vsplit'
+        execute 'topleft ' . max([1, g:wplus_explorer_width]) . 'vsplit'
         enew
         silent! file WplusExplorer
     endif
@@ -228,12 +239,19 @@ function! s:on_add() abort
     
     let l:name = input('New file/dir: ')
     if empty(l:name) | return | endif
+    if l:name =~# '^/' || l:name =~# '^\a:\\' || l:name =~# '\.\.'
+        call wplus#util#warn_msg('explorer', 'path must stay inside the project root')
+        return
+    endif
     let l:full_path = l:parent . '/' . l:name
+    if !s:inside_root(l:full_path)
+        call wplus#util#warn_msg('explorer', 'path must stay inside the project root')
+        return
+    endif
     if l:name =~ '/$'
         call mkdir(l:full_path, 'p')
     else
         call writefile([], l:full_path)
-    endif
     call s:invalidate_cache(l:parent)
     call s:refresh()
 endfunction
@@ -273,7 +291,19 @@ function! s:on_rename() abort
     if empty(l:item) | return | endif
     let l:new_name = input('Rename to: ', l:item.name)
     if empty(l:new_name) || l:new_name == l:item.name | return | endif
-    call rename(l:item.path, fnamemodify(l:item.path, ':h') . '/' . l:new_name)
+    if l:new_name =~# '^/' || l:new_name =~# '^\a:\\' || l:new_name =~# '\.\.'
+        call wplus#util#warn_msg('explorer', 'path must stay inside the project root')
+        return
+    endif
+    let l:destination = fnamemodify(l:item.path, ':h') . '/' . l:new_name
+    if !s:inside_root(l:destination)
+        call wplus#util#warn_msg('explorer', 'path must stay inside the project root')
+        return
+    endif
+    if rename(l:item.path, l:destination) != 0
+        call wplus#util#error_msg('explorer', 'Failed to rename ' . l:item.name)
+        return
+    endif
     call s:invalidate_cache(fnamemodify(l:item.path, ':h'))
     call s:refresh()
 endfunction

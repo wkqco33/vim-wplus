@@ -14,7 +14,7 @@ function! wplus#root#find_root() abort
         return s:root_cache[l:dir]
     endif
 
-    let l:markers = ['.git', 'go.mod', 'Makefile', 'package.json', 'Cargo.toml', '.geminiignore']
+    let l:markers = ['.git', 'go.mod', 'Makefile', 'package.json', 'Cargo.toml', '.geminiignore', '.wplus.vim']
     let l:curr = l:dir
     let l:prev = ''
     

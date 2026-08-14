@@ -29,12 +29,15 @@ function! Test_health_command_and_output() abort
     let l:text2 = join(l:lines2, "\n")
     call assert_false(l:text2 =~# 'secret-api-key-12345', 'API key must never be printed in health report')
 
-    " Assert unknown options are caught
+    " Assert newly introduced unknown options are caught without depending on
+    " unrelated options from other modules.
+    let l:before_unknown = wplus#health#unknown_options()
     let g:wplus_unknown_test_option = 1
     let l:unknown = wplus#health#unknown_options()
-    call assert_equal(['wplus_unknown_test_option'], l:unknown, 'Unknown option should be detected')
+    call assert_equal(['wplus_unknown_test_option'], filter(l:unknown, 'index(l:before_unknown, v:val) < 0'), 'Unknown option should be detected')
     unlet g:wplus_unknown_test_option
 
-    " Close health window
-    close
+    " Leave the test runner with a valid window; :close cannot close the last
+    " window in Vim's ex mode.
+    enew
 endfunction

@@ -157,7 +157,7 @@ let g:wplus_ai_azure_api_version = '2024-02-15-preview'
 let g:wplus_ai_ollama_host       = 'http://localhost:11434'
 let g:wplus_ai_ollama_keep_alive = '30m'
 let g:wplus_ai_ollama_fim        = 0      " FIM 활성화
-let g:wplus_ai_ollama_think      = 0      " 추론 모델 think 활성화
+let g:wplus_ai_ollama_think      = 0      " 추론 모델 think 활성화 (Ghost Text에도 적용)
 let g:wplus_ai_ollama_options    = {}     " 샘플링 옵션 오버라이드
 
 " ── Ghost Text ───────────────────────────────────────────────────────────
@@ -170,4 +170,10 @@ let g:wplus_ai_suggest_max_lines     = 3
 let g:wplus_ai_suggest_temperature   = 0.2
 let g:wplus_ai_suggest_timeout       = 10
 let g:wplus_ai_suggest_debug         = 0
+let g:wplus_ai_response_max_bytes    = 1048576  " AI 응답 최대 크기
+let g:wplus_ai_request_max_bytes     = 262144   " AI 요청 최대 크기 (pipe 정체 방지)
+let g:wplus_ai_block_sensitive_context = 1      " 민감 파일/비밀 패턴 전송 차단
+let g:wplus_ai_sensitive_files       = ['.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', '*credential*', '*secret*', '*password*', '*token*']
+" 정말 필요한 경우에만 일시적으로 사용. cloud provider로 비밀이 전송될 수 있음.
+let g:wplus_ai_allow_sensitive_context = 0
 ```

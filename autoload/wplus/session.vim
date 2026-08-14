@@ -14,7 +14,9 @@ let s:session_dir = expand('~/.vim/sessions')
 
 function! wplus#session#setup() abort
     if !isdirectory(s:session_dir)
-        call mkdir(s:session_dir, 'p')
+        call mkdir(s:session_dir, 'p', 0700)
+    elseif exists('*setfperm')
+        call setfperm(s:session_dir, 'rwx------')
     endif
     " terminal 버퍼는 Windows에서 복원 시 hang 유발
     set sessionoptions-=terminal
@@ -44,9 +46,12 @@ endfunction
 function! s:get_session_name() abort
     let l:root = wplus#root#find_root()
     if empty(l:root) | let l:root = getcwd() | endif
-    " Create a safe filename from the path
-    let l:name = substitute(l:root, '[\\/:]', '_', 'g')
-    return s:session_dir . '/' . l:name . '.vim'
+    let l:root = resolve(fnamemodify(l:root, ':p'))
+    " A readable basename is useful for inspection, while the hash prevents
+    " collisions such as /a_b and /a/b sharing a session file.
+    let l:base = substitute(fnamemodify(l:root, ':t'), '[^A-Za-z0-9_.-]', '_', 'g')
+    let l:digest = exists('*sha256') ? sha256(l:root)[:15] : substitute(l:root, '[^A-Za-z0-9]', '_', 'g')[:31]
+    return s:session_dir . '/' . l:base . '-' . l:digest . '.vim'
 endfunction
 
 function! s:close_plugin_windows() abort

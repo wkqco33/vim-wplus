@@ -21,12 +21,20 @@ jobs:
         run: vint --style autoload plugin
 
   source-check:
-    name: vim source check
-    runs-on: ubuntu-latest
+    name: vim source check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-      - name: Install vim
+      - name: Install vim (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y vim
+      - name: Install vim (macOS)
+        if: runner.os == 'macOS'
+        run: brew install vim
       - name: Assert vim version
         # plugin/wplus.vim requires 9.1+; without this the other jobs would
         # silently pass on an older vim that never reaches the failing code.
@@ -49,11 +57,19 @@ jobs:
           fi
 
   test:
-    name: test suite
-    runs-on: ubuntu-latest
+    name: test suite (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-      - name: Install vim
+      - name: Install vim (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y vim
+      - name: Install vim (macOS)
+        if: runner.os == 'macOS'
+        run: brew install vim
       - name: Run tests
         run: ./test/run.sh
