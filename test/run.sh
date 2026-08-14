@@ -58,7 +58,7 @@ for file in "${files[@]}"; do
     {
         printf 'let v:errors = []\n'
         printf 'source %s\n' "$(printf '%s' "$file" | sed 's/ /\\ /g')"
-        for test_fn in "${tests[@]}"; do
+        for test_fn in "${tests[@]+"${tests[@]}"}"; do
             printf 'call %s()\n' "$test_fn"
         done
         printf "call writefile(v:errors, '%s')\n" "$(printf '%s' "$errfile" | sed "s/'/''/g")"
