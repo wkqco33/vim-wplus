@@ -252,6 +252,7 @@ function! s:on_add() abort
         call mkdir(l:full_path, 'p')
     else
         call writefile([], l:full_path)
+    endif
     call s:invalidate_cache(l:parent)
     call s:refresh()
 endfunction
