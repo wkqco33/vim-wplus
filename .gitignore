@@ -92,6 +92,19 @@ Temporary Items
 # iCloud generated files
 *.icloud
 
+### Project secrets and local configuration ###
+/.vimrc
+/.vimrc.local
+/.vimrc.secret
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*
+*secrets*
+
 ### Vim ###
 # Swap
 [._]*.s[a-v][a-z]
