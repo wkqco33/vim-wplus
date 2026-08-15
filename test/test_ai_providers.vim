@@ -55,7 +55,8 @@ function! Test_ai_blocks_sensitive_context() abort
     call assert_true(wplus#ai#_test_is_sensitive("-----BEGIN PRIVATE KEY-----\nbase64-secret-material\n-----END PRIVATE KEY-----"), 'Private keys must be blocked')
     let g:wplus_ai_allow_sensitive_context = 1
     call assert_false(wplus#ai#_test_is_sensitive("api_key = 'allowed-by-explicit-override'"), 'Explicit override should be honored')
-    unlet g:wplus_ai_allow_sensitive_context
+    call assert_false(wplus#ai#_test_is_sensitive("let g:wplus_ai_api_key = ''               \" API 키 필수 설정"), 'Empty quotes with inline comments must not be blocked')
+    call assert_false(wplus#ai#_test_is_sensitive("let g:wplus_ai_api_key = $OPENAI_API_KEY  \" 환경 변수 권장"), 'Environment variable references with comments must not be blocked')
     call assert_false(wplus#ai#_test_is_sensitive("g:wplus_ai_api_key\nAuthorization: Bearer ollama\nsecret-api-key-12345"), 'Documentation/config references must not be blocked')
     let g:wplus_ai_allow_sensitive_context = 1
     unlet! g:wplus_ai_allow_sensitive_context

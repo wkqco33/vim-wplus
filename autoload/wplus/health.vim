@@ -48,6 +48,12 @@ let s:known_options = [
     \ 'wplus_session_autoload', 'wplus_session_autosave', 'wplus_session_max_files',
     \ 'wplus_theme_auto', 'wplus_todo_grep_backend', 'wplus_todo_keywords',
     \ 'wplus_load_errors',
+    \ 'wplus_conflict_auto_highlight', 'wplus_explorer_width', 'wplus_explorer_ignore',
+    \ 'wplus_format_on_save', 'wplus_format_preserve_undo',
+    \ 'wplus_gitgutter_disable_on_large_files', 'wplus_gitgutter_file_size_limit',
+    \ 'wplus_grep_backend', 'wplus_grep_ignore_vcs', 'wplus_grep_max_results',
+    \ 'wplus_lsp_debug', 'wplus_lsp_definition_split', 'wplus_lsp_servers',
+    \ 'wplus_terminal_height', 'wplus_terminal_position',
     \ ]
 
 function! wplus#health#native_keys() abort
