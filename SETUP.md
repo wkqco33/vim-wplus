@@ -1,4 +1,4 @@
-﻿# vim-wplus 설정 가이드
+# vim-wplus 설정 가이드
 
 > [← README](README.md) · [모듈 문서](docs/) · [단축키](docs/keymaps.md)
 
@@ -180,9 +180,14 @@ let g:wplus_ai_ollama_keep_alive = '30m'
 
 **Ghost Text 수락 키 설정:**
 
+`<Tab>`은 기본적으로 스마트 탭(`g:wplus_ai_tab_complete = 1`)으로 작동하여 AI 제안이 있으면 자동 수락합니다.
+수동 매핑을 원할 경우:
+
 ```vim
-inoremap <expr> <Tab> wplus#ai#accept_suggestion()
-" Tab을 이미 snippet/LSP에 사용 중이라면 다른 키 사용
+inoremap <expr> <Tab> wplus#ai#smart_tab()
+" 또는 <Plug> 매핑 사용:
+imap <Tab> <Plug>WaiSmartTab
+" Tab 대신 다른 키 사용 시:
 inoremap <expr> <C-g> wplus#ai#accept_suggestion()
 ```
 
@@ -212,7 +217,6 @@ vnoremap <leader>ae :WaiExplain<CR>
 vnoremap <leader>af :WaiRefactor<CR>
 nnoremap <leader>am :WaiCommitMsg<CR>
 nnoremap <leader>at :WaiToggleSuggest<CR>
-inoremap <expr> <Tab> wplus#ai#accept_suggestion()
 
 " 코드 실행
 nnoremap <leader>rr :Wrun<CR>

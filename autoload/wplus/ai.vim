@@ -30,11 +30,14 @@ let g:wplus_ai_suggest_suffix_lines = get(g:, 'wplus_ai_suggest_suffix_lines', 2
 let g:wplus_ai_suggest_max_tokens = get(g:, 'wplus_ai_suggest_max_tokens', 500)
 let g:wplus_ai_suggest_max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
 let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
+let g:wplus_ai_tab_complete = get(g:, 'wplus_ai_tab_complete', 1)
 
 " Network timeouts (seconds). Commands wait longer; suggestions abort faster.
 let g:wplus_ai_timeout = get(g:, 'wplus_ai_timeout', 30)
 let g:wplus_ai_suggest_timeout = get(g:, 'wplus_ai_suggest_timeout', 10)
 let g:wplus_ai_commit_diff_max_bytes = get(g:, 'wplus_ai_commit_diff_max_bytes', 32768)
+let g:wplus_ai_commit_max_tokens = get(g:, 'wplus_ai_commit_max_tokens', 2048)
+let g:wplus_ai_commit_prompt = get(g:, 'wplus_ai_commit_prompt', '')
 let g:wplus_ai_response_max_bytes = get(g:, 'wplus_ai_response_max_bytes', 1048576)
 " Synchronous ch_sendraw() cannot safely drain very large child stdout while
 " writing. Reject oversized requests before starting curl rather than hanging.
@@ -536,9 +539,13 @@ endfunction
 
 " Merge user-defined sampling options (g:wplus_ai_ollama_options)
 function! s:ollama_options(max_tokens, temperature) abort
-    let l:opts = {'temperature': a:temperature, 'num_predict': a:max_tokens}
+    let l:opts = {}
     if type(g:wplus_ai_ollama_options) == v:t_dict
         call extend(l:opts, g:wplus_ai_ollama_options)
+    endif
+    let l:opts.temperature = a:temperature
+    if a:max_tokens > 0
+        let l:opts.num_predict = a:max_tokens
     endif
     return l:opts
 endfunction
@@ -597,14 +604,16 @@ function! s:report_suggest_error(message) abort
     call wplus#util#error_msg('ai', a:message)
 endfunction
 
-function! s:build_request_payload(prompt) abort
+function! s:build_request_payload(prompt, ...) abort
     let l:prov = s:get_provider(g:wplus_ai_provider)
     if empty(l:prov) | return '' | endif
+    let l:max_tokens = a:0 >= 1 && a:1 > 0 ? a:1 : get(g:, 'wplus_ai_max_tokens', 2048)
+    let l:temperature = a:0 >= 2 ? a:2 : get(g:, 'wplus_ai_temperature', 0.7)
     let l:spec = {
         \ 'system': 'You are a helpful code assistant. Provide concise, accurate responses.',
         \ 'user': a:prompt,
-        \ 'max_tokens': get(g:, 'wplus_ai_max_tokens', 2048),
-        \ 'temperature': get(g:, 'wplus_ai_temperature', 0.7),
+        \ 'max_tokens': l:max_tokens,
+        \ 'temperature': l:temperature,
         \ 'purpose': 'command',
         \ }
     return call(l:prov.payload, [l:spec])
@@ -755,8 +764,21 @@ function! s:preview_replace_range(bufnr, start, end, content) abort
         \ function('s:apply_replace_range', [a:bufnr, a:start, a:end, l:lines]))
 endfunction
 
+function! s:clean_commit_message(content) abort
+    let l:txt = s:sanitize_ai_text(a:content)
+    " Remove completed <think>...</think> and <thought>...</thought> tags
+    let l:txt = substitute(l:txt, '<\%(think\|thought\)\_.\{-}</\%(think\|thought\)>', '', 'g')
+    " Remove unclosed <think> or <thought> tags to the end
+    let l:txt = substitute(l:txt, '<\%(think\|thought\)\_.*$', '', 'g')
+    " Remove markdown code blocks (e.g. ```gitcommit ... ```)
+    let l:txt = substitute(l:txt, '\v^```%(gitcommit|text|markdown)?\s*\n', '', 'g')
+    let l:txt = substitute(l:txt, '\v\n```\s*$', '', 'g')
+    let l:txt = substitute(l:txt, '```', '', 'g')
+    return trim(l:txt)
+endfunction
+
 function! s:preview_commit(content) abort
-    let l:msg = trim(a:content)
+    let l:msg = s:clean_commit_message(a:content)
     if empty(l:msg) | call wplus#util#warn_msg('ai', 'empty commit message') | return | endif
     call s:open_ai_preview('gitcommit', split(l:msg, "\n"), function('s:apply_commit', [l:msg]))
 endfunction
@@ -856,16 +878,50 @@ function! wplus#ai#commit_message() abort
         return
     endif
 
-    let l:lines = []
-    call job_start(['git', '-C', l:root, 'diff', '--cached'], {
-        \ 'out_cb':   {_, l -> add(l:lines, l)},
-        \ 'close_cb': {_ -> s:on_commit_diff(l:lines)},
+    let l:stat_lines = []
+    call job_start(['git', '-C', l:root, 'diff', '--cached', '--stat'], {
+        \ 'out_cb':   {_, l -> add(l:stat_lines, l)},
+        \ 'close_cb': {_ -> s:on_commit_stat_done(l:root, l:stat_lines)},
         \ 'err_cb':   {_ch, _msg -> 0},
         \ })
     call wplus#util#info_msg('ai', 'reading staged changes...')
 endfunction
 
-function! s:on_commit_diff(lines) abort
+function! s:on_commit_stat_done(root, stat_lines) abort
+    let l:stat = trim(join(a:stat_lines, "\n"))
+    if empty(l:stat)
+        call wplus#util#warn_msg('ai', 'no staged changes (git add first)')
+        return
+    endif
+    let l:diff_lines = []
+    call job_start(['git', '-C', a:root, 'diff', '--cached'], {
+        \ 'out_cb':   {_, l -> add(l:diff_lines, l)},
+        \ 'close_cb': {_ -> s:on_commit_diff_collected(l:stat, l:diff_lines)},
+        \ 'err_cb':   {_ch, _msg -> 0},
+        \ })
+endfunction
+
+function! s:build_commit_prompt(stat, diff) abort
+    if !empty(g:wplus_ai_commit_prompt)
+        let l:p = g:wplus_ai_commit_prompt
+        let l:p = substitute(l:p, '{stat}', escape(a:stat, '&~'), 'g')
+        let l:p = substitute(l:p, '{diff}', escape(a:diff, '&~'), 'g')
+        return l:p
+    endif
+
+    let l:prompt = "You are an expert software developer writing a Git commit message in Korean.\n"
+        \ . "Based on the staged changes below, write a structured and detailed Git commit message following the Conventional Commits convention.\n\n"
+        \ . "### Requirements:\n"
+        \ . "1. First line: '<type>(<scope>): <summary>' (e.g. feat(ai): ..., fix(auth): ..., refactor(core): ...). Max 50 chars in Korean.\n"
+        \ . "2. Second line: Leave a blank line.\n"
+        \ . "3. Third line onwards (Body): Write a clear, bulleted list ('- ') explaining WHAT changed and WHY. Cover all significant modified modules/files with sufficient detail without cutting off.\n"
+        \ . "4. Do NOT output markdown code fences (no ```), no <think> tags, and no meta-commentary. Output ONLY the raw commit message.\n\n"
+        \ . "### Changed Files (Diff Stat):\n" . a:stat . "\n\n"
+        \ . "### Diff:\n" . a:diff
+    return l:prompt
+endfunction
+
+function! s:on_commit_diff_collected(stat, lines) abort
     let l:diff = join(a:lines, "\n")
     if empty(trim(l:diff))
         call wplus#util#warn_msg('ai', 'no staged changes (git add first)')
@@ -875,15 +931,16 @@ function! s:on_commit_diff(lines) abort
     if len(l:diff) > l:max
         call wplus#util#warn_msg('ai', 'diff too large (' . (len(l:diff)/1024) . 'KB), truncating to ' . (l:max/1024) . 'KB')
         let l:diff = l:diff[:l:max - 1]
+        let l:last_nl = strridx(l:diff, "\n")
+        if l:last_nl > 0
+            let l:diff = l:diff[:l:last_nl]
+        endif
     endif
-    let l:prompt = "Write a concise git commit message in Korean for the following staged diff. "
-        \ . "First line: a short imperative summary (max 50 chars). "
-        \ . "Then a blank line and, only if needed, a short body explaining what changed. "
-        \ . "No markdown fences.\n\ndiff:\n" . l:diff
-    call s:send_request(l:prompt, function('s:preview_commit'))
+    let l:prompt = s:build_commit_prompt(a:stat, l:diff)
+    call s:send_request(l:prompt, function('s:preview_commit'), g:wplus_ai_commit_max_tokens, 0.3)
 endfunction
 
-function! s:send_request(prompt, OnContent) abort
+function! s:send_request(prompt, OnContent, ...) abort
     if g:wplus_ai_provider !=# 'ollama' && empty(g:wplus_ai_api_key)
         call wplus#util#error_msg('ai', 'API key not configured (g:wplus_ai_api_key)')
         return
@@ -902,7 +959,9 @@ function! s:send_request(prompt, OnContent) abort
     let l:headers = s:get_request_headers()
     if empty(l:headers) | return | endif
 
-    let l:payload = s:build_request_payload(a:prompt)
+    let l:max_tokens = a:0 >= 1 && a:1 > 0 ? a:1 : get(g:, 'wplus_ai_max_tokens', 2048)
+    let l:temperature = a:0 >= 2 ? a:2 : get(g:, 'wplus_ai_temperature', 0.7)
+    let l:payload = s:build_request_payload(a:prompt, l:max_tokens, l:temperature)
     if strlen(l:payload) > g:wplus_ai_request_max_bytes
         call wplus#util#error_msg('ai', 'request exceeds g:wplus_ai_request_max_bytes')
         return
@@ -1057,8 +1116,14 @@ function! wplus#ai#setup() abort
     xnoremap <silent> <Plug>WaiExplain   :WaiExplain<CR>
     nnoremap <silent> <Plug>WaiToggleSuggest :WaiToggleSuggest<CR>
     inoremap <silent> <Plug>WaiDismissSuggest <C-r>=wplus#ai#dismiss_suggestion()<CR>
+    inoremap <silent> <expr> <Plug>WaiAcceptSuggest wplus#ai#accept_suggestion()
     inoremap <silent> <expr> <Plug>WaiAcceptWord wplus#ai#accept_word_suggestion()
+    inoremap <silent> <expr> <Plug>WaiSmartTab wplus#ai#smart_tab()
     nnoremap <silent> <leader>ac :WaiCancel<CR>
+
+    if g:wplus_ai_tab_complete && empty(maparg('<Tab>', 'i'))
+        imap <expr> <Tab> wplus#ai#smart_tab()
+    endif
 
     if g:wplus_ai_suggest_enabled
         augroup WplusAISuggest
@@ -1207,6 +1272,20 @@ function! wplus#ai#accept_suggestion_insert() abort
         call append(line('.'), split(l:content, "\n", 1))
     endif
     call s:suggest_debug('suggestion accepted (insert)')
+endfunction
+
+" Smart Tab handler:
+" 1. If Ghost Text is active -> accept suggestion
+" 2. If completion popup is visible -> select next item (<C-n>)
+" 3. Otherwise -> normal <Tab>
+function! wplus#ai#smart_tab() abort
+    if wplus#ai#has_suggestion()
+        return wplus#ai#accept_suggestion()
+    endif
+    if pumvisible()
+        return "\<C-n>"
+    endif
+    return "\<Tab>"
 endfunction
 
 function! wplus#ai#has_suggestion() abort
@@ -1565,4 +1644,16 @@ endfunction
 
 function! wplus#ai#_test_is_sensitive(text) abort
     return s:is_sensitive_context(a:text)
+endfunction
+
+function! wplus#ai#_test_set_suggestion(content) abort
+    let s:suggest_content = a:content
+endfunction
+
+function! wplus#ai#_test_clean_commit(content) abort
+    return s:clean_commit_message(a:content)
+endfunction
+
+function! wplus#ai#_test_build_commit_prompt(stat, diff) abort
+    return s:build_commit_prompt(a:stat, a:diff)
 endfunction

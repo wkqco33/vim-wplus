@@ -208,6 +208,8 @@ let g:wplus_ai_temperature = 0.7
 let g:wplus_ai_max_tokens = 2000
 let g:wplus_ai_timeout = 60
 let g:wplus_ai_commit_diff_max_bytes = 32768
+let g:wplus_ai_commit_max_tokens = 2048       " 커밋 메시지 최대 토큰 수
+let g:wplus_ai_tab_complete = 1               " <Tab> 스마트 완성 체이닝 활성화 (Ghost text -> 팝업 -> 인덴트)
 
 " Claude 설정 예시 (provider='claude'일 때)
 " let g:wplus_ai_provider = 'claude'
@@ -281,7 +283,7 @@ nnoremap <leader>fR :WgrepRx<CR>             " 정규표현식 검색
 " <M-F>       : 코드 포매팅 (:Wformat)
 
 " ── 4. AI Assistant & Health ──
-" ※ <Tab>은 직접 매핑하지 않습니다. (LSP 모듈이 AI 제안 -> 팝업 -> 들여쓰기 -> 완성을 자동 체이닝)
+" ※ <Tab>은 기본 제공되는 스마트 탭이 Ghost Text 제안 수락 -> 팝업 메뉴 선택 -> 일반 탭(인덴트) 순으로 자동 처리합니다. (g:wplus_ai_tab_complete=1)
 nnoremap <leader>am :WaiCommitMsg<CR>        " AI Git 커밋 메시지 생성
 nnoremap <leader>ac :WaiCancel<CR>           " 진행 중인 AI 요청 취소
 nnoremap <leader>ai :WaiToggleSuggest<CR>    " Ghost Text 자동완성 온/오프

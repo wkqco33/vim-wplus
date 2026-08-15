@@ -117,3 +117,45 @@ function! Test_ai_large_payload_stdin_chunked() abort
     call assert_equal(32768, l:total_len, 'Bounded payload should be sent without E631 error')
     silent! call job_stop(l:job)
 endfunction
+
+function! Test_ai_smart_tab_and_plug_mappings() abort
+    call wplus#ai#setup()
+    
+    " Test smart_tab when no suggestion
+    call wplus#ai#dismiss_suggestion()
+    call assert_false(wplus#ai#has_suggestion(), 'Should have no suggestion')
+    call assert_equal("\<Tab>", wplus#ai#smart_tab(), 'smart_tab should return <Tab> when no suggestion')
+
+    " Test smart_tab when suggestion exists
+    call wplus#ai#_test_set_suggestion('const answer = 42;')
+    call assert_true(wplus#ai#has_suggestion(), 'Should have suggestion')
+    call assert_equal('const answer = 42;', wplus#ai#smart_tab(), 'smart_tab should return suggestion')
+    call assert_false(wplus#ai#has_suggestion(), 'Suggestion should be consumed after accept')
+
+    " Test Plug mappings exist in insert mode
+    call assert_true(!empty(maparg('<Plug>WaiAcceptSuggest', 'i')), '<Plug>WaiAcceptSuggest should be defined')
+    call assert_true(!empty(maparg('<Plug>WaiAcceptWord', 'i')), '<Plug>WaiAcceptWord should be defined')
+    call assert_true(!empty(maparg('<Plug>WaiSmartTab', 'i')), '<Plug>WaiSmartTab should be defined')
+endfunction
+
+function! Test_ai_clean_commit_message() abort
+    call wplus#ai#setup()
+    let l:raw_with_think = "<think>\nThinking about changes...\n</think>\nfeat(ai): add smart tab completion\n\n- Support smart tab\n- Fix commit prompt"
+    let l:cleaned = wplus#ai#_test_clean_commit(l:raw_with_think)
+    call assert_equal("feat(ai): add smart tab completion\n\n- Support smart tab\n- Fix commit prompt", l:cleaned, 'Should strip <think> tags')
+
+    let l:raw_with_markdown = "```gitcommit\nfix(git): improve commit message generation\n\n- Add diff stat\n```"
+    let l:cleaned2 = wplus#ai#_test_clean_commit(l:raw_with_markdown)
+    call assert_equal("fix(git): improve commit message generation\n\n- Add diff stat", l:cleaned2, 'Should strip markdown fences')
+endfunction
+
+function! Test_ai_commit_prompt_structure() abort
+    call wplus#ai#setup()
+    let l:stat = " src/main.rs | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)"
+    let l:diff = "diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,3 @@"
+    let l:prompt = wplus#ai#_test_build_commit_prompt(l:stat, l:diff)
+    
+    call assert_true(l:prompt =~# 'Conventional Commits', 'Prompt should guide Conventional Commits')
+    call assert_true(l:prompt =~# 'src/main\.rs', 'Prompt should include diff stat')
+    call assert_true(l:prompt =~# 'diff --git', 'Prompt should include diff content')
+endfunction
