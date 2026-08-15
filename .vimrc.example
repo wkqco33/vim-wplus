@@ -11,23 +11,31 @@ let mapleader = " "
 call plug#begin('~/.vim/plugged')
 
 " 메인 플러그인 (wplus)
-Plug '/path/to/vim-wplus'
+Plug 'wkqco33/vim-wplus'
+" 로컬 개발 시: Plug '/path/to/vim-wplus'
 
-" UI / 필수 도구
+" UI / 필수 도구 (선택)
 Plug 'morhetz/gruvbox'                  " 컬러 테마
 Plug 'tpope/vim-fugitive'               " Git 명령어 통합 (:Git)
 Plug 'preservim/tagbar'                 " 코드 구조 보기 (ctags 필요)
+
+" 마이그레이션 권장 플러그인 (선택)
+Plug 'tpope/vim-repeat'                 " '.'로 surround/commentary 등 복합 동작 반복 지원
+Plug 'mbbill/undotree'                  " 비주얼 실행 취소 히스토리 트리 탐색기 (:UndotreeToggle)
 
 " 언어별 Syntax (선택사항)
 Plug 'sheerun/vim-polyglot'
 
 " 참고: 아래 플러그인들은 wplus로 완전히 대체됨
 " - neoclide/coc.nvim         -> wplus LSP
-" - juneguun/fzf / fzf.vim    -> wplus finder/grep
+" - juneguun/fzf / fzf.vim    -> wplus finder/grep/history
 " - preservim/nerdtree        -> wplus explorer
 " - dense-analysis/ale        -> wplus LSP/format
 " - tpope/vim-commentary      -> wplus commentary
 " - airblade/vim-gitgutter     -> wplus gitgutter
+" - tpope/vim-surround        -> wplus surround
+" - ThePrimeagen/harpoon      -> wplus harpoon
+" - svermeulen/vim-easyclip   -> wplus register
 
 call plug#end()
 
@@ -68,11 +76,11 @@ silent! colorscheme gruvbox
 " wplus 설정 가이드
 " ──────────────────────────────────────────────────────────
 
-" ═ 핵심 기능 ═
-
-" LSP (Language Server Protocol)
+" ═ 1. LSP (Language Server Protocol) ═
 let g:wplus_lsp_enabled = 1
 let g:wplus_lsp_debug = 0
+let g:wplus_lsp_log_enabled = 0         " 디버그 로그 파일 (lsp.log)
+let g:wplus_lsp_inlay_hints = 1         " Inlay Hints 가상 텍스트 표시
 let g:wplus_lsp_servers = {
     \ 'python': { 'cmd': ['pylsp'] },
     \ 'go': { 'cmd': ['gopls'] },
@@ -83,245 +91,269 @@ let g:wplus_lsp_servers = {
     \ 'cpp': { 'cmd': ['clangd'] }
 \ }
 let g:wplus_lsp_definition_split = 0    " 0=same, 1=split, 2=vsplit, 3=tab
-let g:wplus_lsp_cache_enabled = 1
 let g:wplus_lsp_cache_ttl = 300         " 캐시 유효시간(초)
+let g:wplus_lsp_sig_delay = 100         " 시그니처 힌트 지연(ms)
+let g:wplus_lsp_diag_delay = 300        " 진단 갱신 지연(ms)
 
-" Gitgutter (Git 상태 표시)
+" ═ 2. Git 모듈 (Gitgutter, Blame, Diffview, Conflict) ═
 let g:wplus_gitgutter_enabled = 1
 let g:wplus_gitgutter_disable_on_large_files = 1
 let g:wplus_gitgutter_file_size_limit = 500000
+let g:wplus_gitgutter_sign_add    = '┃'
+let g:wplus_gitgutter_sign_change = '┃'
+let g:wplus_gitgutter_sign_delete = '▁'
 
-" 터미널
-let g:wplus_terminal_height = 15
-let g:wplus_terminal_position = 'bottom'  " bottom, top, left, right
+let g:wplus_blame_enabled = 1
+let g:wplus_blame_delay = 500           " 표시 지연 (ms)
+let g:wplus_blame_prefix = '   '
+let g:wplus_blame_template = '<author>, <date> • <summary>'
+let g:wplus_blame_date_format = '%y/%m/%d'
 
-" Explorer (파일 탐색기)
+let g:wplus_diffview_enabled = 1
+let g:wplus_conflict_enabled = 1
+let g:wplus_conflict_auto_highlight = 1
+
+" ═ 3. 탐색 및 검색 (Finder, Explorer, Grep, History, Harpoon) ═
+let g:wplus_finder_enabled = 1
+let g:wplus_finder_fuzzy_limit = 10000
+let g:wplus_finder_width_ratio = 0.7
+let g:wplus_finder_height_ratio = 0.4
+
 let g:wplus_explorer_enabled = 1
 let g:wplus_explorer_width = 35
-let g:wplus_explorer_auto_cd = 1
 let g:wplus_explorer_ignore = ['.git', '.node_modules', '__pycache__', '.venv']
+let g:wplus_explorer_max_entries = 1000
+let g:wplus_explorer_max_depth = 8
 
-" Finder (빠른 파일 검색)
-let g:wplus_finder_enabled = 1
-let g:wplus_finder_match_limit = 10000
-let g:wplus_finder_height = 0.5
-
-" Grep (전역 검색)
 let g:wplus_grep_backend = 'rg'         " rg, git grep, grep
 let g:wplus_grep_max_results = 1000
 let g:wplus_grep_ignore_vcs = 1
 
-" Format (코드 포매팅)
+let g:wplus_history_enabled = 1
+let g:wplus_history_max = 50            " 최근 파일 최대 개수
+let g:wplus_history_project_only = 0     " 1이면 기본으로 현재 프로젝트 파일만
+
+let g:wplus_harpoon_enabled = 1
+let g:wplus_harpoon_max_slots = 4       " 파일 북마크 최대 슬롯 (기본 4)
+
+" ═ 4. 실행 / 프로젝트 / 세션 (Run, Scratch, Project, Session, Terminal) ═
+let g:wplus_run_enabled = 1
+let g:wplus_run_use_terminal = 1        " 1=터미널 실행, 0=quickfix 출력
+let g:wplus_run_commands = {}           " 파일타입별 커스텀 실행 명령 ({'python': 'python3 %s'})
+let g:wplus_build_commands = {}         " 빌드 마커별 커스텀 빌드 명령
+
+let g:wplus_scratch_enabled = 1
+let g:wplus_scratch_file = expand('~/.vim/scratch.txt')
+let g:wplus_scratch_height = 15
+let g:wplus_scratch_ft = 'markdown'
+
+let g:wplus_project_enabled = 1
+let g:wplus_project_config = '.wplus.vim'
+let g:wplus_project_trust_all = 0       " 1이면 .wplus.vim 보안 프롬프트 건너뛰고 신뢰
+
+let g:wplus_session_enabled = 1
+let g:wplus_session_autoload = 1
+let g:wplus_session_autosave = 1
+let g:wplus_session_max_files = 50
+
+let g:wplus_terminal_enabled = 1
+let g:wplus_terminal_height = 15
+let g:wplus_terminal_position = 'bottom'  " bottom, top, left, right
+
+" ═ 5. 편집 및 UI 모듈 ═
+let g:wplus_fold_enabled = 1
+let g:wplus_fold_method = 'indent'      " 'indent' | 'lsp' | 'syntax'
+let g:wplus_fold_level = 99             " 초기 foldlevel (99=모두 열기)
+let g:wplus_fold_column = 0             " foldcolumn 너비 (0=숨김)
+
+let g:wplus_marks_enabled = 1           " Vim 내장 마크(a-z) 시각화
+let g:wplus_marks_sign_prefix = ''
+
+let g:wplus_surround_enabled = 1
+let g:wplus_pairs_enabled = 1
+let g:wplus_commentary_enabled = 1
+
+let g:wplus_indent_enabled = 1
+let g:wplus_indent_char = '▏'
+let g:wplus_indent_ft_exclude = ['help', 'nerdtree', 'undotree', 'tagbar']
+
+let g:wplus_illuminate_enabled = 1
+let g:wplus_illuminate_delay = 200
+let g:wplus_illuminate_ft_block = ['help', 'nerdtree']
+
+let g:wplus_yankhighlight_enabled = 1
+let g:wplus_yank_duration = 250         " 복사 하이라이트 지속시간(ms)
+
 let g:wplus_format_enabled = 1
 let g:wplus_format_on_save = 0
 let g:wplus_format_preserve_undo = 1
 
-" Blame (Git Blame)
-let g:wplus_blame_enabled = 1
-
-" Session (세션 관리)
-let g:wplus_session_enabled = 1
-let g:wplus_session_auto_restore = 1
-let g:wplus_session_auto_save = 1
-
-" ─────────────────────────────────────────────────────────
-" ═ 신규 기능 설정 ═
-" ─────────────────────────────────────────────────────────
-
-" ┌─────────────────────────────────────────────────────────┐
-" │ 1. AI Assistant (ChatGPT, Claude, Azure OpenAI, Ollama)│
-" └─────────────────────────────────────────────────────────┘
-"
-" 제공자 선택: 'openai' | 'claude' | 'azure' | 'ollama'
-" 명령어: :WaiComment, :WaiComplete, :WaiRefactor
-"
-
-" OpenAI 설정
-let g:wplus_ai_provider = 'openai'
-let g:wplus_ai_api_key = ''               " API 키 필수 설정
-let g:wplus_ai_model = 'gpt-3.5-turbo'   " gpt-3.5-turbo, gpt-4
-let g:wplus_ai_temperature = 0.7         " 0.0~1.0 (낮을수록 결정적)
-let g:wplus_ai_max_tokens = 2000
-
-" Claude 설정 (provider='claude'일 때)
-" let g:wplus_ai_provider = 'claude'
-" let g:wplus_ai_api_key = ''
-" let g:wplus_ai_model = 'claude-3-sonnet-20240229'
-
-" Azure OpenAI 설정 (provider='azure'일 때)
-" let g:wplus_ai_provider = 'azure'
-" let g:wplus_ai_api_key = ''
-" let g:wplus_ai_model = 'gpt-4'
-" let g:wplus_ai_azure_resource = 'my-company-ai'        " Azure 리소스명
-" let g:wplus_ai_azure_deployment = 'gpt-4-deployment'   " 배포명
-" let g:wplus_ai_azure_api_version = '2024-02-15-preview'
-
-" Ollama 설정 (provider='ollama'일 때) — API 키 불필요
-" Ollama 설치 후 `ollama pull <model>` 로 모델을 받아두어야 함
-" native /api/chat 엔드포인트를 사용한다
-" let g:wplus_ai_provider = 'ollama'
-" let g:wplus_ai_model = 'deepseek-v4-flash:cloud' " deepseek-v4-flash:cloud, qwen2.5-coder:7b 등
-" let g:wplus_ai_ollama_host = 'http://localhost:11434'  " 기본값
-" thinking 모델(qwen3, deepseek-r1 등)은 추론 토큰 때문에 느리므로 기본으로 추론을 끈다.
-" let g:wplus_ai_ollama_think = 0           " 기본 0(끔, 속도 극대화)
-" 모델을 메모리에 유지하는 시간. '5m'=5분 유지, '30m'=30분, '0'=즉시 해제
-" let g:wplus_ai_ollama_keep_alive = '5m'
-"
-" ── 모델 성능 및 자동완성 호환성 강화 ──
-" 1) FIM (Fill-In-Middle) 옵션: 원격/클라우드 모델에서 무응답(404/400)이 발생하는 경우 0(비활성화) 설정 권장
-" let g:wplus_ai_ollama_fim = 0
-" 2) 샘플링 튜닝: 기본 온도로 안정적인 응답 유도
-" let g:wplus_ai_temperature = 0.5
-" let g:wplus_ai_suggest_temperature = 0.2
-" let g:wplus_ai_ollama_options = {}
-
-" Ghost Text 자동완성 및 네트워크 설정
-" InsertMode에서 자동으로 AI 제안을 Ghost Text로 표시
-let g:wplus_ai_suggest_enabled = 1               " 자동완성 활성화 여부
-let g:wplus_ai_suggest_delay = 500               " 제안 대기시간 (ms, 연속 요청 스팸 방지)
-let g:wplus_ai_suggest_context_lines = 50        " prefix 수집 라인 수
-let g:wplus_ai_suggest_suffix_lines = 20         " suffix 수집 라인 수
-let g:wplus_ai_suggest_max_lines = 5             " 제안 표시할 최대 줄 수
-let g:wplus_ai_suggest_max_tokens = 300          " 제안 토큰 수 제한
-let g:wplus_ai_suggest_timeout = 15              " 클라우드 모델 응답 대기를 위한 타임아웃(15초)
-let g:wplus_ai_timeout = 60                      " 일반 AI 명령 타임아웃(60초)
-" let g:wplus_ai_suggest_debug = 1               " 문제 발생시 :messages 확인용 디버그 활성화
-let g:wplus_ai_response_max_bytes = 1048576       " AI 응답 최대 크기
-let g:wplus_ai_block_sensitive_context = 1        " 민감 파일/비밀 패턴 전송 차단
-let g:wplus_ai_sensitive_files = ['.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', '*credential*', '*secret*', '*password*', '*token*']
-" let g:wplus_ai_allow_sensitive_context = 1     " 위험: 민감 컨텍스트 전송 허용
-
-" Ghost Text 키 매핑
-" <Tab> 은 매핑하지 않는다. lsp 모듈이 버퍼 로컬로
-"   AI 제안 → 팝업메뉴 → 들여쓰기 → LSP 완성
-" 순서를 이미 체이닝하므로, 전역 inoremap <Tab> 은 그 체인을 무력화한다.
-nnoremap <Leader>ai :WaiToggleSuggest<CR>
-
-"
-" ┌─────────────────────────────────────────────────────────┐
-" │ 2. Git Conflict Resolver (충돌 해결기)                 │
-" └─────────────────────────────────────────────────────────┘
-" 
-" 명령어:
-"   :WconflictNext   - 다음 충돌로 이동
-"   :WconflictPrev   - 이전 충돌로 이동
-"   :WconflictOurs   - Ours 버전 선택
-"   :WconflictTheirs - Theirs 버전 선택
-"   :WconflictBoth   - 둘 다 선택
-"
-
-let g:wplus_conflict_enabled = 1
-let g:wplus_conflict_auto_highlight = 1
-
-"
-" ┌─────────────────────────────────────────────────────────┐
-" │ 3. TODO Manager (TODO 관리자)                          │
-" └─────────────────────────────────────────────────────────┘
-" 
-" 명령어:
-"   :WtodoQuickfix - TODO/FIXME/HACK 목록을 Quickfix에 표시
-" 
-" 검색 대상: TODO, FIXME, HACK, BUG, XXX
-"
-
 let g:wplus_todo_enabled = 1
 let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
-let g:wplus_todo_grep_backend = 'rg'      " rg, git grep, grep
+let g:wplus_todo_grep_backend = 'rg'
 
-"
-" ┌─────────────────────────────────────────────────────────┐
-" │ 4. Theme (하이라이트 및 테마 관리)                     │
-" └─────────────────────────────────────────────────────────┘
-" 
-
+let g:wplus_multicursor_enabled = 1
+let g:wplus_register_enabled = 1
+let g:wplus_outline_enabled = 1
+let g:wplus_quickfix_enabled = 1
 let g:wplus_theme = 'default'
 
-"
-" ┌─────────────────────────────────────────────────────────┐
-" │ 5. Project Trust (프로젝트 설정 보안)                   │
-" └─────────────────────────────────────────────────────────┘
-" 
-" 1이면 .wplus.vim 로드 시 보안 프롬프트 건너뛰고 바로 로드
-" let g:wplus_project_trust_all = 0
+" ═ 6. AI Assistant (OpenAI, Claude, Azure, Ollama) ═
+" 제공자 선택: 'openai' | 'claude' | 'azure' | 'ollama'
+let g:wplus_ai_enabled = 1
+let g:wplus_ai_provider = 'openai'
+let g:wplus_ai_api_key = $OPENAI_API_KEY  " 환경 변수 권장
+let g:wplus_ai_model = 'gpt-4o'
+let g:wplus_ai_temperature = 0.7
+let g:wplus_ai_max_tokens = 2000
+let g:wplus_ai_timeout = 60
+let g:wplus_ai_commit_diff_max_bytes = 32768
 
-" ─────────────────────────────────────────────────────────
-" ═ 기타 모듈 설정 ═
-" ─────────────────────────────────────────────────────────
+" Claude 설정 예시 (provider='claude'일 때)
+" let g:wplus_ai_provider = 'claude'
+" let g:wplus_ai_api_key = $ANTHROPIC_API_KEY
+" let g:wplus_ai_model = 'claude-3-5-sonnet-20241022'
 
-" Surround (괄호/따옴표)
-let g:wplus_surround_enabled = 1
+" Azure OpenAI 설정 예시 (provider='azure'일 때)
+" let g:wplus_ai_provider = 'azure'
+" let g:wplus_ai_api_key = $AZURE_OPENAI_KEY
+" let g:wplus_ai_azure_resource = 'my-company-ai'
+" let g:wplus_ai_azure_deployment = 'gpt-4-deployment'
+" let g:wplus_ai_azure_api_version = '2024-02-15-preview'
 
-" Pairs (쌍 이동)
-let g:wplus_pairs_enabled = 1
+" Ollama 설정 예시 (provider='ollama'일 때 — API 키 불필요)
+" let g:wplus_ai_provider = 'ollama'
+" let g:wplus_ai_model = 'qwen2.5-coder:7b'  " deepseek-v4-flash:cloud 등
+" let g:wplus_ai_ollama_host = 'http://localhost:11434'
+" let g:wplus_ai_ollama_think = 0            " 0=추론 과정 숨김(속도 극대화)
+" let g:wplus_ai_ollama_keep_alive = '30m'   " 세션 메모리 유지 시간
+" let g:wplus_ai_ollama_fim = 0              " 0=chat 방식(안정적, 권장), 1=로컬 FIM 전용 모델용
+" let g:wplus_ai_ollama_options = {}
 
+" Ghost Text 인라인 자동완성 및 보안 설정
+let g:wplus_ai_suggest_enabled = 1          " 자동완성 활성화
+let g:wplus_ai_suggest_delay = 400          " 입력 후 대기시간 (ms)
+let g:wplus_ai_suggest_context_lines = 50   " 상단 prefix 라인 수
+let g:wplus_ai_suggest_suffix_lines = 20    " 하단 suffix 라인 수
+let g:wplus_ai_suggest_max_lines = 3        " 표시할 최대 제안 라인 수
+let g:wplus_ai_suggest_max_tokens = 300
+let g:wplus_ai_suggest_temperature = 0.2
+let g:wplus_ai_suggest_timeout = 15
 
-" Commentary (주석 토글)
-let g:wplus_commentary_enabled = 1
-
-" Indent (들여쓰기 가이드)
-let g:wplus_indent_enabled = 1
+let g:wplus_ai_block_sensitive_context = 1   " 민감 파일/비밀 패턴 전송 차단
+let g:wplus_ai_sensitive_files = ['.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', '*credential*', '*secret*', '*password*', '*token*']
+let g:wplus_ai_response_max_bytes = 1048576  " 응답 최대 크기
 
 " ──────────────────────────────────────────────────────────
-" 키 매핑 (wplus 명령어)
+" 키 매핑 가이드 (접두 충돌 없는 깔끔한 키맵)
 " ──────────────────────────────────────────────────────────
 
-" 1. 탐색 및 검색
-nnoremap <leader>e  :WexplorerToggle<CR>      " 탐색기 토글
-nnoremap <leader>p  :WfindFiles<CR>           " 파일 검색
-nnoremap <leader>b  :WfindBuffers<CR>         " 버퍼 검색
-nnoremap <leader>m  :WfindMRU<CR>             " 최근 파일
-nnoremap <leader>fg :Wgrep <C-r><C-w><CR>    " 단어 검색
-nnoremap <leader>fR :WgrepRx<CR>              " 정규표현식 검색
-nnoremap <leader>fw :WgrepWord<CR>            " 단어 검색 (엄격)
+" ── 1. 탐색 및 파일 검색 (플러그인 기본 내장) ──
+" <leader>ff  : 파일 찾기 (:WfindFiles)
+" <leader>fb  : 열린 버퍼 찾기 (:WfindBuffers)
+" <leader>fr  : 최근 파일 찾기 (:WfindMRU)
+" <leader>fh  : 최근 히스토리 전체 (:Whistory)
+" <leader>fH  : 프로젝트 내 최근 히스토리 (:WhistoryProject)
+" <leader>e   : 파일 탐색기 토글 (:WexplorerToggle)
+" :A / :AV / :AS : 헤더↔소스 전환 (altfile)
 
-" 2. LSP 기능 (기본 바인딩)
-" gd   - 정의 이동
-" gr   - 참조 찾기
-" K    - 호버 정보
-" <F2> - 이름 변경 (플러그인에서 설정)
+" 커스텀 Grep 검색 매핑
+nnoremap <leader>fg :Wgrep <C-r><C-w><CR>   " 커서 위치 단어 검색
+nnoremap <leader>fw :WgrepWord<CR>           " 단어 일치 검색
+nnoremap <leader>fR :WgrepRx<CR>             " 정규표현식 검색
 
-" 3. AI Assistant & Health
-nnoremap <leader>am :WaiCommitMsg<CR>         " AI 커밋 메시지 생성
-nnoremap <leader>ac :WaiCancel<CR>            " AI 진행 중 요청 취소
-nnoremap <leader>ai :WaiToggleSuggest<CR>     " Ghost Text 토글
-nnoremap <leader>hc :WplusHealth<CR>          " 진단 보고서 실행
-vnoremap <leader>ar :WaiRefactor<CR>          " 리팩토링 제안
+" ── 2. Harpoon 북마크 (플러그인 기본 내장) ──
+" <leader>ha  : 현재 파일 슬롯에 추가 (:WharpoonAdd)
+" <leader>hd  : 현재 파일 슬롯에서 제거 (:WharpoonRemove)
+" <leader>hl  : 슬롯 목록 팝업 (:WharpoonList)
+" <leader>h1~4: 슬롯 1~4번 파일로 즉시 점프
 
-" 4. Git 기능
-nnoremap <leader>bl :BlamerToggle<CR>         " Git Blame 토글
-nnoremap <leader>cn :WconflictNext<CR>        " 다음 충돌
-nnoremap <leader>cp :WconflictPrev<CR>        " 이전 충돌
-nnoremap <leader>co :WconflictOurs<CR>        " Ours 선택
-nnoremap <leader>ct :WconflictTheirs<CR>      " Theirs 선택
-nnoremap <leader>cb :WconflictBoth<CR>        " 둘 다 선택
+" ── 3. LSP 코드 도구 (플러그인 기본 내장) ──
+" gd          : 정의 이동 (:WlspDefinition)
+" gr          : 참조 찾기 (:WlspReferences)
+" K           : 호버 심볼 정보 (:WlspHover)
+" <leader>rn  : 심볼 이름 변경 (:WlspRename)
+" <leader>ca  : 코드 액션 (:WlspCodeAction)
+" ]d / [d     : 다음/이전 진단 항목
+" <leader>d   : 현재 줄 진단 팝업 (:WlspDiagPopup)
+" Insert <C-s>: 시그니처 힌트 (:WlspSignatureHelp)
+" <leader>o   : 코드 아웃라인 토글 (:WoutlineToggle)
+" <M-F>       : 코드 포매팅 (:Wformat)
 
-" 5. TODO/Quickfix
-nnoremap <leader>tt :WtodoQuickfix<CR>        " TODO 목록
+" ── 4. AI Assistant & Health ──
+" ※ <Tab>은 직접 매핑하지 않습니다. (LSP 모듈이 AI 제안 -> 팝업 -> 들여쓰기 -> 완성을 자동 체이닝)
+nnoremap <leader>am :WaiCommitMsg<CR>        " AI Git 커밋 메시지 생성
+nnoremap <leader>ac :WaiCancel<CR>           " 진행 중인 AI 요청 취소
+nnoremap <leader>ai :WaiToggleSuggest<CR>    " Ghost Text 자동완성 온/오프
+nnoremap <leader>hc :WplusHealth<CR>         " wplus 전체 상태 및 키맵 충돌 진단
 
-" 6. Undo/Terminal
-nnoremap <leader>u  :UndotreeToggle<CR>       " Undo tree
-nnoremap <leader>tm :WplusTerminalToggle<CR>  " 터미널
+vnoremap <leader>ar :WaiReview<CR>           " [Visual] 선택 영역 코드 리뷰
+vnoremap <leader>ae :WaiExplain<CR>          " [Visual] 선택 영역 단계별 설명
+vnoremap <leader>af :WaiRefactor<CR>         " [Visual] 선택 영역 리팩토링 제안
 
-" 7. 버퍼/윈도우
-nnoremap <leader>bd :Bdelete<CR>              " 버퍼 삭제
-nnoremap <leader>t  :TagbarToggle<CR>         " Tagbar
+" ── 5. Git 도구 (Gitgutter, Blame, Diffview, Conflict) ──
+" ]h / [h     : 다음/이전 Git 변경 Hunk (gitgutter)
+" <leader>hp  : Hunk 미리보기
+" <leader>hs  : Hunk 스테이징
+" <leader>hr  : Hunk 원복 (Revert)
+" <leader>bl  : 인라인 Git Blame 토글 (:BlamerToggle)
+" <leader>gd  : 현재 파일 Git Diff (:WdiffviewFile)
+" <leader>gD  : 저장소 전체 Git Diff (:WdiffviewRepo)
 
-" 8. 윈도우 네비게이션
+" Git 충돌 해결 (Conflict Resolver)
+nnoremap <leader>cn :WconflictNext<CR>       " 다음 충돌로 이동
+nnoremap <leader>cp :WconflictPrev<CR>       " 이전 충돌로 이동
+nnoremap <leader>co :WconflictOurs<CR>       " Ours 버전 채택
+nnoremap <leader>ct :WconflictTheirs<CR>     " Theirs 버전 채택
+nnoremap <leader>cb :WconflictBoth<CR>       " 둘 다 채택
+
+" ── 6. 빌드 / 실행 / 프로젝트 / 스크래치 (기본 내장) ──
+" <leader>rr  : 현재 파일 실행 (:Wrun)
+" <leader>rb  : 프로젝트 빌드 (:Wbuild)
+" <leader>rt  : 테스트 실행 (:Wtest)
+" <leader>sc  : 스크래치 버퍼 하단 토글 (:WscratchToggle)
+" <leader>sv  : 스크래치 버퍼 수직 분할 (:WscratchVertical)
+" <leader>pe  : 프로젝트 .wplus.vim 설정 편집 (:WprojectEdit)
+" <leader>pr  : 프로젝트 설정 재로드 (:WprojectReload)
+" <leader>tm  : 터미널 토글 (:WplusTerminalToggle)
+
+" ── 7. UI / 마크 / 폴드 / Quickfix / 멀티커서 ──
+" <leader>zz / za / zc / zo : 스마트 폴드 토글/모두열기/모두닫기/주변닫기
+" <leader>ml  : 마크 목록 팝업 (:WmarksList)
+" <leader>md  : 현재 줄 마크 삭제 (:WmarksDelete)
+" <leader>xq  : Quickfix 창 토글
+" <leader>xl  : Location list 창 토글
+" ]q / [q     : 다음/이전 Quickfix 항목
+" <leader>xr  : Quickfix 목록 기반 프로젝트 일괄 치환
+" <leader>tq  : TODO 목록 Quickfix (:WtodoQuickfix)
+" <leader>ft  : TODO 목록 Finder (:WtodoFinder)
+" <C-n>       : 다음 일치 단어 멀티커서 추가
+" <leader>vx  : 현재 멀티커서 건너뛰기
+" <leader>va  : 모든 일치 단어 멀티커서 일괄 선택
+" \" / @      : 레지스터 / 매크로 레지스터 미리보기 팝업
+
+" ── 8. 버퍼 관리 및 창 이동 ──
+nnoremap <leader>bd :Bdelete<CR>             " 창 분할을 유지하며 버퍼 닫기
+nnoremap <leader>bD :Bwipeout<CR>            " 버퍼 완전 삭제
+nnoremap <leader>bt :TagbarToggle<CR>        " Tagbar 토글 (<leader>t 충돌 방지)
+nnoremap <leader>u  :UndotreeToggle<CR>      " Undotree 토글
+
+" 창 간 빠른 이동
 nnoremap <C-h> <C-w>h
 nnoremap <C-j> <C-w>j
 nnoremap <C-k> <C-w>k
 nnoremap <C-l> <C-w>l
 
-" 9. 일반 편의 매핑
+" ── 9. 일반 편의 매핑 ──
 nnoremap <Tab>   :bnext<CR>
 nnoremap <S-Tab> :bprev<CR>
-nnoremap <silent> <leader>h :noh<CR>
+nnoremap <silent> <leader>nh :noh<CR>        " 검색 하이라이트 끄기 (<leader>h 충돌 방지)
 nnoremap <leader>w :w<CR>
 nnoremap <leader>q :q<CR>
 nnoremap <leader>Q :qa!<CR>
 
 " ──────────────────────────────────────────────────────────
-" 자동 명령
+" 자동 명령 (Autocmds)
 " ──────────────────────────────────────────────────────────
 
 " 파일 열 때 마지막 커서 위치 복귀

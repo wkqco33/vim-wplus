@@ -419,39 +419,61 @@ function! s:is_sensitive_context(text) abort
         return 0
     endif
     let l:name = expand('%:t')
-    for l:pattern in get(g:, 'wplus_ai_sensitive_files', [])
-        if exists('*glob2regpat') && l:name =~# glob2regpat(l:pattern)
-            return 1
-        elseif l:name ==# l:pattern
-            return 1
-        endif
-    endfor
-    for l:line in split(a:text, "\n", 1)
-        " Match assignments, not option names or documentation references.
-        if l:line =~? '-----BEGIN.*PRIVATE KEY-----' && a:text =~? '-----END.*PRIVATE KEY-----'
-            return 1
-        endif
-        if l:line =~? '\capi[_-]\?key\s*[=:]' || l:line =~? '\csecret[_-]\?key\s*[=:]' || l:line =~? '\cpassword\s*[=:]'
-            let l:value = substitute(matchstr(l:line, '[=:].*$'), '^[=:]\s*', '', '')
-            " A credential keyword is only a real secret when the right-hand side
-            " is a literal value. References such as settings.API_KEY,
-            " os.environ["X"], get_secret() or $VAR are common in real code and
-            " must not block commit diffs.
-            if s:value_is_literal_secret(l:value)
+    if !empty(l:name) && l:name !=# 'COMMIT_EDITMSG'
+        for l:pattern in get(g:, 'wplus_ai_sensitive_files', [])
+            if exists('*glob2regpat') && l:name =~# glob2regpat(l:pattern)
+                return 1
+            elseif l:name ==# l:pattern
                 return 1
             endif
+        endfor
+    endif
+    for l:line in split(a:text, "\n", 1)
+        " Match private key envelopes
+        if l:line =~? '-----BEGIN.*PRIVATE KEY-----' && a:text =~? '-----END.*PRIVATE KEY-----'
+            return 1
         endif
         if l:line =~? '\cauthorization:\s*bearer\s\+\S\{16,}' || l:line =~? '\cbearer\s\+[A-Za-z0-9._~-]\{16,}'
             return 1
         endif
-        if l:line =~? '\caws_access_key_id\s*[=:]' || l:line =~? '\caws_secret_access_key\s*[=:]'
-            let l:value = substitute(matchstr(l:line, '[=:].*$'), '^[=:]\s*', '', '')
+        " Check credential keyword assignments (api_key, secret_key, password, aws credentials)
+        if l:line =~? '\v\c%(api[_-]?key|secret[_-]?key|password|aws_access_key_id|aws_secret_access_key)\s*[=:]'
+            let l:value = s:extract_credential_rhs_value(l:line)
             if s:value_is_literal_secret(l:value)
                 return 1
             endif
         endif
     endfor
     return 0
+endfunction
+
+" Extract only the right-hand side value after an assignment keyword, stripping
+" surrounding quotes, inline comments, and delimiters.
+function! s:extract_credential_rhs_value(line) abort
+    let l:parts = matchlist(a:line, '\v\c%(api[_-]?key|secret[_-]?key|password|aws_access_key_id|aws_secret_access_key)\s*[=:]\s*(.*)')
+    if empty(l:parts) || empty(l:parts[1])
+        return ''
+    endif
+    let l:raw = trim(l:parts[1])
+
+    " Single-quoted literal: 'secret_value' [optional comment]
+    let l:sq = matchlist(l:raw, "^'\\([^']*\\)'")
+    if !empty(l:sq)
+        return l:sq[1]
+    endif
+
+    " Double-quoted literal: "secret_value" [optional comment]
+    let l:dq = matchlist(l:raw, '^"\([^"]*\)"')
+    if !empty(l:dq)
+        return l:dq[1]
+    endif
+
+    " Unquoted identifier / expression / reference: strip trailing inline comments & punctuation
+    let l:val = substitute(l:raw, '\s*#.*$', '', '')
+    let l:val = substitute(l:val, '\s*//.*$', '', '')
+    let l:val = substitute(l:val, '\s*".*$', '', '')
+    let l:val = substitute(l:val, '[,;]\s*$', '', '')
+    return trim(l:val)
 endfunction
 
 " Return true only when the right-hand side of a credential assignment is a
