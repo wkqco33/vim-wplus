@@ -21,7 +21,7 @@ vnoremap <leader>ar :WaiReview<CR>
 vnoremap <leader>ae :WaiExplain<CR>
 vnoremap <leader>af :WaiRefactor<CR>
 nnoremap <leader>am :WaiCommitMsg<CR>
-inoremap <expr> <Tab> wplus#ai#accept_suggestion()
+" <Tab>은 기본 내장 스마트 탭으로 자동 지원됩니다. (g:wplus_ai_tab_complete=1)
 ```
 
 ---
@@ -117,9 +117,20 @@ InsertMode에서 타이핑을 멈추면 AI가 다음 코드를 회색 ghost text
 
 ### 수락 키 설정
 
+기본적으로 `g:wplus_ai_tab_complete = 1`이 설정되어 있어 `<Tab>`을 누르면:
+1. Ghost Text가 표시 중이면 제안을 즉시 수락합니다.
+2. 팝업 메뉴가 열려 있으면 다음 항목을 선택합니다 (`<C-n>`).
+3. 그 외에는 일반 탭/들여쓰기를 수행합니다.
+
+수동으로 매핑하거나 다른 키를 사용하려면:
+
 ```vim
-" Ghost Text 전체 수락
-inoremap <expr> <Tab> wplus#ai#accept_suggestion()
+" 스마트 탭 수락
+inoremap <expr> <Tab> wplus#ai#smart_tab()
+
+" Ghost Text 전체 수락 (<Plug> 매핑)
+imap <Tab> <Plug>WaiSmartTab
+" 또는: inoremap <expr> <Tab> wplus#ai#accept_suggestion()
 
 " 단어 단위 수락
 inoremap <expr> <C-Right> wplus#ai#accept_word_suggestion()
@@ -127,8 +138,6 @@ inoremap <expr> <C-Right> wplus#ai#accept_word_suggestion()
 " 명시적 취소
 inoremap <C-e> <Cmd>WaiDismissSuggest<CR>
 ```
-
-> `<Tab>`을 snippet 점프나 LSP 완성에 이미 사용 중이면 `<C-g>` 등 다른 키를 사용하세요.
 
 ### Ghost Text 설정
 

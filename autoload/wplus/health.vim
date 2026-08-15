@@ -30,6 +30,7 @@ let s:known_options = [
     \ 'wplus_ai_ollama_options', 'wplus_ai_suggest_enabled', 'wplus_ai_suggest_delay',
     \ 'wplus_ai_suggest_context_lines', 'wplus_ai_suggest_suffix_lines', 'wplus_ai_suggest_max_tokens',
     \ 'wplus_ai_suggest_max_lines', 'wplus_ai_suggest_temperature', 'wplus_ai_suggest_debug',
+    \ 'wplus_ai_tab_complete', 'wplus_ai_commit_max_tokens', 'wplus_ai_commit_prompt',
     \ 'wplus_ai_timeout', 'wplus_ai_suggest_timeout', 'wplus_ai_response_max_bytes', 'wplus_ai_request_max_bytes',
     \ 'wplus_ai_block_sensitive_context', 'wplus_ai_allow_sensitive_context',
     \ 'wplus_ai_sensitive_files', 'wplus_ai_openai_endpoint', 'wplus_multicursor_enabled', 'wplus_register_enabled',

@@ -102,7 +102,11 @@
 | `:WaiFixDiag` | Normal | LSP 진단 수정 |
 | `:WaiCommitMsg` | Normal | 커밋 메시지 생성 |
 | `:WaiToggleSuggest` | Normal | Ghost Text 토글 |
-| `<Tab>` (Insert) | Insert | Ghost Text 수락 |
+| `<Tab>` (Insert) | Insert | 스마트 탭 (Ghost Text 수락 → 팝업 메뉴 → 인덴트) |
+| `<Plug>WaiAcceptSuggest` | Insert | Ghost Text 수락 |
+| `<Plug>WaiAcceptWord` | Insert | Ghost Text 다음 단어 수락 |
+| `<Plug>WaiSmartTab` | Insert | 스마트 탭 수락/완성 |
+| `<Plug>WaiDismissSuggest` | Insert | Ghost Text 닫기 |
 
 ---
 
@@ -171,7 +175,6 @@ nnoremap <C-k> <C-w>k
 nnoremap <C-l> <C-w>l
 ```
 
-> **`<Tab>` 을 직접 매핑하지 말 것.** lsp 모듈이 버퍼 로컬로
-> AI 제안 → 팝업메뉴 → 들여쓰기 → LSP 완성 순서를 이미 체이닝한다.
-> 전역 `inoremap <expr> <Tab> wplus#ai#accept_suggestion()` 은 그 체인을
-> 무력화하고 LSP 완성을 못 쓰게 만든다.
+> **`<Tab>` 동작 방식**: `g:wplus_ai_tab_complete = 1`(기본값) 설정 시, `<Tab>`은
+> AI Ghost Text 수락 → 팝업 메뉴 선택(`pumvisible()`) → 일반 탭/들여쓰기 순으로 스마트하게 체이닝됩니다.
+> 원치 않을 경우 `let g:wplus_ai_tab_complete = 0`으로 비활성화하거나 `<Plug>WaiSmartTab`을 원하는 키에 매핑할 수 있습니다.
