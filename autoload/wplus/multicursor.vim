@@ -1,11 +1,11 @@
 " wplus/multicursor.vim — Multi-cursor: select occurrences and apply edits
 " Mappings:
-"   <C-n>  — add next occurrence of word under cursor
-"   <C-x>  — skip current occurrence, select next
-"   <C-a>  — select all occurrences in buffer
-"   c      — change all selected occurrences (prompt for replacement)
-"   d      — delete all selected occurrences
-"   <Esc>  — exit multi-cursor mode
+"   <C-n>       — add next occurrence of word under cursor
+"   <leader>vx  — skip current occurrence, select next
+"   <leader>va  — select all occurrences in buffer
+"   c           — change all selected occurrences (prompt for replacement)
+"   d           — delete all selected occurrences
+"   <Esc>       — exit multi-cursor mode
 
 if exists('g:autoloaded_wplus_multicursor') | finish | endif
 let g:autoloaded_wplus_multicursor = 1

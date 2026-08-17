@@ -73,14 +73,14 @@ function(arg1, arg2, arg3)
 
 ## multicursor — 다중 커서
 
-| 키 | 모드 | 동작 |
-|----|------|------|
-| `<C-n>` | Normal | 커서 아래 단어의 다음 일치 항목을 다중 선택에 추가 |
-| `<C-x>` | Normal | 현재 다중 선택 항목 중 가장 최근 것을 취소하고 다음 항목 선택 |
-| `<C-a>` | Normal | 현재 버퍼 내 모든 동일 단어 한 번에 다중 선택 |
-| `c` | Normal | 선택된 모든 항목 치환 (입력 프롬프트 팝업) |
-| `d` | Normal | 선택된 모든 항목 삭제 |
-| `<Esc>` | Normal | 멀티커서 모드 종료 및 다중 선택 해제 |
+| 키 / 명령 | 모드 | 동작 |
+|-----------|------|------|
+| `<C-n>` / `:WmulticursorAddNext` | Normal | 커서 아래 단어의 다음 일치 항목을 다중 선택에 추가 |
+| `<leader>vx` / `:WmulticursorSkip` | Normal | 현재 일치 항목을 건너뛰고 다음 항목 선택 |
+| `<leader>va` / `:WmulticursorSelectAll` | Normal | 현재 버퍼 내 모든 동일 단어 한 번에 다중 선택 |
+| `c` | Normal | 선택된 모든 항목 일괄 치환 (입력 프롬프트) |
+| `d` | Normal | 선택된 모든 항목 일괄 삭제 |
+| `<Esc>` | Normal | 멀티커서 모드 종료 및 선택 해제 |
 
 ---
 

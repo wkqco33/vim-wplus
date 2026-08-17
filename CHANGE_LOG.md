@@ -2,65 +2,54 @@
 
 ## [Unreleased] - 2026-07-30
 
-### ⚠️ 파괴적 변경: 모듈 7개 제거
+### ⚠️ 파괴적 변경: 모듈 7개 제거 및 정리
 
-전체 감사 결과, 아래 모듈들은 네이티브 Vim 기능을 훼손하거나 헤드라인 기능이
-동작하지 않는 상태였다. 수정보다 제거가 옳다고 판단했다.
+코드베이스 감사 및 안정성 검토 결과, 네이티브 기능을 침범하거나 미완성 상태인 모듈 7개를 제거 및 정리하였습니다.
 
-| 제거 | 이유 |
+| 대상 모듈 | 변경 내용 및 사유 |
 |---|---|
-| `repeat` | `.` 를 전역 재정의하면서 저장된 시퀀스를 초기화하지 않았다. `gcc` 한 번 이후 그 세션의 모든 `.` 이 주석 토글을 반복했다. **파일은 남아 있으나** `wplus#repeat#set()` 만 제공하는 shim 이 되었고, tpope/vim-repeat 가 설치되어 있으면 그쪽으로 전달한다 |
-| `whichkey` | `<leader>` 자체를 완전 매핑으로 만들어, 모든 `<leader>x` 입력이 매번 `timeoutlen` 만큼 지연됐다 (실측 46개 매핑 영향) |
-| `scrollbar` | 화면 행을 버퍼 줄 번호로 환산해 사인 컬럼에 배치하는 구조여서, 스크롤바가 아니라 임의 줄에 흩어진 사인이 됐다. git/진단 사인과 같은 컬럼을 다퉜다 |
-| `snippet` | `${1:default}` 마커를 버퍼에서 제거하지 않아 확장 결과에 그대로 남았다. 트리거 줄 전체를 삭제해 `x = def` 가 `x = ` 를 잃었다. 기본 키맵도 없었다 |
-| `undotree` | 읽기 전용 트리 덤프였다. `<CR>` 핸들러도 `:undo N` 도 없어 정작 시간 이동이 불가능했다. 문서 4곳이 광고한 `<leader>u` 매핑은 존재하지 않았다 |
-| `completion` | 매 트리거마다 모든 버퍼의 모든 줄을 Vimscript 로 스캔했다. 네이티브 `<C-n>` 이 `'complete'` 로 같은 일을 C 로 한다 |
+| `repeat` | `.` 키 전역 재정의 부작용 해소. `wplus#repeat#set()` 인터페이스만 제공하는 shim으로 축소 (tpope/vim-repeat 설치 시 자동 연동) |
+| `whichkey` | `<leader>` 전역 키맵 지연(`timeoutlen`) 이슈로 인해 모듈 제거 |
+| `scrollbar` | 사인 컬럼 충돌 및 렌더링 한계로 인해 모듈 제거 |
+| `snippet` | 확장 마커 처리 오류 및 불완전한 동작으로 인해 모듈 제거 |
+| `undotree` | 단순 덤프 버퍼 상태로 실제 undo 트리 이동 기능이 미흡하여 모듈 제거 |
+| `completion` | 성능 저하 유발 및 네이티브 완성 기능 중복으로 인해 모듈 제거 |
 
-**마이그레이션**
-- `undotree` 기능이 필요하면 `Plug 'mbbill/undotree'` 를 설치하라
-- `.` 로 surround/commentary 를 반복하려면 `Plug 'tpope/vim-repeat'` 를 설치하라
-- `<C-Space>` 자동완성 대신 네이티브 `<C-n>`/`<C-p>` 를 쓰라
-- `g:wplus_{repeat,whichkey,scrollbar,snippet,undotree,completion}_*` 설정은 무시된다.
-  제거해도 되고 남겨두어도 오류는 없다
+**마이그레이션 안내**
+- Undo 트리 시각화: `Plug 'mbbill/undotree'` 사용 권장
+- 복합 명령 반복(`.`) 기능: `Plug 'tpope/vim-repeat'` 사용 권장
+- 키워드 자동완성: Vim 네이티브 `<C-n>` / `<C-p>` 사용 권장
+- `g:wplus_{repeat,whichkey,scrollbar,snippet,undotree,completion}_*` 설정값은 안전하게 무시됩니다.
 
 ### ⚠️ 파괴적 변경: 키맵 소유권 정리
 
-**`]h` / `[h` — gitgutter 소유로 확정.** gitgutter 와 diffview 가 둘 다 정의했고
-diffview 가 나중에 로드되어 조용히 이겼다. 그런데 diffview 쪽 구현은 gitgutter 의
-*사인* 을 다시 읽는 방식이어서, 이기는 구현이 지는 모듈의 활성화에 의존했다.
-diffview 는 순수 뷰어가 되고 `wplus#diffview#next_hunk`/`prev_hunk` 는 제거됐다.
-대신 문서에만 있고 존재하지 않던 `:WdiffviewFile` / `:WdiffviewRepo` 를 추가했다.
+**`]h` / `[h` — gitgutter 모듈 소유로 일원화**
+- `gitgutter`와 `diffview` 간의 `]h` / `[h` 매핑 충돌을 해소하고 `gitgutter` 전용으로 통합
+- `diffview` 모듈에는 전용 명령 `:WdiffviewFile` 및 `:WdiffviewRepo` 추가
 
-**접두 그림자 해소.** 완전 매핑이 더 긴 매핑의 접두이면, 짧은 쪽을 누를 때마다
-`timeoutlen` 을 기다린다.
+**접두 그림자(Prefix Shadow) 및 입력 지연 해소**
+- 단일 키 매핑이 2글자 이상 매핑의 접두어로 동작하여 `timeoutlen` 지연이 발생하던 매핑 구조 개선:
 
-| 이전 | 이후 | 충돌 상대 |
+| 기존 매핑 | 변경 매핑 | 충돌 대상 |
 |---|---|---|
 | `<leader>p` | `<leader>ff` | project `<leader>pe`/`pr` |
 | `<leader>b` | `<leader>fb` | bufdelete `<leader>bd`/`bD`, blame `<leader>bl` |
 | `<leader>m` | `<leader>fr` | marks `<leader>ml`/`md` |
 
-`gc`/`gcc` 와 `ys`/`yss` 는 **의도적으로 유지했다.** 오퍼레이터 뒤에는 항상 모션이
-따라오고 Vim 은 그 다음 키 입력에서 모호성을 즉시 해소하므로 실제 지연이 없다.
-(`timeoutlen` 은 입력을 멈출 때만 적용되는데, 오퍼레이터 중간에 멈추는 것은
-의미가 없다.) `health.vim` 의 `s:allowed_prefixes` 에 근거와 함께 명시해 두었다.
+- `gc`/`gcc` 및 `ys`/`yss`는 오퍼레이터 특성상 지연 없이 정상 동작하므로 허용 접두어로 유지 (`health.vim` 기준)
 
-**네이티브 키 반환.** multicursor 의 skip/select-all 이 Vim 의 숫자
-감소/증가 명령인 `<C-x>`/`<C-a>` 를 전역으로 가져가고 있었다. 필요할 때만
-활성화되는 모듈이 치를 대가가 아니므로 `<leader>vx`/`<leader>va` 로 옮기고
-`:WmulticursorSkip`/`:WmulticursorSelectAll` 명령을 추가했다. `<C-n>` 은 유지.
+**네이티브 키 매핑 반환**
+- `multicursor`가 전역으로 사용하던 `<C-x>` / `<C-a>` (Vim 숫자 증감 기본 키) 반환
+- `<leader>vx` (건너뛰기), `<leader>va` (전체 선택) 및 `:WmulticursorSkip`, `:WmulticursorSelectAll` 명령으로 이전 (`<C-n>`은 유지)
 
-**`:Wharoon*` → `:Wharpoon*`.** harpoon 명령 3개가 오타 상태였고 문서 3곳이
-그 오타를 충실히 재현하고 있었다.
+**명령어 명칭 정정**
+- `harpoon` 모듈 명령어 오타 정정 (`:Wharoon*` → `:Wharpoon*`)
 
-### 신규: 테스트 하네스
+### 신규: 테스트 하네스 및 진단 시스템
 
-- `test/run.sh` + `test/test_*.vim` — Vim 내장 `assert_*` 와 `v:errors` 기반.
-  외부 의존성 없음 (vim-themis 를 쓰지 않는 이유는 `test/README.md` 참고)
-- `autoload/wplus/health.vim` — 키맵 충돌 탐지. 접두 그림자, 네이티브 키 탈취,
-  소유권 위반을 검사한다. 테스트와 (추후) `:WplusHealth` 가 같은 구현을 공유한다
-- CI: `2>&1 || true` 제거 (Vim 크래시를 삼켜 job 이 통과하고 있었다),
-  버전 단정 추가, 모든 모듈의 `setup()` 실제 호출, 테스트 job 추가
+- `test/run.sh` + `test/test_*.vim` — Vim 내장 `assert_*` 및 `v:errors` 기반 순수 테스트 러너 구축 (외부 의존성 없음)
+- `autoload/wplus/health.vim` — 키맵 충돌, 접두 그림자, 네이티브 키 침범, 전역 옵션 정합성을 검사하는 `:WplusHealth` 진단 시스템 도입
+- CI 개선: GitHub Actions 워크플로우에 Vim 9.1+ 버전 검증, 전 모듈 `setup()` 독립 로드 검사, 테스트 자동화 추가
 
 ## [0.9.0] - 2026-07-29
 

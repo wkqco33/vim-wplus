@@ -40,6 +40,7 @@
 | `ii` / `ai` | Visual/Op | textobj | 들여쓰기 블록 |
 | `ia` / `aa` | Visual/Op | textobj | 함수 인자 |
 | `<C-n>` | Normal | multicursor | 다음 일치 항목 다중 선택 추가 |
+| `<leader>vx` | Normal | multicursor | 현재 일치 항목 건너뛰기 |
 | `<leader>va` | Normal | multicursor | 모든 일치 항목 다중 선택 |
 | `<M-F>` | Normal/Visual | format | 포맷 |
 | `.` | Normal | repeat | 마지막 동작 반복 |
@@ -51,7 +52,7 @@
 | 키 / 명령 | 모듈 | 동작 |
 |-----------|------|------|
 | `<leader>hr` | gitgutter | 커서 위치 hunk 원복 |
-| `]h` / `[h` | gitgutter/diffview | 다음/이전 hunk |
+| `]h` / `[h` | gitgutter | 다음/이전 hunk |
 | `:BlamerToggle` | blame | 인라인 blame 토글 |
 | `<leader>gd` | diffview | 현재 파일 Diff |
 | `<leader>gD` | diffview | 저장소 전체 Diff |
