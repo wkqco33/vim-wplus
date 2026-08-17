@@ -104,6 +104,8 @@ Temporary Items
 *.pfx
 *credentials*
 *secrets*
+.claude/
+.antigravitycli/
 
 ### Vim ###
 # Swap
