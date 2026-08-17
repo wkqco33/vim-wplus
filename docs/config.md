@@ -80,8 +80,8 @@ let g:wplus_indent_ft_exclude = ['help', 'nerdtree', 'undotree', 'tagbar']
 let g:wplus_illuminate_delay    = 200     " 하이라이트 지연 (ms)
 let g:wplus_illuminate_ft_block = ['help', 'nerdtree']
 
-" ── colorscheme ──────────────────────────────────────────────────────────
-let g:wplus_colorscheme_auto_detect = 1
+" ── theme ────────────────────────────────────────────────────────────────
+let g:wplus_theme_auto = 1                 " 배경 자동 감지 및 통합 테마 적용
 ```
 
 ---

@@ -2,7 +2,6 @@ wplus-ai	wplus.txt	/*wplus-ai*
 wplus-altfile	wplus.txt	/*wplus-altfile*
 wplus-blame	wplus.txt	/*wplus-blame*
 wplus-bufdelete	wplus.txt	/*wplus-bufdelete*
-wplus-colorscheme	wplus.txt	/*wplus-colorscheme*
 wplus-commentary	wplus.txt	/*wplus-commentary*
 wplus-config	wplus.txt	/*wplus-config*
 wplus-conflict	wplus.txt	/*wplus-conflict*
@@ -40,6 +39,7 @@ wplus-surround	wplus.txt	/*wplus-surround*
 wplus-tabline	wplus.txt	/*wplus-tabline*
 wplus-terminal	wplus.txt	/*wplus-terminal*
 wplus-textobj	wplus.txt	/*wplus-textobj*
+wplus-theme	wplus.txt	/*wplus-theme*
 wplus-todo	wplus.txt	/*wplus-todo*
 wplus-yankhighlight	wplus.txt	/*wplus-yankhighlight*
 wplus.txt	wplus.txt	/*wplus.txt*

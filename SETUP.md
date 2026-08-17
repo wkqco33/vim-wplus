@@ -35,10 +35,10 @@ Vim에서 `:PlugInstall` 실행.
 
 ```bash
 # Unix / macOS
-git clone <url> ~/.vim/pack/user/start/vim-wplus
+git clone https://github.com/wkqco33/vim-wplus.git ~/.vim/pack/user/start/vim-wplus
 
 # Windows (PowerShell)
-git clone <url> "$env:USERPROFILE\vimfiles\pack\user\start\vim-wplus"
+git clone https://github.com/wkqco33/vim-wplus.git "$env:USERPROFILE\vimfiles\pack\user\start\vim-wplus"
 ```
 
 별도 `source` 없이 자동 로드됩니다.
@@ -61,7 +61,7 @@ source C:/Users/<user>/vimfiles/pack/user/start/vim-wplus/plugin/wplus.vim
 
 ```bash
 # 1. 복제
-git clone <url> ~/.vim/pack/user/start/vim-wplus
+git clone https://github.com/wkqco33/vim-wplus.git ~/.vim/pack/user/start/vim-wplus
 
 # 2. 예시 설정 복사
 cp ~/.vim/pack/user/start/vim-wplus/.vimrc.example ~/.vimrc

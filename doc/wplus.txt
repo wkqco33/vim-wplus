@@ -41,7 +41,7 @@ CONTENTS                                                      *wplus-contents*
   25. Tabline ...................... |wplus-tabline|
   26. Indent Guide ................. |wplus-indent|
   27. Illuminate ................... |wplus-illuminate|
-  28. Colorscheme .................. |wplus-colorscheme|
+  28. Theme ........................ |wplus-theme|
 
   CODE TOOLS ~
   29. LSP .......................... |wplus-lsp|
@@ -94,7 +94,7 @@ Modules organized by category.
 
   UI ~
     statusline    tabline       indent        illuminate
-    colorscheme
+    theme
 
   CODE TOOLS ~
     lsp           format        outline       fold
@@ -115,7 +115,7 @@ vim-plug: >
     Plug 'wkqco33/vim-wplus'
 <
 Pack: >
-    git clone <url> ~/.vim/pack/user/start/vim-wplus
+    git clone https://github.com/wkqco33/vim-wplus.git ~/.vim/pack/user/start/vim-wplus
 <
 Manual: >
     set runtimepath+=~/.vim/pack/user/start/vim-wplus
@@ -460,12 +460,12 @@ Configuration: >
 <
 
 ==============================================================================
-28. COLORSCHEME                                            *wplus-colorscheme*
+28. THEME                                                      *wplus-theme*
 
-Auto-detect terminal background brightness and adjust colorscheme.
+Unified theme and highlight management with background auto-detection.
 
 Configuration: >
-    let g:wplus_colorscheme_auto_detect = 1
+    let g:wplus_theme_auto = 1
 <
 
 ==============================================================================
