@@ -18,7 +18,7 @@ function! wplus#session#setup() abort
     elseif exists('*setfperm')
         call setfperm(s:session_dir, 'rwx------')
     endif
-    " terminal 버퍼는 Windows에서 복원 시 hang 유발
+    " Terminal buffers can cause hang on restore on Windows
     set sessionoptions-=terminal
 
     if g:wplus_session_autoload

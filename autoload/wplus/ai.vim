@@ -303,7 +303,7 @@ function! s:cleanup_curl_config(file) abort
     endif
 endfunction
 
-" payload를 stdin으로 chunk단위로 안전하게 전송하고 stdin 닫기 (E631 파이프 버퍼 오버플로우 방지)
+" Send payload over stdin in chunks safely and close channel (prevents E631 pipe buffer overflow)
 function! s:write_payload_stdin(job, payload) abort
     let l:ch = job_getchannel(a:job)
     if type(l:ch) != v:t_channel || ch_status(l:ch) !=# 'open'
@@ -338,7 +338,7 @@ endfunction
 
 function! s:extract_response_content(json) abort
     if g:wplus_ai_provider ==# 'ollama'
-        " native /api/chat 응답: {"message": {"content": ...}}
+        " Native /api/chat response: {"message": {"content": ...}}
         if has_key(a:json, 'message') && type(a:json.message) == v:t_dict
             return get(a:json.message, 'content', '')
         endif
@@ -1490,7 +1490,7 @@ function! s:on_suggest_response_complete(request_id, channel) abort
         return
     endtry
 
-    " FIM(/api/generate)은 응답이 {"response": ...} 형식
+    " FIM (/api/generate) returns {"response": ...}
     if get(l:request, 'fim', 0)
         let l:content = get(l:json, 'response', '')
     else
@@ -1498,11 +1498,11 @@ function! s:on_suggest_response_complete(request_id, channel) abort
     endif
     if empty(l:content)
         let l:error_msg = s:extract_error_message(l:json)
-        " FIM 미지원 모델이면 chat 방식으로 자동 폴백 후 재시도
+        " Automatically fallback to chat method and retry if model does not support FIM
         if l:error_msg =~? 'does not support insert'
             let g:wplus_ai_ollama_fim = 0
-            call s:report_suggest_error('FIM 미지원 모델 → chat 방식으로 전환 (g:wplus_ai_ollama_fim=0)')
-            " 커서가 여전히 제안 위치에 있을 때만 즉시 재시도
+            call s:report_suggest_error('Model does not support FIM -> fallback to chat (g:wplus_ai_ollama_fim=0)')
+            " Retry immediately only if cursor is still at the suggestion position
             if line('.') == l:request.line && col('.') == l:request.col && bufnr('%') == l:request.bufnr
                 let l:prefix = wplus#ai#context#get_prefix(l:request.line, l:request.col, g:wplus_ai_suggest_context_lines)
                 let l:suffix = wplus#ai#context#get_suffix(l:request.line, l:request.col, g:wplus_ai_suggest_suffix_lines)

@@ -95,8 +95,8 @@ function! wplus#ai#context#extract_symbols() abort
         elseif l:ft == 'python'
             let l:name = matchstr(l:line, '\v^\s*%(def|class)\s+\zs\w+')
         elseif l:ft =~# '\v^(c|cpp)$'
-            " C/C++: 함수/클래스 정의만 잡는다. 제어문(if/for/switch/while/return)과
-            " 일반 호출을 배제하기 위해 라인 시작 키워드 목록으로 거른다.
+            " C/C++: Capture function/class definitions while excluding control
+            " statements (if/for/switch/while/return) and regular function calls.
             let l:name = s:match_any(l:line, [
                 \ '\v^\s*%(class|struct|enum\s+class|enum)\s+\zs\w+',
                 \ '\v^\s*%(namespace)\s+\zs\w+',
