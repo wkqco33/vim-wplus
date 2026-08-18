@@ -115,7 +115,7 @@ vim-plug: >
     Plug 'wkqco33/vim-wplus'
 <
 Pack: >
-    git clone <url> ~/.vim/pack/user/start/vim-wplus
+    git clone https://github.com/wkqco33/vim-wplus.git ~/.vim/pack/user/start/vim-wplus
 <
 Manual: >
     set runtimepath+=~/.vim/pack/user/start/vim-wplus

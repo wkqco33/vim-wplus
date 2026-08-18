@@ -14,7 +14,7 @@ let s:outline_buf = -1
 let s:symbols   = []   " [{name, kind, lnum}, ...]
 let s:src_buf   = -1   " buffer being outlined
 
-" kind 코드 → 표시 기호 (ctags universal/exuberant 공통)
+" Kind code -> display symbol mapping (universal/exuberant ctags)
 let s:kind_icon = {
     \ 'f': 'f', 'F': 'f', 'm': 'm', 'M': 'm',
     \ 'c': 'c', 'C': 'c', 's': 's', 'S': 's',
@@ -23,7 +23,7 @@ let s:kind_icon = {
     \ 'n': 'n', 'p': 'f', 'i': 'i',
     \ }
 
-" ── ctags 파싱 ────────────────────────────────────────────────────────────
+" ── Ctags Parsing ────────────────────────────────────────────────────────────
 
 function! s:get_symbols(file) abort
     if !executable('ctags') | return [] | endif
@@ -53,7 +53,7 @@ function! s:get_symbols(file) abort
     return sort(l:syms, {a, b -> a.lnum - b.lnum})
 endfunction
 
-" ── 렌더링 ────────────────────────────────────────────────────────────────
+" ── Rendering ────────────────────────────────────────────────────────────────
 
 function! s:render() abort
     let l:winid = bufwinid(s:outline_buf)
@@ -76,7 +76,7 @@ function! s:render() abort
     call win_execute(l:winid, 'setlocal nomodifiable')
 endfunction
 
-" ── 사이드바 초기화 ───────────────────────────────────────────────────────
+" ── Sidebar Setup ────────────────────────────────────────────────────────────
 
 function! s:init_buffer() abort
     setlocal buftype=nofile bufhidden=hide noswapfile
@@ -115,7 +115,7 @@ function! s:on_refresh() abort
     call s:render()
 endfunction
 
-" ── 토글 ──────────────────────────────────────────────────────────────────
+" ── Toggle ───────────────────────────────────────────────────────────────────
 
 function! wplus#outline#toggle() abort
     let l:winid = bufwinid(s:outline_buf)

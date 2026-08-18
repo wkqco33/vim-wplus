@@ -18,22 +18,18 @@ Vim 8+ 내장 `assert_equal` / `assert_true` / `assert_report` 와 `v:errors` �
 전에 죽으면 그것도 실패로 처리한다 (이전 CI 는 `2>&1 || true` 로 크래시를
 삼켜 통과했다).
 
-## Phase 0 기준선: 의도적으로 RED
+## 핵심 회귀 방지 검증 항목
 
-이 스위트는 **실패하는 상태로 커밋되었다.** 아래 16건은 감사에서 확인된
-실제 결함이며, 각 Phase 가 동작했다는 증거는 해당 항목이 GREEN 으로
-바뀌는 것이다.
+본 테스트 스위트는 아래 핵심 결함 및 회귀 시나리오를 지속적으로 검증합니다.
 
-| 실패 | 원인 | 해소 Phase |
+| 검증 항목 | 대상 모듈 | 해결 및 검증 내용 |
 |---|---|---|
-| `.` / `<C-a>` / `<C-x>` 가 전역 매핑됨 | `repeat.vim:12`, `multicursor.vim:236-237` | 1, 2 |
-| `]h` / `[h` 가 diffview 소유 | `gitgutter.vim:350` 과 `diffview.vim:130` 이중 정의, 로드 순서로 diffview 승 | 2 |
-| `<Space>` 가 46개 매핑의 접두 | `whichkey.vim:142` 가 `<leader>` 자체를 완전 매핑으로 | 1 |
-| `<Space>b` / `<Space>p` / `<Space>m` 접두 그림자 | `finder.vim:174-176` vs bufdelete/blame/project/marks | 2 |
-| `ys` / `gc` 접두 그림자 | `surround.vim:158` vs `:160`, `commentary.vim:96` vs `:94` | 2 |
-| `:WharpoonAdd/Remove/List` 미정의 | `harpoon.vim:134-136` 이 `:Wharoon*` 로 오타 | 4 |
-| `i(<BS>` 가 `)` 를 남김 (2건) | `pairs.vim:19-22` off-by-one — `line[col('.')-3]` 을 읽음 | 4 |
-| `don'` → `don''` (2건) | `pairs.vim:51-52` 가 커서 뒤 문자만 검사 | 4 |
+| 네이티브 키 (`.`, `<C-a>`, `<C-x>`) 보존 | `repeat.vim`, `multicursor.vim` | 전역 탈취 방지 및 전용 키맵 격리 검증 |
+| `]h` / `[h` Hunk 이동 키맵 소유권 | `gitgutter.vim`, `diffview.vim` | gitgutter 단독 소유 및 이중 정의 방지 |
+| 접두 그림자(Prefix Shadow) 방지 | `finder.vim`, `project.vim` 등 | 2글자 이상 네임스페이스 키맵으로 지연 방지 |
+| 오퍼레이터 접두어 예외 정상성 | `surround.vim`, `commentary.vim` | `ys`, `gc` 등 모션 대기 오퍼레이터 정상 동작 |
+| 명령어 명칭 정합성 | `harpoon.vim` | `:WharpoonAdd/Remove/List` 명령 정상 등록 |
+| 자동 괄호 완성 및 백스페이스 엣지 케이스 | `pairs.vim` | `i(<BS>` 시 닫는 괄호 동시 삭제 및 따옴표 중복 방지 |
 
 ## 테스트 추가
 

@@ -15,7 +15,7 @@ Plug 'wkqco33/vim-wplus'
 
 ```bash
 # pack 직접 설치
-git clone <url> ~/.vim/pack/user/start/vim-wplus
+git clone https://github.com/wkqco33/vim-wplus.git ~/.vim/pack/user/start/vim-wplus
 ```
 
 ```vim
@@ -90,7 +90,7 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 | `tabline` | 버퍼 탭라인 | 자동 |
 | `indent` | 들여쓰기 가이드 | 자동 |
 | `illuminate` | 심볼 하이라이트 | 자동 |
-| `colorscheme` | 배경 자동 감지 | 자동 |
+| `colorscheme` | 배경 자동 감지 및 하이라이트 통합 | 자동 |
 
 ### 🛠 코드 도구
 
@@ -153,3 +153,9 @@ let g:wplus_ai_enabled      = 0
 | `marks` | chentoast/marks.nvim |
 | `run` | skywind3000/asyncrun.vim |
 | `fold` | kevinhwang91/nvim-ufo |
+
+---
+
+## 라이선스
+
+[MIT License](LICENSE) © 2026 wkqco33

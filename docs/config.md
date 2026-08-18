@@ -81,7 +81,7 @@ let g:wplus_illuminate_delay    = 200     " 하이라이트 지연 (ms)
 let g:wplus_illuminate_ft_block = ['help', 'nerdtree']
 
 " ── colorscheme ──────────────────────────────────────────────────────────
-let g:wplus_colorscheme_auto_detect = 1
+let g:wplus_colorscheme_auto_detect = 1    " 배경 자동 감지 및 통합 색상 적용
 ```
 
 ---
