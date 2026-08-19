@@ -156,6 +156,10 @@ function! Test_ai_commit_prompt_structure() abort
     let l:prompt = wplus#ai#_test_build_commit_prompt(l:stat, l:diff)
     
     call assert_true(l:prompt =~# 'Conventional Commits', 'Prompt should guide Conventional Commits')
+    call assert_true(l:prompt =~# 'concise', 'Commit prompt should request a concise message')
+    call assert_true(l:prompt =~# 'single-line', 'Commit prompt should prefer a single-line summary')
+    call assert_false(l:prompt =~# 'structured and detailed', 'Commit prompt should not request detailed messages')
+    call assert_false(l:prompt =~# 'all significant modified modules/files', 'Commit prompt should not enumerate every changed file')
     call assert_true(l:prompt =~# 'src/main\.rs', 'Prompt should include diff stat')
     call assert_true(l:prompt =~# 'diff --git', 'Prompt should include diff content')
 endfunction

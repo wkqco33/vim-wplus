@@ -125,12 +125,12 @@ function! wplus#ai#provider#build_commit_prompt(stat, diff) abort
         return l:p
     endif
 
-    let l:prompt = "You are an expert software developer writing a Git commit message in Korean.\n"
-        \ . "Based on the staged changes below, write a structured and detailed Git commit message following the Conventional Commits convention.\n\n"
+    let l:prompt = "You are an expert software developer writing a concise Git commit message in Korean.\n"
+        \ . "Based on the staged changes below, write a short Git commit message following the Conventional Commits convention. Prefer a single-line summary; add a brief body only when context is needed.\n\n"
         \ . "### Requirements:\n"
         \ . "1. First line: '<type>(<scope>): <summary>' (e.g. feat(ai): ..., fix(auth): ..., refactor(core): ...). Max 50 chars in Korean.\n"
-        \ . "2. Second line: Leave a blank line.\n"
-        \ . "3. Third line onwards (Body): Write a clear, bulleted list ('- ') explaining WHAT changed and WHY. Cover all significant modified modules/files with sufficient detail without cutting off.\n"
+        \ . "2. Keep it concise: do not list files, repeat diff details, or explain obvious changes.\n"
+        \ . "3. If a body is needed, leave one blank line and use at most 2 short bullets for the main change or reason.\n"
         \ . "4. Do NOT output markdown code fences (no ```), no <think> tags, and no meta-commentary. Output ONLY the raw commit message.\n\n"
         \ . "### Changed Files (Diff Stat):\n" . a:stat . "\n\n" .
         \ "### Diff:\n" . a:diff
