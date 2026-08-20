@@ -163,3 +163,31 @@ function! Test_ai_commit_prompt_structure() abort
     call assert_true(l:prompt =~# 'src/main\.rs', 'Prompt should include diff stat')
     call assert_true(l:prompt =~# 'diff --git', 'Prompt should include diff content')
 endfunction
+
+function! Test_ai_commit_prompt_adapts_to_change_scale() abort
+    call wplus#ai#setup()
+    " Small change: keep concise single-line guidance.
+    let l:small_stat = " src/main.rs | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)"
+    let l:small_diff = "diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1,3 +1,3 @@"
+    let l:small_prompt = wplus#ai#_test_build_commit_prompt(l:small_stat, l:small_diff)
+    call assert_true(l:small_prompt =~# 'single-line', 'Small changes should prefer a single-line summary')
+
+    " Large change: request a detailed body that covers the full scope.
+    let l:large_stat = " src/a.rs | 100 +++++++++++\n src/b.rs | 200 +++++++++++\n src/c.rs | 300 +++++++++++\n src/d.rs | 400 +++++++++++\n src/e.rs | 500 +++++++++++\n 5 files changed, 1500 insertions(+), 0 deletions(-)"
+    let l:large_diff = "diff --git a/src/a.rs b/src/a.rs\n--- a/src/a.rs\n+++ b/src/a.rs\n@@ -1,3 +1,3 @@"
+    let l:large_prompt = wplus#ai#_test_build_commit_prompt(l:large_stat, l:large_diff)
+    call assert_true(l:large_prompt =~# 'extensive', 'Large changes should request a detailed body')
+    call assert_true(l:large_prompt =~# 'bullets', 'Large changes should request bullet points')
+    call assert_true(l:large_prompt =~# 'full scope', 'Large changes should cover the full scope')
+endfunction
+
+function! Test_ai_commit_diff_truncates_at_file_boundary() abort
+    call wplus#ai#setup()
+    let l:diff = "diff --git a/a.rs b/a.rs\n--- a/a.rs\n+++ b/a.rs\n@@ -1,3 +1,3 @@\n+line1\n"
+        \ . "diff --git a/b.rs b/b.rs\n--- a/b.rs\n+++ b/b.rs\n@@ -1,3 +1,3 @@\n+line2\n"
+        \ . "diff --git a/c.rs b/c.rs\n--- a/c.rs\n+++ b/c.rs\n@@ -1,3 +1,3 @@\n+line3\n"
+    " Limit that lands inside the second file: must keep only the first file.
+    let l:cut = wplus#ai#_test_truncate_diff(l:diff, 80)
+    call assert_true(l:cut =~# 'diff --git a/a\.rs', 'Truncated diff should keep the first file')
+    call assert_false(l:cut =~# 'diff --git a/b\.rs', 'Truncated diff must not cut mid-file into the second file')
+endfunction

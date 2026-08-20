@@ -258,14 +258,29 @@ function! s:on_commit_diff_collected(stat, lines) abort
     let l:max = g:wplus_ai_commit_diff_max_bytes
     if len(l:diff) > l:max
         call wplus#util#warn_msg('ai', 'diff too large (' . (len(l:diff)/1024) . 'KB), truncating to ' . (l:max/1024) . 'KB')
-        let l:diff = l:diff[:l:max - 1]
-        let l:last_nl = strridx(l:diff, "\n")
-        if l:last_nl > 0
-            let l:diff = l:diff[:l:last_nl]
-        endif
+        let l:diff = s:truncate_diff(l:diff, l:max)
     endif
     let l:prompt = wplus#ai#provider#build_commit_prompt(a:stat, l:diff)
     call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#preview_commit'), g:wplus_ai_commit_max_tokens, 0.3)
+endfunction
+
+" Truncate a git diff to at most a:max bytes, cutting at a file boundary
+" (a line starting with "diff --git ") so the tail of a file is never
+" dropped mid-hunk. Falls back to the last newline when no boundary fits.
+function! s:truncate_diff(diff, max) abort
+    if len(a:diff) <= a:max
+        return a:diff
+    endif
+    let l:cut = a:diff[:a:max - 1]
+    let l:idx = strridx(l:cut, "\ndiff --git ")
+    if l:idx > 0
+        return l:cut[:l:idx]
+    endif
+    let l:last_nl = strridx(l:cut, "\n")
+    if l:last_nl > 0
+        return l:cut[:l:last_nl]
+    endif
+    return l:cut
 endfunction
 
 function! wplus#ai#review() range abort
@@ -400,4 +415,8 @@ endfunction
 
 function! wplus#ai#_test_build_commit_prompt(stat, diff) abort
     return wplus#ai#provider#build_commit_prompt(a:stat, a:diff)
+endfunction
+
+function! wplus#ai#_test_truncate_diff(diff, max) abort
+    return s:truncate_diff(a:diff, a:max)
 endfunction

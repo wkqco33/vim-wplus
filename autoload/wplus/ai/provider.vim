@@ -125,16 +125,48 @@ function! wplus#ai#provider#build_commit_prompt(stat, diff) abort
         return l:p
     endif
 
-    let l:prompt = "You are an expert software developer writing a concise Git commit message in Korean.\n"
-        \ . "Based on the staged changes below, write a short Git commit message following the Conventional Commits convention. Prefer a single-line summary; add a brief body only when context is needed.\n\n"
+    let l:scale = s:commit_scale(a:stat)
+    let l:prompt = "You are an expert software developer writing a Git commit message in Korean.\n"
+        \ . "Based on the staged changes below, write a commit message following the Conventional Commits convention.\n\n"
         \ . "### Requirements:\n"
         \ . "1. First line: '<type>(<scope>): <summary>' (e.g. feat(ai): ..., fix(auth): ..., refactor(core): ...). Max 50 chars in Korean.\n"
-        \ . "2. Keep it concise: do not list files, repeat diff details, or explain obvious changes.\n"
-        \ . "3. If a body is needed, leave one blank line and use at most 2 short bullets for the main change or reason.\n"
-        \ . "4. Do NOT output markdown code fences (no ```), no <think> tags, and no meta-commentary. Output ONLY the raw commit message.\n\n"
-        \ . "### Changed Files (Diff Stat):\n" . a:stat . "\n\n" .
-        \ "### Diff:\n" . a:diff
+        \ . "2. Do NOT output markdown code fences (no ```), no <thinking> tags, and no meta-commentary. Output ONLY the raw commit message.\n"
+
+    if l:scale ==# 'large'
+        let l:prompt .= "3. The changes are extensive. After the summary line, leave one blank line and write a body with short bullets that cover the main changes grouped by area or module. You may reference the main files or modules involved. Make sure the body reflects the full scope of the changes, not just the first file.\n"
+    elseif l:scale ==# 'medium'
+        let l:prompt .= "3. If the changes span multiple areas, leave one blank line and add a short body (2-4 bullets) covering the main changes.\n"
+    else
+        let l:prompt .= "3. Keep it concise: prefer a single-line summary; add a brief body only when context is needed.\n"
+    endif
+
+    let l:prompt .= "\n### Changed Files (Diff Stat):\n" . a:stat . "\n\n### Diff:\n" . a:diff
     return l:prompt
+endfunction
+
+" Estimate the scale of a change set from its `git diff --cached --stat` output
+" so the prompt can ask for a single-line summary for small changes but a
+" detailed body that reflects the full scope for large ones.
+function! s:commit_scale(stat) abort
+    let l:files = 0
+    for l:line in split(a:stat, "\n")
+        " File stat lines look like ' path | 10 +++++-----'; the summary line
+        " ('N files changed, ...') has no '|' and is not counted.
+        if l:line =~# '\v^\s*\S.*\|'
+            let l:files += 1
+        endif
+    endfor
+    let l:total = 0
+    let l:m = matchlist(a:stat, '\v(\d+) insertions\?(\+)')
+    if !empty(l:m) | let l:total += str2nr(l:m[1]) | endif
+    let l:m = matchlist(a:stat, '\v(\d+) deletions\?(\-)')
+    if !empty(l:m) | let l:total += str2nr(l:m[1]) | endif
+    if l:files >= 5 || l:total >= 200
+        return 'large'
+    elseif l:files >= 2 || l:total >= 30
+        return 'medium'
+    endif
+    return 'small'
 endfunction
 
 function! wplus#ai#provider#build_request_payload(prompt, ...) abort
