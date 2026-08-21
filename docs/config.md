@@ -99,6 +99,11 @@ let g:wplus_lsp_diag_delay   = 300        " 진단 갱신 지연 (ms)
 let g:wplus_lsp_auto_complete = 1         " 타이핑 중 자동완성 트리거
 let g:wplus_lsp_complete_delay = 300      " 자동완성 트리거 지연 (ms)
 
+" ── vscode ────────────────────────────────────────────────────────────────
+" VS Code 단축키 정렬 레이어 (opt-in). 1로 설정하면 F2/F12/Ctrl+Shift+F 등
+" VS Code 단축키가 wplus 기능에 매핑됩니다.
+let g:wplus_vscode_keymaps = 0
+
 " ── fold ─────────────────────────────────────────────────────────────────
 let g:wplus_fold_method     = 'indent'    " 'indent' | 'lsp' | 'syntax'
 let g:wplus_fold_level      = 99          " 초기 foldlevel

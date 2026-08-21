@@ -456,7 +456,11 @@ function! s:handle_request_result(ft, method, result, ...) abort
         call s:send(a:ft, 'initialized', {}, 1)
         call s:did_open(a:ft)
     elseif a:method ==# 'textDocument/definition'
-        call s:goto_location(a:result)
+        if get(a:req, 'tag', '') ==# 'peek'
+            call s:peek_definition(a:result)
+        else
+            call s:goto_location(a:result)
+        endif
     elseif a:method ==# 'textDocument/typeDefinition' || a:method ==# 'textDocument/implementation'
         call s:goto_location(a:result)
     elseif a:method ==# 'textDocument/hover'
@@ -841,6 +845,69 @@ function! wplus#lsp#definition() abort
         return
     endif
     call s:send(l:ft, 'textDocument/definition', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 1)
+endfunction
+
+" Peek definition: show the definition source in a popup without navigating.
+function! wplus#lsp#peek_definition() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    call s:send(l:ft, 'textDocument/definition', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 1, 'peek')
+endfunction
+
+function! s:peek_definition(result) abort
+    if empty(a:result) | return | endif
+    let l:loc = type(a:result) == v:t_list ? a:result[0] : a:result
+    let l:uri = get(l:loc, 'uri', get(l:loc, 'targetUri', ''))
+    let l:range = get(l:loc, 'range', get(l:loc, 'targetSelectionRange', {}))
+    if empty(l:uri) || empty(l:range) | return | endif
+    let l:path = s:decode_uri_path(l:uri)
+    let l:lines = filereadable(l:path) ? readfile(l:path) : []
+    if empty(l:lines) | return | endif
+    let l:sl = l:range.start.line + 1
+    let l:el = min([l:range.end.line + 1, len(l:lines)])
+    let l:start = max([1, l:sl - 3])
+    let l:end = min([len(l:lines), l:el + 3])
+    let l:content = []
+    for l:i in range(l:start, l:end)
+        let l:marker = l:i >= l:sl && l:i <= l:el ? '▸ ' : '  '
+        call add(l:content, printf('%s%4d %s', l:marker, l:i, l:lines[l:i - 1]))
+    endfor
+    call popup_create(l:content, wplus#util#popup_options({
+        \ 'line': 'cursor-1',
+        \ 'col': 'cursor',
+        \ 'moved': 'any',
+        \ 'title': ' ' . fnamemodify(l:path, ':t') . ':' . l:sl . ' ',
+        \ }))
+endfunction
+
+" List all LSP diagnostics across loaded buffers in the quickfix list.
+function! wplus#lsp#problems() abort
+    let l:qf = []
+    for l:buf in getbufinfo({'buflisted': 1})
+        let l:diags = getbufvar(l:buf.bufnr, 'wplus_lsp_diags', {})
+        if empty(l:diags) | continue | endif
+        let l:name = bufname(l:buf.bufnr)
+        for [l:lnum, l:list] in items(l:diags)
+            for l:d in l:list
+                call add(l:qf, {
+                    \ 'filename': l:name,
+                    \ 'lnum': str2nr(l:lnum),
+                    \ 'col': get(l:d, 'col', 1),
+                    \ 'text': l:d.msg,
+                    \ 'type': l:d.sev == 1 ? 'E' : 'W',
+                    \ })
+            endfor
+        endfor
+    endfor
+    if empty(l:qf)
+        call wplus#util#info_msg('lsp', 'No problems found')
+        return
+    endif
+    call setqflist(l:qf)
+    botright copen
 endfunction
 
 function! wplus#lsp#type_definition() abort
@@ -1696,6 +1763,9 @@ function! wplus#lsp#setup() abort
     let s:timeout_timer = timer_start(5000, function('s:check_request_timeouts'), {'repeat': -1})
 
     command! WlspHover          call wplus#lsp#hover()
+    command! WlspCompletion     call wplus#lsp#completion()
+    command! WlspPeekDefinition call wplus#lsp#peek_definition()
+    command! WlspProblems       call wplus#lsp#problems()
     command! WlspDefinition     call wplus#lsp#definition()
     command! WlspTypeDefinition call wplus#lsp#type_definition()
     command! WlspImplementation call wplus#lsp#implementation()

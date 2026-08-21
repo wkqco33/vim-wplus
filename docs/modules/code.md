@@ -22,6 +22,9 @@
 | `]e` / `[e` | 다음/이전 진단 |
 | `<leader>E` | 현재 줄 진단 팝업 |
 | `:WlspSymbols {query}` | 워크스페이스 심볼 검색 (Quickfix) |
+| `:WlspPeekDefinition` | 정의 소스 팝업 (이동 없이) |
+| `:WlspProblems` | 모든 버퍼 진단을 Quickfix로 |
+| `:WlspCompletion` | 완성 트리거 |
 
 진단은 sign 컬럼에 `E`, `W`, `I`, `H`로 표시되며 상태바에 `E:n W:n` 형식으로도 표시됩니다.
 

@@ -97,6 +97,9 @@ let g:wplus_lsp_diag_delay = 300        " 진단 갱신 지연(ms)
 let g:wplus_lsp_auto_complete = 1       " 타이핑 중 자동완성 트리거
 let g:wplus_lsp_complete_delay = 300    " 자동완성 트리거 지연(ms)
 
+" VS Code 단축키 정렬 레이어 (opt-in): F2/F12/Ctrl+Shift+F 등
+let g:wplus_vscode_keymaps = 0
+
 " ═ 2. Git 모듈 (Gitgutter, Blame, Diffview, Conflict) ═
 let g:wplus_gitgutter_enabled = 1
 let g:wplus_gitgutter_disable_on_large_files = 1

@@ -184,3 +184,35 @@ nnoremap <C-l> <C-w>l
 > **`<Tab>` 동작 방식**: `g:wplus_ai_tab_complete = 1`(기본값) 설정 시, `<Tab>`은
 > AI Ghost Text 수락 → 팝업 메뉴 선택(`pumvisible()`) → 일반 탭/들여쓰기 순으로 스마트하게 체이닝됩니다.
 > 원치 않을 경우 `let g:wplus_ai_tab_complete = 0`으로 비활성화하거나 `<Plug>WaiSmartTab`을 원하는 키에 매핑할 수 있습니다.
+
+---
+
+## VS Code 단축키 정렬 (opt-in)
+
+`let g:wplus_vscode_keymaps = 1`로 켜면 VS Code 단축키가 그대로 동작합니다.
+기본값은 `0`(꺼짐)이라 기존 사용자에게 영향을 주지 않습니다.
+
+| VS Code | 동작 |
+|---------|------|
+| `F12` | 정의 이동 |
+| `Shift+F12` | 참조 찾기 |
+| `Alt+F12` | Peek Definition (팝업) |
+| `F2` | 심볼 이름 변경 |
+| `Ctrl+.` | Quick Fix (Code Action) |
+| `Ctrl+Shift+F` | 파일에서 찾기 (grep) |
+| `Ctrl+Shift+O` | 파일 내 심볼 (outline) |
+| `Ctrl+T` | 워크스페이스 심볼 |
+| `Ctrl+Shift+E` | 탐색기 토글 |
+| `Ctrl+Shift+M` | Problems (진단 목록) |
+| `Ctrl+Space` | 완성 트리거 |
+| `Ctrl+Shift+Space` | 시그니처 힌트 |
+| `Ctrl+Shift+K` | 줄 삭제 |
+| `Ctrl+Enter` / `Ctrl+Shift+Enter` | 아래/위에 줄 삽입 |
+| `Ctrl+Shift+[` / `]` | 접기 / 펼치기 |
+| `Ctrl+K Ctrl+0` / `Ctrl+K Ctrl+J` | 모두 접기 / 모두 펼치기 |
+| `` Ctrl+` `` / `Ctrl+Shift+C` | 터미널 토글 |
+| `Ctrl+P` | 파일 찾기 |
+| `Ctrl+Tab` / `Ctrl+PageDown` | 다음 버퍼 |
+
+> **터미널 주의**: 일부 터미널은 `Ctrl+Space`와 `Ctrl+Shift+Space`를 구분하지 못합니다.
+> `Ctrl+Space`는 `Ctrl+@`(NUL)에도 함께 매핑되어 있습니다.
