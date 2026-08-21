@@ -204,6 +204,7 @@ nnoremap <C-l> <C-w>l
 | `Ctrl+T` | 워크스페이스 심볼 |
 | `Ctrl+Shift+E` | 탐색기 토글 |
 | `Ctrl+Shift+M` | Problems (진단 목록) |
+| `Ctrl+Shift+H` | 호출 계층 (누가 호출) |
 | `Ctrl+Space` | 완성 트리거 |
 | `Ctrl+Shift+Space` | 시그니처 힌트 |
 | `Ctrl+Shift+K` | 줄 삭제 |

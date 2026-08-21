@@ -25,6 +25,8 @@
 | `:WlspPeekDefinition` | 정의 소스 팝업 (이동 없이) |
 | `:WlspProblems` | 모든 버퍼 진단을 Quickfix로 |
 | `:WlspCompletion` | 완성 트리거 |
+| `:WlspCallHierarchy` | 호출 계층 (누가 호출) |
+| `:WlspCallHierarchyOutgoing` | 호출 계층 (무엇을 호출) |
 
 진단은 sign 컬럼에 `E`, `W`, `I`, `H`로 표시되며 상태바에 `E:n W:n` 형식으로도 표시됩니다.
 

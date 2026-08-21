@@ -105,6 +105,9 @@ function! s:supports(ft, method, ...) abort
         \ 'workspace/symbol': 'workspaceSymbolProvider',
         \ 'textDocument/semanticTokens': 'semanticTokensProvider',
         \ 'textDocument/documentLink': 'documentLinkProvider',
+        \ 'textDocument/prepareCallHierarchy': 'callHierarchyProvider',
+        \ 'callHierarchy/incomingCalls': 'callHierarchyProvider',
+        \ 'callHierarchy/outgoingCalls': 'callHierarchyProvider',
         \ }
 
     if has_key(l:cap_map, a:method)
@@ -511,6 +514,12 @@ function! s:handle_request_result(ft, method, result, ...) abort
         call s:show_semantic_tokens(a:result)
     elseif a:method ==# 'textDocument/documentLink'
         call s:store_document_links(a:result)
+    elseif a:method ==# 'textDocument/prepareCallHierarchy'
+        call s:on_prepare_call_hierarchy(get(a:req, 'tag', 'incoming'), a:result)
+    elseif a:method ==# 'callHierarchy/incomingCalls'
+        call s:show_call_hierarchy(a:result, 'incoming')
+    elseif a:method ==# 'callHierarchy/outgoingCalls'
+        call s:show_call_hierarchy(a:result, 'outgoing')
     endif
 endfunction
 
@@ -1291,6 +1300,75 @@ function! wplus#lsp#open_document_link() abort
     call s:open_link_target(get(l:link, 'target', ''))
 endfunction
 
+" ── Call hierarchy ────────────────────────────────────────────────────────
+
+" Request call hierarchy for the symbol under the cursor. a:mode is
+" 'incoming' (who calls this) or 'outgoing' (what this calls).
+function! wplus#lsp#call_hierarchy(mode) abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    if !s:supports(l:ft, 'textDocument/prepareCallHierarchy') | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    call s:send(l:ft, 'textDocument/prepareCallHierarchy', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 1, a:mode)
+endfunction
+
+function! s:on_prepare_call_hierarchy(mode, result) abort
+    if empty(a:result) | return | endif
+    let l:item = type(a:result) == v:t_list ? a:result[0] : a:result
+    if type(l:item) != v:t_dict | return | endif
+    let l:ft = &filetype
+    let l:method = a:mode ==# 'outgoing' ? 'callHierarchy/outgoingCalls' : 'callHierarchy/incomingCalls'
+    call s:send(l:ft, l:method, {'item': l:item}, 0, 1, a:mode)
+endfunction
+
+" Incoming calls: navigate to the call site (first fromRange).
+function! s:incoming_calls_to_qf(result) abort
+    let l:qf = []
+    for l:call in a:result
+        let l:from = get(l:call, 'from', {})
+        let l:ranges = get(l:call, 'fromRanges', [])
+        if empty(l:from) || empty(l:ranges) | continue | endif
+        let l:r = l:ranges[0]
+        call add(l:qf, {
+            \ 'filename': s:decode_uri_path(get(l:from, 'uri', '')),
+            \ 'lnum': l:r.start.line + 1,
+            \ 'col': l:r.start.character + 1,
+            \ 'text': get(l:from, 'name', ''),
+            \ })
+    endfor
+    return l:qf
+endfunction
+
+" Outgoing calls: navigate to the callee definition (selectionRange).
+function! s:outgoing_calls_to_qf(result) abort
+    let l:qf = []
+    for l:call in a:result
+        let l:to = get(l:call, 'to', {})
+        if empty(l:to) | continue | endif
+        let l:sel = get(l:to, 'selectionRange', {})
+        if empty(l:sel) | continue | endif
+        call add(l:qf, {
+            \ 'filename': s:decode_uri_path(get(l:to, 'uri', '')),
+            \ 'lnum': l:sel.start.line + 1,
+            \ 'col': l:sel.start.character + 1,
+            \ 'text': get(l:to, 'name', ''),
+            \ })
+    endfor
+    return l:qf
+endfunction
+
+function! s:show_call_hierarchy(result, mode) abort
+    let l:qf = a:mode ==# 'outgoing' ? s:outgoing_calls_to_qf(a:result) : s:incoming_calls_to_qf(a:result)
+    if empty(l:qf)
+        call wplus#util#info_msg('lsp', 'No ' . a:mode . ' calls found')
+        return
+    endif
+    call setqflist(l:qf)
+    botright copen
+endfunction
+
 function! wplus#lsp#get_symbols(bufnr) abort
     let l:buf = a:bufnr == 0 ? bufnr('%') : a:bufnr
     let l:uri = s:get_buf_uri(l:buf)
@@ -1748,6 +1826,14 @@ function! wplus#lsp#_test_find_document_link_at(links, lnum, col) abort
     return s:find_document_link_at(a:links, a:lnum, a:col)
 endfunction
 
+function! wplus#lsp#_test_incoming_calls_to_qf(result) abort
+    return s:incoming_calls_to_qf(a:result)
+endfunction
+
+function! wplus#lsp#_test_outgoing_calls_to_qf(result) abort
+    return s:outgoing_calls_to_qf(a:result)
+endfunction
+
 function! wplus#lsp#_test_set_caps(ft, caps) abort
     if !has_key(s:servers, a:ft)
         let s:servers[a:ft] = {'job': v:null, 'channel': v:null, 'last_id': 0, 'requests': {}, 'buffer': '', 'caps': a:caps, 'initialized': 1}
@@ -1774,6 +1860,8 @@ function! wplus#lsp#setup() abort
     command! WlspCodeAction     call wplus#lsp#code_action()
     command! WlspOrganizeImports call wplus#lsp#organize_imports()
     command! WlspOpenLink       call wplus#lsp#open_document_link()
+    command! WlspCallHierarchy        call wplus#lsp#call_hierarchy('incoming')
+    command! WlspCallHierarchyOutgoing call wplus#lsp#call_hierarchy('outgoing')
     command! WlspNextDiag       call wplus#lsp#next_diag()
     command! WlspPrevDiag       call wplus#lsp#prev_diag()
     command! WlspDiagPopup      call wplus#lsp#diag_popup()

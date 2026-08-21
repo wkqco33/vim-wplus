@@ -39,6 +39,7 @@ function! wplus#vscode#setup() abort
         call s:map('i', '<C-@>', '<C-o>:WlspCompletion<CR>')
         call s:map('n', '<C-S-M>', ':WlspProblems<CR>')
         call s:map('n', '<C-T>', ':WlspSymbols<CR>')
+        call s:map('n', '<C-S-H>', ':WlspCallHierarchy<CR>')
     endif
 
     " ── Search / navigation ───────────────────────────────────────────────
