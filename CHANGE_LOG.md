@@ -1,5 +1,56 @@
 # 변경 이력 (CHANGE LOG)
 
+## [Unreleased] - 2026-08-21
+
+### ✨ LSP — IDE 수준 기능 확장
+
+외부 의존성 없이 Vim 9.1 내장 기능만으로 LSP 클라이언트를 대폭 확장했다.
+
+**동기화 & 완성**
+- **Incremental sync**: `didChange`가 전체 파일 대신 변경 범위만 전송 (대용량 파일 성능 개선)
+- **자동완성 트리거**: `TextChangedI` + debounce로 타이핑 중 자동 완성 (`g:wplus_lsp_auto_complete`)
+- **스니펫 지원**: `snippetSupport` 활성화, `$N`/`${N:placeholder}`/`$0` 파싱, `<Tab>`/`<S-Tab>` 탭스톱 이동
+
+**탐색 & 리팩토링**
+- **rename 미리보기**: `prepareRename` 검증 + 적용 전 미리보기 팝업
+- **typeDefinition / implementation** 이동 (`gy`, `<leader>gi`)
+- **call hierarchy**: `:WlspCallHierarchy`(incoming) / `:WlspCallHierarchyOutgoing`
+- **workspace symbol 검색**: `:WlspSymbols {query}` → Quickfix
+
+**코드 품질 & 시각화**
+- **organize imports**: `:WlspOrganizeImports` (`source.organizeImports` 코드액션)
+- **document link**: 열기/저장 시 수집, `<leader>gl`로 커서 링크 열기
+- **semantic tokens**: delta 디코딩 + textprop 하이라이트
+- **problems 패널**: `:WlspProblems`로 모든 버퍼 진단을 Quickfix에
+
+**설정**
+- **프로젝트별 서버 설정**: `g:wplus_lsp_servers` 값에 `root` 스코핑 지원
+- 새 옵션: `g:wplus_lsp_auto_complete`, `g:wplus_lsp_complete_delay`
+
+### ⌨️ VS Code 단축키 정렬 레이어 (opt-in)
+
+`let g:wplus_vscode_keymaps = 1`로 켜는 새 모듈 `vscode`. VS Code 단축키를 그대로 매핑한다.
+
+| VS Code | 동작 |
+|---|---|
+| `F2` / `F12` / `Shift+F12` / `Alt+F12` | rename / 정의 / 참조 / peek |
+| `Ctrl+.` / `Ctrl+Shift+F` / `Ctrl+Shift+O` / `Ctrl+T` | Quick Fix / grep / outline / 심볼 |
+| `Ctrl+Shift+E` / `Ctrl+Shift+M` / `Ctrl+Shift+H` | 탐색기 / Problems / 호출 계층 |
+| `Ctrl+Space` / `Ctrl+Shift+Space` | 완성 / 시그니처 |
+| `Ctrl+Shift+K` / `Ctrl+Enter` / `Ctrl+Shift+Enter` | 줄 삭제 / 아래·위 삽입 |
+| `Ctrl+Shift+[` / `]` / `` Ctrl+` `` / `Ctrl+P` | 접기·펼치기 / 터미널 / 파일 찾기 |
+
+> `Ctrl+K Ctrl+0/J`(모두 접기)는 `<C-k>` 창 이동과 충돌하므로 매핑하지 않았다. `<leader>za`/`<leader>zc` 사용.
+
+### 🐛 버그 수정
+- `gitgutter` diff 파서가 `+++ b/x` 파일 헤더를 가짜 Add(lnum 0)로 오인하던 문제 수정
+- `s:handle_request_result`에서 `a:req`(정의되지 않음)를 `l:req`로 수정 (vint CI가 발견)
+
+### 🧪 테스트
+- 신규 테스트 13개: `lsp_sync`, `lsp_autocomplete`, `lsp_snippet`, `lsp_workspace_symbols`, `lsp_semantic_tokens`, `lsp_project_config`, `lsp_rename`, `lsp_navigation`, `lsp_organize_imports`, `lsp_document_links`, `lsp_call_hierarchy`, `gitgutter`, `vscode`
+
+---
+
 ## [Unreleased] - 2026-07-30
 
 ### ⚠️ 파괴적 변경: 모듈 7개 제거

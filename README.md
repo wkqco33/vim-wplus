@@ -96,7 +96,7 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 
 | 모듈 | 기능 | 핵심 키 |
 |------|------|---------|
-| `lsp` | 경량 LSP 클라이언트 | `gd`, `gr`, `K` |
+| `lsp` | LSP 클라이언트 (정의/참조/rename/완성/스니펫/시맨틱/호출계층) | `gd`, `gr`, `K`, `F2` |
 | `format` | 스마트 포매터 | `<M-F>` |
 | `outline` | 코드 아웃라인 | `<leader>o` |
 | `fold` | 스마트 폴드 | `<leader>zz` |
