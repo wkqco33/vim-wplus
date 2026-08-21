@@ -68,11 +68,13 @@ function! wplus#vscode#setup() abort
     call s:map('n', '<C-S-\\>', '%')
 
     " ── Folding ───────────────────────────────────────────────────────────
+    " Note: VS Code's fold-all (Ctrl+K Ctrl+0 / Ctrl+K Ctrl+J) is deliberately
+    " NOT mapped here because <C-k> is a common Vim window-navigation key and
+    " would be shadowed, adding a timeoutlen delay on every <C-k> press.
+    " Fold-all remains available via <leader>za / <leader>zc.
     if s:enabled('fold')
         call s:map('n', '<C-S-[>', ':call wplus#fold#toggle()<CR>')
         call s:map('n', '<C-S-]>', ':call wplus#fold#open_all()<CR>')
-        call s:map('n', '<C-k><C-0>', ':call wplus#fold#close_all()<CR>')
-        call s:map('n', '<C-k><C-j>', ':call wplus#fold#open_all()<CR>')
     endif
 
     " ── Buffer cycling ────────────────────────────────────────────────────
