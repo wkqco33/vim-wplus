@@ -277,15 +277,24 @@ nnoremap <leader>fR :WgrepRx<CR>             " 정규표현식 검색
 
 " ── 3. LSP 코드 도구 (플러그인 기본 내장) ──
 " gd          : 정의 이동 (:WlspDefinition)
+" gy          : 타입 정의 이동 (:WlspTypeDefinition)
+" <leader>gi  : 구현 이동 (:WlspImplementation)
 " gr          : 참조 찾기 (:WlspReferences)
 " K           : 호버 심볼 정보 (:WlspHover)
 " <leader>rn  : 심볼 이름 변경 (:WlspRename)
 " <leader>ca  : 코드 액션 (:WlspCodeAction)
+" <leader>ci  : Import 정리 (:WlspOrganizeImports)
+" <leader>gl  : Document Link 열기 (:WlspOpenLink)
 " ]d / [d     : 다음/이전 진단 항목
 " <leader>d   : 현재 줄 진단 팝업 (:WlspDiagPopup)
 " Insert <C-s>: 시그니처 힌트 (:WlspSignatureHelp)
 " <leader>o   : 코드 아웃라인 토글 (:WoutlineToggle)
 " <M-F>       : 코드 포매팅 (:Wformat)
+" :WlspSymbols {query}          : 워크스페이스 심볼 검색
+" :WlspProblems                 : 모든 버퍼 진단 목록 (Quickfix)
+" :WlspCallHierarchy            : 호출 계층 - Incoming (:WlspCallHierarchy)
+" :WlspCallHierarchyOutgoing    : 호출 계층 - Outgoing (:WlspCallHierarchyOutgoing)
+" :WlspPeekDefinition           : 정의 미리보기 팝업
 
 " ── 4. AI Assistant & Health ──
 " ※ <Tab>은 기본 제공되는 스마트 탭이 Ghost Text 제안 수락 -> 팝업 메뉴 선택 -> 일반 탭(인덴트) 순으로 자동 처리합니다. (g:wplus_ai_tab_complete=1)
