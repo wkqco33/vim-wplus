@@ -67,10 +67,14 @@
 | 키 | 모듈 | 동작 |
 |----|------|------|
 | `gd` | lsp | 정의 이동 |
+| `gy` | lsp | 타입 정의 이동 |
+| `<leader>gi` | lsp | 구현 이동 |
 | `gr` | lsp | 참조 찾기 |
 | `K` | lsp | 심볼 정보 (Hover) |
-| `<leader>rn` | lsp | 심볼 이름 변경 |
+| `<leader>rn` | lsp | 심볼 이름 변경 (미리보기) |
 | `<leader>ca` | lsp | Code Action |
+| `<leader>ci` | lsp | Organize Imports |
+| `<leader>gl` | lsp | Document Link 열기 |
 | `]e` / `[e` | lsp | 다음/이전 진단 |
 | `<leader>E` | lsp | 현재 줄 진단 팝업 |
 | `<leader>o` | outline | 코드 아웃라인 토글 |

@@ -99,8 +99,12 @@ function! s:supports(ft, method, ...) abort
         \ 'textDocument/inlayHint': 'inlayHintProvider',
         \ 'textDocument/codeAction': 'codeActionProvider',
         \ 'textDocument/rename': 'renameProvider',
+        \ 'textDocument/prepareRename': 'renameProvider',
+        \ 'textDocument/typeDefinition': 'typeDefinitionProvider',
+        \ 'textDocument/implementation': 'implementationProvider',
         \ 'workspace/symbol': 'workspaceSymbolProvider',
         \ 'textDocument/semanticTokens': 'semanticTokensProvider',
+        \ 'textDocument/documentLink': 'documentLinkProvider',
         \ }
 
     if has_key(l:cap_map, a:method)
@@ -136,6 +140,7 @@ function! s:did_open(ft) abort
     call s:send(a:ft, 'textDocument/didOpen', l:params, 1)
     call wplus#lsp#request_inlay_hints()
     call wplus#lsp#request_semantic_tokens()
+    call wplus#lsp#request_document_links()
 endfunction
 
 function! s:did_close(bufnr) abort
@@ -243,6 +248,7 @@ function! s:did_save(ft) abort
     call s:send(a:ft, 'textDocument/didSave', {'textDocument': {'uri': l:uri}}, 1)
     call wplus#lsp#request_inlay_hints()
     call wplus#lsp#request_semantic_tokens()
+    call wplus#lsp#request_document_links()
 endfunction
 
 function! s:job_running(job) abort
@@ -336,6 +342,7 @@ function! s:send(ft, method, params, ...) abort
     if !has_key(s:servers, a:ft) | return 0 | endif
     let l:is_notify = a:0 > 0 ? a:1 : 0
     let l:is_user   = a:0 > 1 ? a:2 : 0
+    let l:tag       = a:0 > 2 ? a:3 : ''
 
     if !l:is_notify && !s:supports(a:ft, a:method)
         return 0
@@ -351,6 +358,7 @@ function! s:send(ft, method, params, ...) abort
         let l:req_uri = get(get(a:params, 'textDocument', {}), 'uri', '')
         let l:s.requests[l:req.id] = {
             \ 'method': a:method,
+            \ 'tag': l:tag,
             \ 'at': localtime(),
             \ 'is_user': l:is_user,
             \ 'uri': l:req_uri,
@@ -449,6 +457,8 @@ function! s:handle_request_result(ft, method, result, ...) abort
         call s:did_open(a:ft)
     elseif a:method ==# 'textDocument/definition'
         call s:goto_location(a:result)
+    elseif a:method ==# 'textDocument/typeDefinition' || a:method ==# 'textDocument/implementation'
+        call s:goto_location(a:result)
     elseif a:method ==# 'textDocument/hover'
         call s:show_hover(a:result)
     elseif a:method ==# 'textDocument/references'
@@ -456,9 +466,15 @@ function! s:handle_request_result(ft, method, result, ...) abort
     elseif a:method ==# 'textDocument/completion'
         call s:show_completion(a:result)
     elseif a:method ==# 'textDocument/rename'
-        call s:apply_workspace_edit(a:result)
+        call s:preview_rename(a:result)
+    elseif a:method ==# 'textDocument/prepareRename'
+        call s:on_prepare_rename(a:ft, a:result)
     elseif a:method ==# 'textDocument/codeAction'
-        call s:show_code_actions(a:result)
+        if get(a:req, 'tag', '') ==# 'organize_imports'
+            call s:execute_organize_imports(a:result)
+        else
+            call s:show_code_actions(a:result)
+        endif
     elseif a:method ==# 'textDocument/signatureHelp'
         call s:show_signature_help(a:result)
     elseif a:method ==# 'textDocument/inlayHint'
@@ -489,6 +505,8 @@ function! s:handle_request_result(ft, method, result, ...) abort
         call s:show_workspace_symbols(a:result)
     elseif a:method ==# 'textDocument/semanticTokens/full'
         call s:show_semantic_tokens(a:result)
+    elseif a:method ==# 'textDocument/documentLink'
+        call s:store_document_links(a:result)
     endif
 endfunction
 
@@ -825,6 +843,24 @@ function! wplus#lsp#definition() abort
     call s:send(l:ft, 'textDocument/definition', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 1)
 endfunction
 
+function! wplus#lsp#type_definition() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    call s:send(l:ft, 'textDocument/typeDefinition', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 1)
+endfunction
+
+function! wplus#lsp#implementation() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    call s:send(l:ft, 'textDocument/implementation', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 1)
+endfunction
+
 function! wplus#lsp#references() abort
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
@@ -883,11 +919,76 @@ function! wplus#lsp#rename() abort
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
     if empty(l:uri) | return | endif
+    let l:pos = getcurpos()
+    if s:supports(l:ft, 'textDocument/prepareRename')
+        " Validate the symbol is renameable before prompting.
+        call s:send(l:ft, 'textDocument/prepareRename', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 1)
+    else
+        call s:do_rename(l:ft, l:uri, l:pos)
+    endif
+endfunction
+
+function! s:do_rename(ft, uri, pos) abort
     let l:word = expand('<cword>')
     let l:new_name = input('New name: ', l:word)
     if empty(l:new_name) || l:new_name ==# l:word | return | endif
+    call s:send(a:ft, 'textDocument/rename', {'textDocument': {'uri': a:uri}, 'position': {'line': a:pos[1] - 1, 'character': a:pos[2] - 1}, 'newName': l:new_name}, 0, 1)
+endfunction
+
+function! s:prepare_rename_valid(result) abort
+    if type(a:result) != v:t_dict | return 0 | endif
+    return has_key(a:result, 'range') || has_key(a:result, 'placeholder')
+endfunction
+
+function! s:on_prepare_rename(ft, result) abort
+    if !s:prepare_rename_valid(a:result)
+        call wplus#util#warn_msg('lsp', 'symbol is not renameable at cursor')
+        return
+    endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
     let l:pos = getcurpos()
-    call s:send(l:ft, 'textDocument/rename', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}, 'newName': l:new_name}, 0, 1)
+    call s:do_rename(a:ft, l:uri, l:pos)
+endfunction
+
+" Build human-readable preview lines for a workspace edit (rename result).
+function! s:edit_preview_lines(path, edits) abort
+    let l:lines = []
+    for l:e in a:edits
+        let l:lnum = l:e.range.start.line + 1
+        let l:col = l:e.range.start.character + 1
+        call add(l:lines, printf('%s:%d:%d  →  %s', a:path, l:lnum, l:col, l:e.newText))
+    endfor
+    return l:lines
+endfunction
+
+function! s:rename_preview_lines(edit) abort
+    let l:lines = []
+    if has_key(a:edit, 'documentChanges')
+        for l:change in a:edit.documentChanges
+            if has_key(l:change, 'textDocument')
+                call extend(l:lines, s:edit_preview_lines(s:decode_uri_path(l:change.textDocument.uri), l:change.edits))
+            endif
+        endfor
+    elseif has_key(a:edit, 'changes')
+        for [l:uri, l:edits] in items(a:edit.changes)
+            call extend(l:lines, s:edit_preview_lines(s:decode_uri_path(l:uri), l:edits))
+        endfor
+    endif
+    return l:lines
+endfunction
+
+" Show a preview of the rename edit and apply only on confirmation.
+function! s:preview_rename(edit) abort
+    let l:lines = s:rename_preview_lines(a:edit)
+    if empty(l:lines)
+        call s:apply_workspace_edit(a:edit)
+        return
+    endif
+    let l:options = ['Apply'] + l:lines + ['Cancel']
+    call popup_menu(l:options, {
+        \ 'callback': {id, idx -> idx == 1 ? s:apply_workspace_edit(a:edit) : 0},
+        \ 'title': ' Rename Preview ',
+        \ })
 endfunction
 
 function! wplus#lsp#code_action() abort
@@ -899,6 +1000,38 @@ function! wplus#lsp#code_action() abort
     let l:diags = get(b:, 'wplus_lsp_diags', {})
     let l:line_diags = get(l:diags, l:pos[1], [])
     call s:send(l:ft, 'textDocument/codeAction', {'textDocument': {'uri': l:uri}, 'range': {'start': {'line': l:pos[1] - 1, 'character': 0}, 'end': {'line': l:pos[1], 'character': 0}}, 'context': {'diagnostics': l:line_diags}}, 0, 1)
+endfunction
+
+" Request organize-imports over the whole document and apply it directly.
+function! wplus#lsp#organize_imports() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    let l:params = {
+        \ 'textDocument': {'uri': l:uri},
+        \ 'range': {'start': {'line': 0, 'character': 0}, 'end': {'line': line('$'), 'character': 0}},
+        \ 'context': {'diagnostics': [], 'only': ['source.organizeImports']},
+        \ }
+    call s:send(l:ft, 'textDocument/codeAction', l:params, 0, 1, 'organize_imports')
+endfunction
+
+" Pick the organizeImports action, falling back to the first action.
+function! s:find_organize_imports_action(result) abort
+    if empty(a:result) | return {} | endif
+    for l:a in a:result
+        if type(l:a) == v:t_dict && get(l:a, 'kind', '') =~# 'source.organizeImports'
+            return l:a
+        endif
+    endfor
+    return type(a:result[0]) == v:t_dict ? a:result[0] : {}
+endfunction
+
+function! s:execute_organize_imports(result) abort
+    let l:action = s:find_organize_imports_action(a:result)
+    if !empty(l:action)
+        call s:execute_code_action(l:action)
+    endif
 endfunction
 
 function! wplus#lsp#signature_help() abort
@@ -1033,6 +1166,62 @@ function! wplus#lsp#request_semantic_tokens() abort
     let l:uri = s:get_buf_uri(bufnr('%'))
     if empty(l:uri) | return | endif
     call s:send(l:ft, 'textDocument/semanticTokens/full', {'textDocument': {'uri': l:uri}})
+endfunction
+
+" ── Document links ─────────────────────────────────────────────────────────
+
+function! wplus#lsp#request_document_links() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    if !s:supports(l:ft, 'textDocument/documentLink', 1) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    call s:send(l:ft, 'textDocument/documentLink', {'textDocument': {'uri': l:uri}})
+endfunction
+
+function! s:store_document_links(result) abort
+    call setbufvar(bufnr('%'), 'wplus_lsp_document_links', a:result)
+endfunction
+
+" Find the document link whose range contains (lnum, col), 1-based.
+function! s:find_document_link_at(links, lnum, col) abort
+    for l:link in a:links
+        let l:range = get(l:link, 'range', {})
+        if empty(l:range) | continue | endif
+        let l:sl = l:range.start.line + 1
+        let l:sc = l:range.start.character + 1
+        let l:el = l:range.end.line + 1
+        let l:ec = l:range.end.character + 1
+        if a:lnum < l:sl || a:lnum > l:el | continue | endif
+        if a:lnum == l:sl && a:col < l:sc | continue | endif
+        if a:lnum == l:el && a:col > l:ec | continue | endif
+        return l:link
+    endfor
+    return {}
+endfunction
+
+function! s:open_link_target(target) abort
+    if a:target =~# '^file://'
+        execute 'edit ' . fnameescape(s:decode_uri_path(a:target))
+    elseif a:target =~# '^https\?://'
+        if exists('*netrw#BrowseX')
+            call netrw#BrowseX(a:target, 0)
+        else
+            call wplus#util#warn_msg('lsp', 'no browser available to open ' . a:target)
+        endif
+    else
+        call wplus#util#warn_msg('lsp', 'unsupported link target: ' . a:target)
+    endif
+endfunction
+
+function! wplus#lsp#open_document_link() abort
+    let l:links = get(b:, 'wplus_lsp_document_links', [])
+    let l:link = s:find_document_link_at(l:links, line('.'), col('.'))
+    if empty(l:link)
+        call wplus#util#info_msg('lsp', 'no document link at cursor')
+        return
+    endif
+    call s:open_link_target(get(l:link, 'target', ''))
 endfunction
 
 function! wplus#lsp#get_symbols(bufnr) abort
@@ -1472,6 +1661,26 @@ function! wplus#lsp#_test_resolve_server_config(ft, root) abort
     return s:resolve_server_config(a:ft, a:root)
 endfunction
 
+function! wplus#lsp#_test_prepare_rename_valid(result) abort
+    return s:prepare_rename_valid(a:result)
+endfunction
+
+function! wplus#lsp#_test_rename_preview_lines(edit) abort
+    return s:rename_preview_lines(a:edit)
+endfunction
+
+function! wplus#lsp#_test_goto_location(result) abort
+    call s:goto_location(a:result)
+endfunction
+
+function! wplus#lsp#_test_find_organize_imports_action(result) abort
+    return s:find_organize_imports_action(a:result)
+endfunction
+
+function! wplus#lsp#_test_find_document_link_at(links, lnum, col) abort
+    return s:find_document_link_at(a:links, a:lnum, a:col)
+endfunction
+
 function! wplus#lsp#_test_set_caps(ft, caps) abort
     if !has_key(s:servers, a:ft)
         let s:servers[a:ft] = {'job': v:null, 'channel': v:null, 'last_id': 0, 'requests': {}, 'buffer': '', 'caps': a:caps, 'initialized': 1}
@@ -1488,9 +1697,13 @@ function! wplus#lsp#setup() abort
 
     command! WlspHover          call wplus#lsp#hover()
     command! WlspDefinition     call wplus#lsp#definition()
+    command! WlspTypeDefinition call wplus#lsp#type_definition()
+    command! WlspImplementation call wplus#lsp#implementation()
     command! WlspReferences     call wplus#lsp#references()
     command! WlspRename         call wplus#lsp#rename()
     command! WlspCodeAction     call wplus#lsp#code_action()
+    command! WlspOrganizeImports call wplus#lsp#organize_imports()
+    command! WlspOpenLink       call wplus#lsp#open_document_link()
     command! WlspNextDiag       call wplus#lsp#next_diag()
     command! WlspPrevDiag       call wplus#lsp#prev_diag()
     command! WlspDiagPopup      call wplus#lsp#diag_popup()
@@ -1500,9 +1713,13 @@ function! wplus#lsp#setup() abort
 
     nnoremap <silent> K          :WlspHover<CR>
     nnoremap <silent> gd         :WlspDefinition<CR>
+    nnoremap <silent> gy         :WlspTypeDefinition<CR>
+    nnoremap <silent> <leader>gi :WlspImplementation<CR>
     nnoremap <silent> gr         :WlspReferences<CR>
     nnoremap <silent> <leader>rn :WlspRename<CR>
     nnoremap <silent> <leader>ca :WlspCodeAction<CR>
+    nnoremap <silent> <leader>ci :WlspOrganizeImports<CR>
+    nnoremap <silent> <leader>gl :WlspOpenLink<CR>
     nnoremap <silent> ]d         :WlspNextDiag<CR>
     nnoremap <silent> [d         :WlspPrevDiag<CR>
     nnoremap <silent> <leader>d  :WlspDiagPopup<CR>

@@ -11,10 +11,14 @@
 | 키 | 동작 |
 |----|------|
 | `gd` | 정의 이동 (Go to Definition) |
+| `gy` | 타입 정의 이동 (Type Definition) |
+| `<leader>gi` | 구현 이동 (Implementation) |
 | `gr` | 참조 찾기 (References) |
 | `K` | 심볼 정보 (Hover) |
-| `<leader>rn` | 심볼 이름 변경 (Rename) |
+| `<leader>rn` | 심볼 이름 변경 (Rename, 미리보기 포함) |
 | `<leader>ca` | Code Action |
+| `<leader>ci` | Organize Imports |
+| `<leader>gl` | 커서 위치 Document Link 열기 |
 | `]e` / `[e` | 다음/이전 진단 |
 | `<leader>E` | 현재 줄 진단 팝업 |
 | `:WlspSymbols {query}` | 워크스페이스 심볼 검색 (Quickfix) |
