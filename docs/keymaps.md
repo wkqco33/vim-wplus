@@ -74,6 +74,7 @@
 | `]e` / `[e` | lsp | 다음/이전 진단 |
 | `<leader>E` | lsp | 현재 줄 진단 팝업 |
 | `<leader>o` | outline | 코드 아웃라인 토글 |
+| `:WlspSymbols {query}` | lsp | 워크스페이스 심볼 검색 |
 | `<leader>fg` | grep | 커서 단어로 프로젝트 검색 |
 | `:Wgrep {pat}` | grep | 패턴 검색 |
 

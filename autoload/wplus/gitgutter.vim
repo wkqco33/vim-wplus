@@ -26,22 +26,27 @@ endfunction
 function! s:parse_diff(lines) abort
     let hunks = []
     let new_lnum = 0
+    " Only interpret +/-/context lines once we are inside a hunk. The diff
+    " file headers ("--- a/x", "+++ b/x") also start with '-'/'+' and would
+    " otherwise be misread as content lines.
+    let in_hunk = 0
     for line in a:lines
         if line =~# '^@@'
+            let in_hunk = 1
             " @@ -old_start[,old_count] +new_start[,new_count] @@
             let m = matchlist(line, '^@@ -\d\+\%(,\d\+\)\? +\(\d\+\)\%(,\(\d\+\)\)\? @@')
             if !empty(m)
                 let new_lnum = str2nr(m[1])
             endif
-        elseif line[0] ==# '+'
+        elseif in_hunk && line[0] ==# '+'
             call add(hunks, {'lnum': new_lnum, 'type': 'WplusGGAdd'})
             let new_lnum += 1
-        elseif line[0] ==# '-'
+        elseif in_hunk && line[0] ==# '-'
             " deleted lines don't advance new file lnum
             if new_lnum > 0
                 call add(hunks, {'lnum': new_lnum, 'type': 'WplusGGDelete'})
             endif
-        elseif line[0] ==# ' '
+        elseif in_hunk && line[0] ==# ' '
             let new_lnum += 1
         endif
     endfor
@@ -92,6 +97,14 @@ function! s:parse_hunks(lines) abort
 endfunction
 
 " ── async refresh ─────────────────────────────────────────────────────────
+
+function! wplus#gitgutter#_test_parse_diff(lines) abort
+    return s:parse_diff(a:lines)
+endfunction
+
+function! wplus#gitgutter#_test_parse_hunks(lines) abort
+    return s:parse_hunks(a:lines)
+endfunction
 
 function! wplus#gitgutter#refresh(bufnr) abort
     let bufnr = a:bufnr == 0 ? bufnr('%') : a:bufnr

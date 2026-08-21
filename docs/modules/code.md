@@ -17,8 +17,29 @@
 | `<leader>ca` | Code Action |
 | `]e` / `[e` | 다음/이전 진단 |
 | `<leader>E` | 현재 줄 진단 팝업 |
+| `:WlspSymbols {query}` | 워크스페이스 심볼 검색 (Quickfix) |
 
 진단은 sign 컬럼에 `E`, `W`, `I`, `H`로 표시되며 상태바에 `E:n W:n` 형식으로도 표시됩니다.
+
+**자동완성 & 스니펫:** 타이핑 중 잠시 멈추면 자동으로 완성 목록이 뜹니다. 서버가 스니펫(`insertTextFormat: 2`)을 제공하면 선택 후 `<Tab>`/`<S-Tab>`으로 탭스톱을 이동하며 채울 수 있습니다.
+
+```vim
+let g:wplus_lsp_auto_complete  = 1    " 타이핑 중 자동완성 트리거
+let g:wplus_lsp_complete_delay = 300  " 자동완성 트리거 지연 (ms)
+```
+
+**시맨틱 토큰:** 서버가 `semanticTokens`를 지원하면 열기/저장 시 LSP 기반 하이라이트를 자동 적용합니다.
+
+**프로젝트별 서버 설정:** `g:wplus_lsp_servers` 값에 `root`를 지정해 프로젝트 루트별로 다른 서버를 쓸 수 있습니다.
+
+```vim
+let g:wplus_lsp_servers = {
+    \ 'go': [
+    \   {'root': '/path/to/projA', 'cmd': ['gopls']},
+    \   {'cmd': ['gopls']},   " 그 외 프로젝트의 기본값
+    \ ],
+    \ }
+```
 
 **지원 언어 서버 설치:**
 

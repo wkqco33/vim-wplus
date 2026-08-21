@@ -21,6 +21,8 @@ let g:wplus_lsp_change_delay    = get(g:, 'wplus_lsp_change_delay',    800)
 let g:wplus_lsp_diag_delay      = get(g:, 'wplus_lsp_diag_delay',      300)
 let g:wplus_lsp_request_timeout = get(g:, 'wplus_lsp_request_timeout', 10)
 let g:wplus_lsp_definition_split = get(g:, 'wplus_lsp_definition_split', 0)
+let g:wplus_lsp_auto_complete   = get(g:, 'wplus_lsp_auto_complete',   1)
+let g:wplus_lsp_complete_delay  = get(g:, 'wplus_lsp_complete_delay',  300)
 let g:wplus_lsp_servers = get(g:, 'wplus_lsp_servers', {
     \ 'go': ['gopls'],
     \ 'c': ['clangd'],
@@ -31,6 +33,15 @@ let g:wplus_lsp_servers = get(g:, 'wplus_lsp_servers', {
     \ })
 let s:CONTENT_LENGTH_PREFIX     = 'Content-Length: '
 let s:timeout_timer             = -1
+let s:auto_complete_timer       = -1
+let s:semantic_prop_types       = {}
+let s:token_type_hl = {
+    \ 0: 'Identifier', 1: 'Type', 2: 'Type', 3: 'Type', 4: 'Type', 5: 'Type',
+    \ 6: 'Identifier', 7: 'Identifier', 8: 'Identifier', 9: 'Identifier',
+    \ 10: 'Constant', 11: 'Function', 12: 'Function', 13: 'Function',
+    \ 14: 'PreProc', 15: 'Statement', 16: 'Special', 17: 'Comment',
+    \ 18: 'String', 19: 'Number', 20: 'String', 21: 'Operator', 22: 'PreProc',
+    \ }
 
 function! s:log(ft, type, msg) abort
     if !g:wplus_lsp_log_enabled | return | endif
@@ -88,6 +99,8 @@ function! s:supports(ft, method, ...) abort
         \ 'textDocument/inlayHint': 'inlayHintProvider',
         \ 'textDocument/codeAction': 'codeActionProvider',
         \ 'textDocument/rename': 'renameProvider',
+        \ 'workspace/symbol': 'workspaceSymbolProvider',
+        \ 'textDocument/semanticTokens': 'semanticTokensProvider',
         \ }
 
     if has_key(l:cap_map, a:method)
@@ -118,9 +131,11 @@ function! s:did_open(ft) abort
     if empty(l:uri) | return | endif
     call setbufvar(l:buf, 'wplus_lsp_uri', l:uri)
     call setbufvar(l:buf, 'wplus_lsp_version', 1)
+    call setbufvar(l:buf, 'wplus_lsp_prev_lines', getline(1, '$'))
     let l:params = {'textDocument': {'uri': l:uri, 'languageId': a:ft, 'version': 1, 'text': join(getline(1, '$'), "\n") . "\n"}}
     call s:send(a:ft, 'textDocument/didOpen', l:params, 1)
     call wplus#lsp#request_inlay_hints()
+    call wplus#lsp#request_semantic_tokens()
 endfunction
 
 function! s:did_close(bufnr) abort
@@ -139,13 +154,85 @@ function! s:did_change(ft, buf) abort
     call setbufvar(a:buf, 'wplus_lsp_change_timer', l:new_timer)
 endfunction
 
+" Compute the minimal changed range between two line lists for LSP incremental
+" (range-based) didChange. Returns a dict {start, end, text, rangeLength} with
+" 0-based LSP line numbers, or {} when the documents are identical.
+"
+"   start       first differing line (0-based)
+"   end         exclusive end line in the OLD document (0-based)
+"   text        replacement for old_lines[start:end] (with trailing newline)
+"   rangeLength character length of the replaced old text (incl. newlines)
+"
+" The range always refers to the OLD document per the LSP spec, so a pure
+" insertion or append yields a zero-width range (start == end).
+function! s:compute_change_range(old_lines, new_lines) abort
+    let l:old_len = len(a:old_lines)
+    let l:new_len = len(a:new_lines)
+    let l:common = min([l:old_len, l:new_len])
+
+    " First differing line (0-based).
+    let l:start = 0
+    while l:start < l:common && a:old_lines[l:start] ==# a:new_lines[l:start]
+        let l:start += 1
+    endwhile
+
+    " Last differing line, walking back from the end (exclusive).
+    let l:old_end = l:old_len
+    let l:new_end = l:new_len
+    while l:old_end > l:start && l:new_end > l:start
+        if a:old_lines[l:old_end - 1] ==# a:new_lines[l:new_end - 1]
+            let l:old_end -= 1
+            let l:new_end -= 1
+        else
+            break
+        endif
+    endwhile
+
+    if l:start == l:old_end && l:start == l:new_end
+        return {}
+    endif
+
+    " Range end is in the OLD document.
+    let l:end = l:old_end
+
+    let l:text = ''
+    if l:new_end > l:start
+        let l:text = join(a:new_lines[l:start : l:new_end - 1], "\n") . "\n"
+    endif
+
+    let l:rangeLength = 0
+    for l:i in range(l:start, l:old_end - 1)
+        let l:rangeLength += len(a:old_lines[l:i]) + 1
+    endfor
+
+    return {'start': l:start, 'end': l:end, 'text': l:text, 'rangeLength': l:rangeLength}
+endfunction
+
 function! s:do_did_change(ft, buf) abort
     call setbufvar(a:buf, 'wplus_lsp_change_timer', -1)
     let l:uri = s:get_buf_uri(a:buf)
     if empty(l:uri) | return | endif
     let l:ver = getbufvar(a:buf, 'wplus_lsp_version', 1) + 1
     call setbufvar(a:buf, 'wplus_lsp_version', l:ver)
-    let l:params = {'textDocument': {'uri': l:uri, 'version': l:ver}, 'contentChanges': [{'text': join(getbufline(a:buf, 1, '$'), "\n") . "\n"}]}
+
+    let l:new_lines = getbufline(a:buf, 1, '$')
+    let l:prev_lines = getbufvar(a:buf, 'wplus_lsp_prev_lines', [])
+    let l:change = s:compute_change_range(l:prev_lines, l:new_lines)
+    call setbufvar(a:buf, 'wplus_lsp_prev_lines', l:new_lines)
+
+    if empty(l:change)
+        return
+    endif
+
+    let l:content_change = {
+        \ 'range': {
+        \   'start': {'line': l:change.start, 'character': 0},
+        \   'end':   {'line': l:change.end,   'character': 0},
+        \ },
+        \ 'rangeLength': l:change.rangeLength,
+        \ 'text': l:change.text,
+        \ }
+    let l:params = {'textDocument': {'uri': l:uri, 'version': l:ver}, 'contentChanges': [l:content_change]}
     call s:send(a:ft, 'textDocument/didChange', l:params, 1)
 endfunction
 
@@ -155,6 +242,7 @@ function! s:did_save(ft) abort
     if empty(l:uri) | return | endif
     call s:send(a:ft, 'textDocument/didSave', {'textDocument': {'uri': l:uri}}, 1)
     call wplus#lsp#request_inlay_hints()
+    call wplus#lsp#request_semantic_tokens()
 endfunction
 
 function! s:job_running(job) abort
@@ -164,6 +252,39 @@ endfunction
 function! s:project_root() abort
     let l:root = exists('*wplus#root#find_root') ? wplus#root#find_root() : ''
     return empty(l:root) ? getcwd() : resolve(fnamemodify(l:root, ':p'))
+endfunction
+
+" Resolve the server command list for a filetype at a given project root.
+" Supports three shapes for g:wplus_lsp_servers[ft]:
+"   ['cmd', ...]                          plain command list
+"   {'cmd': [...], 'root': '/proj'}       dict, optionally scoped to a root
+"   [{'root': '/a', 'cmd': [...]}, ...]   list of dicts; first matching root
+"                                          (or first without a root) wins
+" Returns [] when nothing applies to the current root.
+function! s:resolve_server_config(ft, root) abort
+    let l:configured = get(g:wplus_lsp_servers, a:ft, [])
+    if type(l:configured) == v:t_dict
+        let l:root = get(l:configured, 'root', '')
+        if !empty(l:root) && l:root !=# a:root
+            return []
+        endif
+        return get(l:configured, 'cmd', [])
+    elseif type(l:configured) == v:t_list
+        " A plain command list (all strings) is returned as-is.
+        if !empty(l:configured) && type(l:configured[0]) != v:t_dict
+            return l:configured
+        endif
+        for l:cand in l:configured
+            if type(l:cand) == v:t_dict
+                let l:root = get(l:cand, 'root', '')
+                if empty(l:root) || l:root ==# a:root
+                    return get(l:cand, 'cmd', [])
+                endif
+            endif
+        endfor
+        return []
+    endif
+    return l:configured
 endfunction
 
 function! s:start_server(ft) abort
@@ -176,8 +297,7 @@ function! s:start_server(ft) abort
         " Never reuse a language server from another project root.
         call wplus#lsp#stop(a:ft)
     endif
-    let l:configured = get(g:wplus_lsp_servers, a:ft, [])
-    let l:cmd = type(l:configured) == v:t_dict ? get(l:configured, 'cmd', []) : l:configured
+    let l:cmd = s:resolve_server_config(a:ft, l:root)
     if type(l:cmd) != v:t_list || empty(l:cmd) || !executable(l:cmd[0]) | return | endif
     let l:job = job_start(l:cmd, {'in_mode': 'raw', 'out_mode': 'raw', 'out_cb': {c, m -> s:on_stdout(a:ft, c, m)}, 'err_cb': {c, m -> s:log(a:ft, 'STDERR', m)}})
     let s:servers[a:ft] = {
@@ -198,7 +318,7 @@ function! s:start_server(ft) abort
         \   'hover': {'contentFormat': ['plaintext', 'markdown']},
         \   'definition': {'dynamicRegistration': v:true},
         \   'references': {'dynamicRegistration': v:true},
-        \   'completion': {'completionItem': {'snippetSupport': v:false}},
+        \   'completion': {'completionItem': {'snippetSupport': v:true, 'documentationFormat': ['plaintext', 'markdown']}},
         \   'rename': {'dynamicRegistration': v:true, 'prepareSupport': v:false},
         \   'codeAction': {'dynamicRegistration': v:true, 'codeActionLiteralSupport': {'codeActionKind': {'valueSet': []}}},
         \   'signatureHelp': {'signatureInformation': {'documentationFormat': ['plaintext', 'markdown']}},
@@ -365,6 +485,10 @@ function! s:handle_request_result(ft, method, result, ...) abort
         endif
     elseif a:method ==# 'textDocument/documentHighlight'
         call s:show_document_highlights(a:result)
+    elseif a:method ==# 'workspace/symbol'
+        call s:show_workspace_symbols(a:result)
+    elseif a:method ==# 'textDocument/semanticTokens/full'
+        call s:show_semantic_tokens(a:result)
     endif
 endfunction
 
@@ -724,6 +848,36 @@ function! wplus#lsp#completion() abort
     call s:send(l:ft, 'textDocument/completion', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}})
 endfunction
 
+" Whether auto-completion should fire for a filetype. Gated on the user config
+" and the server's completionProvider capability. The popup check is applied
+" at trigger time (s:do_auto_complete) because pumvisible() is only meaningful
+" while actually in insert mode.
+function! s:auto_complete_enabled(ft) abort
+    if !get(g:, 'wplus_lsp_auto_complete', 1) | return 0 | endif
+    if !has_key(s:servers, a:ft) | return 0 | endif
+    return s:supports(a:ft, 'textDocument/completion', 1)
+endfunction
+
+" Debounced auto-completion trigger for TextChangedI. Restarts the timer on
+" every keystroke so completion only fires once the user pauses typing.
+function! s:trigger_auto_complete(ft, buf) abort
+    if !s:auto_complete_enabled(a:ft) | return | endif
+    if s:auto_complete_timer != -1
+        silent! call timer_stop(s:auto_complete_timer)
+    endif
+    let s:auto_complete_timer = timer_start(g:wplus_lsp_complete_delay, {-> s:do_auto_complete(a:ft, a:buf)})
+endfunction
+
+function! s:do_auto_complete(ft, buf) abort
+    let s:auto_complete_timer = -1
+    if !s:auto_complete_enabled(a:ft) | return | endif
+    " Never interrupt an already-open completion menu.
+    if pumvisible() | return | endif
+    " Only complete while the triggering buffer is still the current one.
+    if bufnr('%') != a:buf || !bufloaded(a:buf) | return | endif
+    call wplus#lsp#completion()
+endfunction
+
 function! wplus#lsp#rename() abort
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
@@ -778,6 +932,107 @@ function! wplus#lsp#request_document_symbols(bufnr) abort
     let l:uri = s:get_buf_uri(l:buf)
     if empty(l:uri) | return | endif
     call s:send(l:ft, 'textDocument/documentSymbol', {'textDocument': {'uri': l:uri}})
+endfunction
+
+function! wplus#lsp#workspace_symbols(query) abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    if !s:supports(l:ft, 'workspace/symbol') | return | endif
+    call s:send(l:ft, 'workspace/symbol', {'query': a:query}, 0, 1)
+endfunction
+
+function! s:workspace_symbols_to_qf(result) abort
+    let l:qf = []
+    for l:sym in a:result
+        let l:loc = get(l:sym, 'location', {})
+        let l:uri = get(l:loc, 'uri', '')
+        let l:range = get(l:loc, 'range', {})
+        if empty(l:uri) || empty(l:range) | continue | endif
+        call add(l:qf, {
+            \ 'filename': s:decode_uri_path(l:uri),
+            \ 'lnum': l:range.start.line + 1,
+            \ 'col': l:range.start.character + 1,
+            \ 'text': get(l:sym, 'name', ''),
+            \ })
+    endfor
+    return l:qf
+endfunction
+
+function! s:show_workspace_symbols(result) abort
+    if empty(a:result) | return | endif
+    let l:qf = s:workspace_symbols_to_qf(a:result)
+    if empty(l:qf) | return | endif
+    call setqflist(l:qf)
+    botright copen
+endfunction
+
+" ── Semantic tokens ─────────────────────────────────────────────────────────
+
+" Decode the flat delta-encoded LSP semantic token array into a list of
+" {lnum, col, length, type, modifiers} with 1-based lnum/col.
+function! s:decode_semantic_tokens(data) abort
+    let l:tokens = []
+    let l:prev_line = 0
+    let l:prev_start = 0
+    let l:i = 0
+    let l:len = len(a:data)
+    while l:i + 4 < l:len
+        let l:delta_line = a:data[l:i]
+        let l:delta_start = a:data[l:i + 1]
+        let l:prev_line += l:delta_line
+        if l:delta_line == 0
+            let l:prev_start += l:delta_start
+        else
+            let l:prev_start = l:delta_start
+        endif
+        call add(l:tokens, {
+            \ 'lnum': l:prev_line + 1,
+            \ 'col': l:prev_start + 1,
+            \ 'length': a:data[l:i + 2],
+            \ 'type': a:data[l:i + 3],
+            \ 'modifiers': a:data[l:i + 4],
+            \ })
+        let l:i += 5
+    endwhile
+    return l:tokens
+endfunction
+
+" Get (creating if needed) a textprop type that highlights with a:group.
+function! s:semantic_prop_type(group) abort
+    let l:name = 'WplusSemantic' . substitute(a:group, '\W', '', 'g')
+    if empty(prop_type_get(l:name))
+        silent! call prop_type_add(l:name, {'highlight': a:group})
+    endif
+    return l:name
+endfunction
+
+function! s:show_semantic_tokens(result) abort
+    if !has('textprop') | return | endif
+    let l:bufnr = bufnr('%')
+    for l:pt in keys(s:semantic_prop_types)
+        silent! call prop_remove({'type': l:pt, 'bufnr': l:bufnr, 'all': v:true})
+    endfor
+    let l:data = type(a:result) == v:t_dict ? get(a:result, 'data', []) : a:result
+    let l:tokens = s:decode_semantic_tokens(l:data)
+    for l:t in l:tokens
+        let l:group = get(s:token_type_hl, l:t.type, 'Identifier')
+        let l:pt = s:semantic_prop_type(l:group)
+        let s:semantic_prop_types[l:pt] = 1
+        silent! call prop_add(l:t.lnum, l:t.col, {
+            \ 'bufnr': l:bufnr,
+            \ 'length': l:t.length,
+            \ 'type': l:pt,
+            \ })
+    endfor
+endfunction
+
+function! wplus#lsp#request_semantic_tokens() abort
+    let l:ft = &filetype
+    if !has_key(s:servers, l:ft) | return | endif
+    if !s:supports(l:ft, 'textDocument/semanticTokens', 1) | return | endif
+    let l:uri = s:get_buf_uri(bufnr('%'))
+    if empty(l:uri) | return | endif
+    call s:send(l:ft, 'textDocument/semanticTokens/full', {'textDocument': {'uri': l:uri}})
 endfunction
 
 function! wplus#lsp#get_symbols(bufnr) abort
@@ -873,12 +1128,205 @@ endfunction
 function! s:show_completion(result) abort
     if empty(a:result) | return | endif
     let l:items = type(a:result) == v:t_list ? a:result : a:result.items
+    " Keep the raw items so CompleteDone can re-parse snippet insertText.
+    call setbufvar(bufnr('%'), 'wplus_lsp_completion_items', l:items)
     let l:matches = []
     let l:kind_map = {1: 'v', 2: 'f', 3: 'm', 4: 'f', 5: 'f', 6: 'c', 7: 'i', 8: 's', 9: 'm', 10: 'p', 11: 'u', 12: 'e', 13: 'k', 14: 's', 15: 's'}
     for l:item in l:items | call add(l:matches, {'word': get(l:item, 'insertText', l:item.label), 'abbr': l:item.label, 'kind': get(l:kind_map, get(l:item, 'kind', 0), 't'), 'menu': get(l:item, 'detail', '')}) | endfor
     let l:start = col('.') - 1
     while l:start > 0 && getline('.')[l:start - 1] =~# '\k' | let l:start -= 1 | endwhile
     call complete(l:start + 1, l:matches)
+endfunction
+
+" ── Snippet support ─────────────────────────────────────────────────────────
+
+" Parse an LSP snippet string into an ordered list of segments:
+"   {'type': 'text', 'text': '...'}
+"   {'type': 'stop', 'index': N, 'placeholder': '...'}
+" Handles $N, ${N}, ${N:placeholder}, $0, and \${ escapes.
+function! s:parse_snippet(snippet) abort
+    let l:segs = []
+    let l:text = ''
+    let l:i = 0
+    let l:len = len(a:snippet)
+    while l:i < l:len
+        let l:c = a:snippet[l:i]
+        if l:c ==# '\' && l:i + 1 < l:len && a:snippet[l:i + 1] ==# '$'
+            let l:text .= '$'
+            let l:i += 2
+            continue
+        endif
+        if l:c ==# '$'
+            if !empty(l:text)
+                call add(l:segs, {'type': 'text', 'text': l:text})
+                let l:text = ''
+            endif
+            let l:j = l:i + 1
+            if l:j < l:len && a:snippet[l:j] ==# '{'
+                let l:close = stridx(a:snippet, '}', l:j)
+                if l:close == -1
+                    let l:text .= a:snippet[l:i :]
+                    break
+                endif
+                let l:inner = a:snippet[l:j + 1 : l:close - 1]
+                let l:colon = stridx(l:inner, ':')
+                if l:colon == -1
+                    call add(l:segs, {'type': 'stop', 'index': str2nr(l:inner), 'placeholder': ''})
+                else
+                    call add(l:segs, {'type': 'stop', 'index': str2nr(l:inner[: l:colon - 1]), 'placeholder': l:inner[l:colon + 1 :]})
+                endif
+                let l:i = l:close + 1
+            else
+                while l:j < l:len && a:snippet[l:j] =~# '\d'
+                    let l:j += 1
+                endwhile
+                if l:j > l:i + 1
+                    call add(l:segs, {'type': 'stop', 'index': str2nr(a:snippet[l:i + 1 : l:j - 1]), 'placeholder': ''})
+                    let l:i = l:j
+                else
+                    let l:text .= '$'
+                    let l:i += 1
+                endif
+            endif
+            continue
+        endif
+        let l:text .= l:c
+        let l:i += 1
+    endwhile
+    if !empty(l:text)
+        call add(l:segs, {'type': 'text', 'text': l:text})
+    endif
+    return l:segs
+endfunction
+
+" Insert text at (lnum, col), handling embedded newlines.
+function! s:insert_text_at(lnum, col, text) abort
+    let l:lines = split(a:text, "\n", 1)
+    let l:cur = getline(a:lnum)
+    let l:prefix = a:col > 1 ? l:cur[: a:col - 2] : ''
+    let l:suffix = a:col <= len(l:cur) ? l:cur[a:col - 1 :] : ''
+    if len(l:lines) == 1
+        call setline(a:lnum, l:prefix . l:lines[0] . l:suffix)
+    else
+        call setline(a:lnum, l:prefix . l:lines[0])
+        call append(a:lnum, l:lines[1 : -2] + [l:lines[-1] . l:suffix])
+    endif
+endfunction
+
+" Advance a (lnum, col) position past a chunk of text.
+function! s:advance_pos(lnum, col, text) abort
+    let l:lines = split(a:text, "\n", 1)
+    if len(l:lines) == 1
+        return [a:lnum, a:col + len(l:lines[0])]
+    endif
+    return [a:lnum + len(l:lines) - 1, len(l:lines[-1]) + 1]
+endfunction
+
+" Insert parsed snippet segments at the current cursor, returning the list of
+" tab stops (each {index, lnum, col, placeholder}).
+function! s:insert_snippet(segs) abort
+    let l:stops = []
+    let l:lnum = line('.')
+    let l:col = col('.')
+    for l:seg in a:segs
+        if l:seg.type ==# 'text'
+            call s:insert_text_at(l:lnum, l:col, l:seg.text)
+            let [l:lnum, l:col] = s:advance_pos(l:lnum, l:col, l:seg.text)
+        else
+            call add(l:stops, {'index': l:seg.index, 'lnum': l:lnum, 'col': l:col, 'placeholder': l:seg.placeholder})
+            if !empty(l:seg.placeholder)
+                call s:insert_text_at(l:lnum, l:col, l:seg.placeholder)
+                let l:col += len(l:seg.placeholder)
+            endif
+        endif
+    endfor
+    return l:stops
+endfunction
+
+" Move the cursor to a stop, selecting its placeholder so typing replaces it.
+function! s:snippet_goto(stop) abort
+    call cursor(a:stop.lnum, a:stop.col)
+    if !empty(a:stop.placeholder)
+        execute 'normal! v' . len(a:stop.placeholder) . 'l'
+    endif
+endfunction
+
+function! s:snippet_clear() abort
+    silent! unlet b:wplus_lsp_snippet_stops
+    silent! unlet b:wplus_lsp_snippet_pos
+    silent! unlet b:wplus_lsp_snippet_active
+    silent! execute 'iunmap <buffer> <Tab>'
+    silent! execute 'iunmap <buffer> <S-Tab>'
+endfunction
+
+function! wplus#lsp#snippet_tab() abort
+    if !get(b:, 'wplus_lsp_snippet_active', 0) | return "\<Tab>" | endif
+    let l:stops = get(b:, 'wplus_lsp_snippet_stops', [])
+    let l:pos = get(b:, 'wplus_lsp_snippet_pos', 0)
+    if l:pos >= len(l:stops) - 1
+        call s:snippet_clear()
+        return "\<Tab>"
+    endif
+    let l:pos += 1
+    call setbufvar(bufnr('%'), 'wplus_lsp_snippet_pos', l:pos)
+    call s:snippet_goto(l:stops[l:pos])
+    return ''
+endfunction
+
+function! wplus#lsp#snippet_shift_tab() abort
+    if !get(b:, 'wplus_lsp_snippet_active', 0) | return "\<S-Tab>" | endif
+    let l:stops = get(b:, 'wplus_lsp_snippet_stops', [])
+    let l:pos = get(b:, 'wplus_lsp_snippet_pos', 0)
+    if l:pos <= 0 | return "\<S-Tab>" | endif
+    let l:pos -= 1
+    call setbufvar(bufnr('%'), 'wplus_lsp_snippet_pos', l:pos)
+    call s:snippet_goto(l:stops[l:pos])
+    return ''
+endfunction
+
+" Replace the just-inserted completion word with a parsed snippet and arm
+" tab-stop navigation. Called from CompleteDone.
+function! s:apply_snippet(snippet) abort
+    let l:segs = s:parse_snippet(a:snippet)
+    let l:word = get(v:completed_item, 'word', '')
+    let l:lnum = line('.')
+    let l:col = col('.')
+    if !empty(l:word) && l:col > len(l:word)
+        let l:cur = getline(l:lnum)
+        let l:start = l:col - len(l:word)
+        call setline(l:lnum, l:cur[: l:start - 2] . l:cur[l:col - 1 :])
+        call cursor(l:lnum, l:start)
+    endif
+    let l:stops = s:insert_snippet(l:segs)
+    if empty(l:stops)
+        return
+    endif
+    " Order stops by index, with the final $0 stop last.
+    call sort(l:stops, {a, b -> a.index == 0 ? 1 : (b.index == 0 ? -1 : a.index - b.index)})
+    call setbufvar(bufnr('%'), 'wplus_lsp_snippet_stops', l:stops)
+    call setbufvar(bufnr('%'), 'wplus_lsp_snippet_pos', 0)
+    call setbufvar(bufnr('%'), 'wplus_lsp_snippet_active', 1)
+    inoremap <buffer> <expr> <Tab>   wplus#lsp#snippet_tab()
+    inoremap <buffer> <expr> <S-Tab> wplus#lsp#snippet_shift_tab()
+    call s:snippet_goto(l:stops[0])
+endfunction
+
+function! s:on_complete_done() abort
+    let l:item = get(v:, 'completed_item', {})
+    if empty(l:item) | return | endif
+    let l:items = get(b:, 'wplus_lsp_completion_items', [])
+    if empty(l:items) | return | endif
+    let l:word = get(l:item, 'word', '')
+    for l:raw in l:items
+        let l:raw_word = get(l:raw, 'insertText', get(l:raw, 'label', ''))
+        if l:raw_word ==# l:word && get(l:raw, 'insertTextFormat', 1) == 2
+            let l:snippet = get(l:raw, 'insertText', '')
+            if !empty(l:snippet)
+                call s:apply_snippet(l:snippet)
+            endif
+            break
+        endif
+    endfor
 endfunction
 
 function! s:apply_workspace_edit(edit) abort
@@ -1000,6 +1448,30 @@ function! wplus#lsp#_test_supports(ft, method) abort
     return s:supports(a:ft, a:method)
 endfunction
 
+function! wplus#lsp#_test_compute_change_range(old_lines, new_lines) abort
+    return s:compute_change_range(a:old_lines, a:new_lines)
+endfunction
+
+function! wplus#lsp#_test_auto_complete_enabled(ft) abort
+    return s:auto_complete_enabled(a:ft)
+endfunction
+
+function! wplus#lsp#_test_parse_snippet(snippet) abort
+    return s:parse_snippet(a:snippet)
+endfunction
+
+function! wplus#lsp#_test_workspace_symbols_to_qf(result) abort
+    return s:workspace_symbols_to_qf(a:result)
+endfunction
+
+function! wplus#lsp#_test_decode_semantic_tokens(data) abort
+    return s:decode_semantic_tokens(a:data)
+endfunction
+
+function! wplus#lsp#_test_resolve_server_config(ft, root) abort
+    return s:resolve_server_config(a:ft, a:root)
+endfunction
+
 function! wplus#lsp#_test_set_caps(ft, caps) abort
     if !has_key(s:servers, a:ft)
         let s:servers[a:ft] = {'job': v:null, 'channel': v:null, 'last_id': 0, 'requests': {}, 'buffer': '', 'caps': a:caps, 'initialized': 1}
@@ -1024,6 +1496,7 @@ function! wplus#lsp#setup() abort
     command! WlspDiagPopup      call wplus#lsp#diag_popup()
     command! WlspSignatureHelp  call wplus#lsp#signature_help()
     command! WlspFormat         call wplus#lsp#format(0)
+    command! -nargs=? WlspSymbols call wplus#lsp#workspace_symbols(<q-args> != '' ? <q-args> : input('Symbol: '))
 
     nnoremap <silent> K          :WlspHover<CR>
     nnoremap <silent> gd         :WlspDefinition<CR>
@@ -1040,6 +1513,8 @@ function! wplus#lsp#setup() abort
         autocmd FileType * call s:start_server(&filetype)
         autocmd BufReadPost * call s:did_open(&filetype)
         autocmd TextChanged,TextChangedI * call s:did_change(&filetype, bufnr('%'))
+        autocmd TextChangedI * call s:trigger_auto_complete(&filetype, bufnr('%'))
+        autocmd CompleteDone * call s:on_complete_done()
         autocmd BufWritePost * call s:did_save(&filetype)
         autocmd BufUnload * call s:did_close(expand('<abuf>'))
         autocmd VimLeavePre * call wplus#lsp#stop_all()

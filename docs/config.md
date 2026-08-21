@@ -96,6 +96,8 @@ let g:wplus_lsp_cache_ttl    = 300        " definition/reference 캐시 TTL (초
 let g:wplus_lsp_sig_delay    = 100        " 시그니처 힌트 지연 (ms)
 let g:wplus_lsp_change_delay = 800        " 텍스트 변경 → didChange 지연 (ms)
 let g:wplus_lsp_diag_delay   = 300        " 진단 갱신 지연 (ms)
+let g:wplus_lsp_auto_complete = 1         " 타이핑 중 자동완성 트리거
+let g:wplus_lsp_complete_delay = 300      " 자동완성 트리거 지연 (ms)
 
 " ── fold ─────────────────────────────────────────────────────────────────
 let g:wplus_fold_method     = 'indent'    " 'indent' | 'lsp' | 'syntax'
