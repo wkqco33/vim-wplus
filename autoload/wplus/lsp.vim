@@ -459,7 +459,7 @@ function! s:handle_request_result(ft, method, result, ...) abort
         call s:send(a:ft, 'initialized', {}, 1)
         call s:did_open(a:ft)
     elseif a:method ==# 'textDocument/definition'
-        if get(a:req, 'tag', '') ==# 'peek'
+        if get(l:req, 'tag', '') ==# 'peek'
             call s:peek_definition(a:result)
         else
             call s:goto_location(a:result)
@@ -477,7 +477,7 @@ function! s:handle_request_result(ft, method, result, ...) abort
     elseif a:method ==# 'textDocument/prepareRename'
         call s:on_prepare_rename(a:ft, a:result)
     elseif a:method ==# 'textDocument/codeAction'
-        if get(a:req, 'tag', '') ==# 'organize_imports'
+        if get(l:req, 'tag', '') ==# 'organize_imports'
             call s:execute_organize_imports(a:result)
         else
             call s:show_code_actions(a:result)
@@ -515,7 +515,7 @@ function! s:handle_request_result(ft, method, result, ...) abort
     elseif a:method ==# 'textDocument/documentLink'
         call s:store_document_links(a:result)
     elseif a:method ==# 'textDocument/prepareCallHierarchy'
-        call s:on_prepare_call_hierarchy(get(a:req, 'tag', 'incoming'), a:result)
+        call s:on_prepare_call_hierarchy(get(l:req, 'tag', 'incoming'), a:result)
     elseif a:method ==# 'callHierarchy/incomingCalls'
         call s:show_call_hierarchy(a:result, 'incoming')
     elseif a:method ==# 'callHierarchy/outgoingCalls'
