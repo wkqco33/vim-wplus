@@ -26,12 +26,59 @@ function! wplus#ai#security#clean_suggest_content(content) abort
     " Remove markdown code blocks
     let l:txt = substitute(l:txt, '```.*\n', '', 'g')
     let l:txt = substitute(l:txt, '```', '', 'g')
-    let l:txt = trim(l:txt)
+    " Keep all response whitespace. A leading newline is often the actual
+    " insertion point (for example when completing the next indented line),
+    " and indentation must survive acceptance. Use trim() only for checks.
     " Some completion models emit the FIM/decorator marker by itself when
     " there is not enough context. It is not useful ghost text and can cause
     " the same one-character suggestion to be rendered repeatedly.
-    if l:txt ==# '@'
+    if trim(l:txt) ==# '@' || empty(trim(l:txt))
         return ''
+    endif
+    return l:txt
+endfunction
+
+" Normalize chat-model output against the exact text surrounding the cursor.
+" Chat fallback models often echo the current line or the first suffix line;
+" leaving that echo in a ghost suggestion makes acceptance duplicate code.
+function! wplus#ai#security#trim_suggest_content(content, suffix, prefix) abort
+    let l:txt = wplus#ai#security#clean_suggest_content(a:content)
+    if empty(l:txt)
+        return ''
+    endif
+
+    let l:prefix_tail = matchstr(a:prefix, '[^\n]*$')
+    let l:prefix_indent = matchstr(l:prefix_tail, '^\s*')
+    let l:prefix_code = substitute(l:prefix_tail, '^\s*', '', '')
+    if !empty(l:prefix_code) && strpart(l:txt, 0, strlen(l:prefix_indent . l:prefix_code)) ==# l:prefix_indent . l:prefix_code
+        let l:txt = strpart(l:txt, strlen(l:prefix_indent . l:prefix_code))
+    elseif !empty(l:prefix_code) && strpart(l:txt, 0, strlen(l:prefix_code)) ==# l:prefix_code
+        let l:txt = strpart(l:txt, strlen(l:prefix_code))
+    elseif !empty(trim(l:prefix_tail)) && strpart(l:txt, 0, strlen(l:prefix_tail)) ==# l:prefix_tail
+        let l:txt = strpart(l:txt, strlen(l:prefix_tail))
+    endif
+
+    if empty(trim(l:txt))
+        return ''
+    endif
+
+    let l:suffix_lines = split(a:suffix, '\n', 1)
+    let l:first_suffix = ''
+    for l:line in l:suffix_lines
+        if !empty(trim(l:line))
+            let l:first_suffix = trim(l:line)
+            break
+        endif
+    endfor
+    if !empty(l:first_suffix)
+        let l:lines = split(l:txt, '\n', 1)
+        for l:i in range(0, len(l:lines) - 1)
+            if trim(l:lines[l:i]) ==# l:first_suffix
+                let l:lines = l:i > 0 ? l:lines[: l:i - 1] : []
+                break
+            endif
+        endfor
+        let l:txt = join(l:lines, "\n")
     endif
     return l:txt
 endfunction

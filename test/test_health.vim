@@ -23,11 +23,12 @@ function! Test_health_command_and_output() abort
     call assert_true(l:text =~# '7\. Unrecognized Global Options', 'Section 7 missing')
 
     " Assert API key is never printed
-    let g:wplus_ai_api_key = 'secret-api-key-12345'
+    let l:fake_key = repeat('k', 32)
+    let g:wplus_ai_api_key = l:fake_key
     WplusHealth
     let l:lines2 = getbufline(l:buf, 1, '$')
     let l:text2 = join(l:lines2, "\n")
-    call assert_false(l:text2 =~# 'secret-api-key-12345', 'API key must never be printed in health report')
+    call assert_false(l:text2 =~# l:fake_key, 'API key must never be printed in health report')
 
     " Assert newly introduced unknown options are caught without depending on
     " unrelated options from other modules.

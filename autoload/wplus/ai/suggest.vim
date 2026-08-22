@@ -10,6 +10,7 @@ let s:suggest_bufnr = 0
 let s:suggest_timer = v:null
 let s:suggest_changedtick = 0
 let s:suggest_keystroke_count = 0
+let s:last_suggest_change_at = 0.0
 let s:last_suggest_error = ''
 let s:last_suggest_error_at = 0
 
@@ -286,10 +287,11 @@ function! s:on_suggest_complete(request, json) abort
 
     if empty(l:content)
         let l:error_msg = wplus#ai#provider#extract_error(a:json)
-        if l:error_msg =~? 'does not support insert'
-            let g:wplus_ai_ollama_fim = 0
-            call wplus#ai#provider#mark_fim_unsupported(wplus#ai#provider#get_completion_model())
-            call s:report_suggest_error('Model does not support FIM -> fallback to chat (g:wplus_ai_ollama_fim=0)')
+        if wplus#ai#provider#is_fim_unsupported_error(l:error_msg)
+            " Capability is model-specific. Remember it for this model instead
+            " of disabling FIM globally (a later model may support it).
+            call wplus#ai#provider#mark_fim_unsupported(get(a:request, 'model', wplus#ai#provider#get_completion_model()))
+            call s:suggest_debug('model does not support FIM; retrying with chat')
             if line('.') == a:request.line && col('.') == a:request.col && bufnr('%') == a:request.bufnr
                 let l:prefix = wplus#ai#context#get_prefix(a:request.line, a:request.col, g:wplus_ai_suggest_context_lines)
                 let l:suffix = wplus#ai#context#get_suffix(a:request.line, a:request.col, g:wplus_ai_suggest_suffix_lines)
@@ -304,8 +306,10 @@ function! s:on_suggest_complete(request, json) abort
         return
     endif
 
-    let l:content = wplus#ai#security#clean_suggest_content(l:content)
+    let l:content = wplus#ai#security#trim_suggest_content(
+        \ l:content, get(a:request, 'suffix', ''), get(a:request, 'prefix', ''))
     if empty(l:content)
+        call wplus#ai#suggest#dismiss()
         return
     endif
     let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
@@ -330,7 +334,14 @@ function! s:on_text_changed() abort
         return
     endif
 
-    let s:suggest_keystroke_count += 1
+    let l:now = reltimefloat(reltime())
+    let l:rapid_window = max([0.5, g:wplus_ai_suggest_delay / 1000.0 * 2.0])
+    if s:last_suggest_change_at <= 0.0 || l:now - s:last_suggest_change_at > l:rapid_window
+        let s:suggest_keystroke_count = 1
+    else
+        let s:suggest_keystroke_count += 1
+    endif
+    let s:last_suggest_change_at = l:now
     if get(b:, 'wplus_lsp_completion_auto', 0) && get(b:, 'wplus_lsp_completion_tick', -1) != b:changedtick
         let b:wplus_lsp_completion_auto = 0
     endif
@@ -350,6 +361,7 @@ endfunction
 
 function! s:on_insert_enter() abort
     let s:suggest_keystroke_count = 0
+    let s:last_suggest_change_at = 0.0
     let s:suggest_changedtick = b:changedtick
 endfunction
 

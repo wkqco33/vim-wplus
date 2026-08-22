@@ -70,6 +70,15 @@ function! wplus#ai#provider#use_ollama_fim() abort
     return g:wplus_ai_provider ==# 'ollama' && g:wplus_ai_ollama_fim && !get(s:fim_unsupported_models, wplus#ai#provider#get_completion_model(), 0)
 endfunction
 
+" Ollama accepts the suffix field only when the model's template implements
+" FIM.  There is no reliable local model-name convention, so capability is
+" learned from the first response rather than guessed from the model name.
+function! wplus#ai#provider#is_fim_unsupported_error(message) abort
+    let l:first = a:message =~? '\c\%(does\s\+not\s\+support\|not\s\+support\|unsupported\)\_.\{0,40}\%\(insert\|suffix\|fim\)'
+    let l:second = a:message =~? '\c\%\(insert\|suffix\|fim\)\_.\{0,40}\%(not\s\+support\|unsupported\|unavailable\)'
+    return l:first || l:second
+endfunction
+
 function! wplus#ai#provider#mark_fim_unsupported(model) abort
     let s:fim_unsupported_models[a:model] = 1
 endfunction
@@ -112,25 +121,23 @@ function! wplus#ai#provider#build_suggest_payload(prefix, suffix) abort
     let l:scope = wplus#ai#context#get_scope()
     let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
 
-    let l:prompt = "Complete the code that directly follows the code before the cursor.\n"
-        \ . "Keep the suggestion short (at most " . l:max_lines . " lines).\n\n"
+    let l:language = empty(&filetype) ? 'plain text' : &filetype
+    let l:prompt = "Complete the code at the cursor.\n"
+        \ . "Language: " . l:language . "\n"
+        \ . "Keep the insertion short (at most " . l:max_lines . " lines).\n\n"
     if !empty(l:scope)
         let l:prompt .= "You are currently inside: " . l:scope . "\n\n"
     endif
     if !empty(l:symbols)
         let l:prompt .= "Relevant symbols available in the workspace: " . join(l:symbols, ', ') . "\n\n"
     endif
-    if !empty(a:prefix)
-        let l:prompt .= "Code before the cursor (prefix):\n" . a:prefix . "\n\n"
-    endif
-    if !empty(a:suffix)
-        let l:prompt .= "Code after the cursor (suffix):\n" . a:suffix . "\n\n"
-            \ . "Your completion must end exactly where the suffix begins and must NOT repeat the suffix itself.\n\n"
-    endif
-    let l:prompt .= "Output ONLY the completion that follows the prefix. No explanation, no markdown, no duplicate of the prefix or suffix."
+    let l:prompt .= "Insert between these exact markers; do not output either marker:\n"
+        \ . "<PREFIX>\n" . a:prefix . "\n<CURSOR>\n"
+        \ . a:suffix . "\n</PREFIX>\n\n"
+        \ . "Return ONLY the text to insert at <CURSOR>. Do not repeat the prefix, suffix, markers, explanations, or markdown.\n"
 
     let l:spec = {
-        \ 'system': 'You are a precise code completion engine. Infer the surrounding function, types, and style from the provided context and return ONLY the next code directly following the cursor, in the same language and style.',
+        \ 'system': 'You are a precise code completion engine for ' . l:language . '. Return only a short insertion at the cursor. Never explain your answer.',
         \ 'user': l:prompt,
         \ 'max_tokens': g:wplus_ai_suggest_max_tokens,
         \ 'temperature': g:wplus_ai_suggest_temperature,
@@ -196,12 +203,13 @@ function! wplus#ai#provider#build_request_payload(prompt, ...) abort
     if empty(l:prov) | return '' | endif
     let l:max_tokens = a:0 >= 1 && a:1 > 0 ? a:1 : get(g:, 'wplus_ai_max_tokens', 2048)
     let l:temperature = a:0 >= 2 ? a:2 : get(g:, 'wplus_ai_temperature', 0.7)
+    let l:purpose = a:0 >= 3 ? a:3 : 'command'
     let l:spec = {
-        \ 'system': 'You are a helpful code assistant. Provide concise, accurate responses.',
+        \ 'system': l:purpose ==# 'suggest' ? 'You are a precise code completion engine. Return only the requested insertion.' : 'You are a helpful code assistant. Provide concise, accurate responses.',
         \ 'user': a:prompt,
         \ 'max_tokens': l:max_tokens,
         \ 'temperature': l:temperature,
-        \ 'purpose': 'command',
+        \ 'purpose': l:purpose,
         \ }
     return call(l:prov.payload, [l:spec])
 endfunction
@@ -221,11 +229,14 @@ function! s:resolve_model(spec) abort
     return 'gpt-3.5-turbo'
 endfunction
 
-function! s:uses_max_completion_tokens() abort
+function! s:uses_max_completion_tokens(spec) abort
     if g:wplus_ai_provider ==# 'claude'
         return v:false
     endif
-    let l:model = tolower(g:wplus_ai_model)
+    let l:model = get(a:spec, 'purpose', '') ==# 'suggest'
+        \ ? wplus#ai#provider#get_completion_model()
+        \ : g:wplus_ai_model
+    let l:model = tolower(l:model)
     return l:model =~# '^gpt-5' || l:model =~# '^o[134]'
 endfunction
 
@@ -255,7 +266,7 @@ function! s:build_openai_payload(spec) abort
         \ 'messages': l:msgs,
         \ 'temperature': a:spec.temperature,
         \ }
-    if s:uses_max_completion_tokens()
+    if s:uses_max_completion_tokens(a:spec)
         let l:body.max_completion_tokens = a:spec.max_tokens
     else
         let l:body.max_tokens = a:spec.max_tokens

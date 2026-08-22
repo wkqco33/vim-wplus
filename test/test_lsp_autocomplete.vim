@@ -88,11 +88,21 @@ function! Test_lsp_autocomplete_only_uses_server_trigger_characters() abort
     setlocal buftype=nofile bufhidden=wipe noswapfile filetype=python
     call setline(1, 'a')
     call cursor(1, 2)
-    call assert_false(wplus#lsp#_test_auto_completion_trigger_available('python'), 'A plain identifier must not open a global completion list')
+    call assert_false(wplus#lsp#_test_auto_completion_trigger_available('python'), 'A one-character identifier should not open a completion list')
+    call setline(1, 'ab ')
+    call cursor(1, 3)
+    call assert_true(wplus#lsp#_test_auto_completion_trigger_available('python'), 'A short identifier should open global completion')
     " In the ex test harness the normal-mode cursor sits on the character
     " where Insert mode would place the cursor after the trigger.
     call setline(1, 'value..')
     call cursor(1, 7)
     call assert_true(wplus#lsp#_test_auto_completion_trigger_available('python'), 'A server trigger character should open member completion')
     bwipeout!
+endfunction
+
+function! Test_lsp_completion_prefers_text_edit_and_utf16_position() abort
+    call wplus#lsp#setup()
+    let l:item = {'label': 'printf', 'insertText': 'wrong', 'textEdit': {'range': {'start': {'line': 0, 'character': 2}, 'end': {'line': 0, 'character': 3}}, 'newText': 'printf(${1})'}, 'insertTextFormat': 2}
+    call assert_equal('printf(${1})', wplus#lsp#_test_completion_item_text(l:item), 'LSP textEdit.newText should be used over insertText')
+    call assert_equal(7, wplus#lsp#_test_lsp_character_to_col('ab😀', 3), 'UTF-16 positions should map to Vim columns')
 endfunction

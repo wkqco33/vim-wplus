@@ -29,7 +29,7 @@ nnoremap <leader>am :WaiCommitMsg<CR>
 ## 명령어 목록
 
 | 명령 | 모드 | 동작 |
-|------|------|------|
+| ------ | ------ | ------ |
 | `:WaiComment` | Normal / Visual | 현재 코드에 주석 생성 |
 | `:WaiComplete` | Normal | 다음 줄 코드 완성 제안 |
 | `:'<,'>WaiRefactor` | Visual | 선택 범위 리팩토링 제안 |
@@ -39,6 +39,8 @@ nnoremap <leader>am :WaiCommitMsg<CR>
 | `:WaiFixDiag` | Normal | 현재 줄 LSP 진단 자동 수정 |
 | `:WaiToggleSuggest` | Normal | Ghost Text 자동완성 토글 |
 | `:WaiCancel` | Normal | 진행 중인 AI 요청 모두 취소 (`<leader>ac`) |
+
+`:WaiComplete`와 Ghost Text는 `g:wplus_ai_completion_model`을 사용하고, 리뷰·리팩토링·커밋 같은 명령은 `g:wplus_ai_model`을 사용합니다.
 
 ---
 
@@ -124,6 +126,7 @@ InsertMode에서 타이핑을 멈추면 AI가 다음 코드를 회색 ghost text
 ### 수락 키 설정
 
 기본적으로 `g:wplus_ai_tab_complete = 1`이 설정되어 있어 `<Tab>`을 누르면:
+
 1. Ghost Text가 표시 중이면 제안을 즉시 수락합니다.
 2. 팝업 메뉴가 열려 있으면 다음 항목을 선택합니다 (`<C-n>`).
 3. 그 외에는 일반 탭/들여쓰기를 수행합니다.
@@ -152,7 +155,7 @@ let g:wplus_ai_suggest_enabled       = 1     " 활성화
 let g:wplus_ai_suggest_delay         = 500   " 제안 지연 (ms)
 let g:wplus_ai_suggest_context_lines = 50    " 커서 앞 컨텍스트 줄 수
 let g:wplus_ai_suggest_suffix_lines  = 20    " 커서 뒤 컨텍스트 줄 수
-let g:wplus_ai_suggest_max_tokens    = 500   " 제안 최대 토큰
+let g:wplus_ai_suggest_max_tokens    = 256   " 제안 최대 토큰 (3줄 UI에 맞춘 빠른 기본값)
 let g:wplus_ai_suggest_max_lines     = 3     " 제안 최대 줄 수
 let g:wplus_ai_suggest_temperature   = 0.2   " 코드 완성 온도 (낮을수록 정확)
 let g:wplus_ai_suggest_timeout       = 10    " 자동완성 타임아웃 (초)
@@ -178,12 +181,13 @@ let g:wplus_ai_ollama_fim = 0     " chat 방식 (클라우드/chat 완성 모델
 ```
 
 로컬 FIM 지원 모델(예: `qwen2.5-coder`)을 완성 전용으로 쓰면:
+
 - 완성 요청이 로컬에서 저지연 처리되고, 커맨드는 큰 클라우드 모델로 품질을 유지합니다.
 - `g:wplus_ai_completion_model`이 FIM을 지원하면 `g:wplus_ai_ollama_fim = 1`일 때 자동으로 FIM 방식이 적용됩니다.
 
 ### Adaptive Delay
 
-빠르게 타이핑할 때 불필요한 API 호출을 줄이기 위해 5회 연속 타이핑 이후 `delay`가 자동으로 2배로 늘어납니다.
+빠르게 타이핑할 때 불필요한 API 호출을 줄이기 위해 연속 입력 중에는 `delay`가 자동으로 2배로 늘어납니다. 입력을 잠시 멈추거나 Insert 모드를 다시 시작하면 카운터가 초기화됩니다.
 
 ### FIM (Fill-In-Middle) — Ollama 전용
 
@@ -194,7 +198,7 @@ let g:wplus_ai_ollama_fim = 0     " chat 방식 (클라우드/chat 완성 모델
 let g:wplus_ai_ollama_fim = 1
 ```
 
-모델이 FIM을 지원하지 않으면 자동으로 chat 방식으로 폴백합니다.
+모델이 FIM을 지원하지 않으면 첫 오류 응답을 기준으로 해당 모델만 capability를 기억하고 chat 방식으로 폴백합니다. 설정한 FIM 옵션 자체는 유지되므로 다른 모델로 바꾸면 다시 FIM을 시도합니다. Ollama 모델 이름만으로 FIM 지원 여부를 확정할 수 없기 때문에 실제 `/api/generate` 응답을 사용합니다.
 
 ---
 

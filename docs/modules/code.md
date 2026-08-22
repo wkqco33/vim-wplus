@@ -30,11 +30,12 @@
 
 진단은 sign 컬럼에 `E`, `W`, `I`, `H`로 표시되며 상태바에 `E:n W:n` 형식으로도 표시됩니다.
 
-**자동완성 & 스니펫:** 일반 식별자 입력 중에는 LSP 완성 팝업을 자동으로 띄우지 않으며, 수동 완성은 `:WlspCompletion`으로 실행할 수 있습니다. 서버 트리거 문자(예: `.`)를 입력하면 멤버 완성 팝업을 잠시 표시하고, 선택하지 않은 채 대기하면 팝업을 닫고 AI Ghost Text 제안으로 넘깁니다. 서버가 스니펫(`insertTextFormat: 2`)을 제공하면 선택 후 `<Tab>`/`<S-Tab>`으로 탭스톱을 이동하며 채울 수 있습니다.
+**자동완성 & 스니펫:** 한 글자 식별자에서는 팝업을 열지 않고, 짧은 식별자(기본 2글자)나 서버 트리거 문자(예: `.`) 뒤에는 LSP 완성을 자동으로 표시합니다. 선택하지 않고 대기하면 팝업을 닫고 AI Ghost Text 제안으로 넘깁니다. 서버가 `textEdit` 또는 스니펫(`insertTextFormat: 2`)을 제공하면 해당 삽입 텍스트와 탭스톱을 사용합니다. 수동 완성은 `:WlspCompletion`으로 실행할 수 있습니다.
 
 ```vim
 let g:wplus_lsp_auto_complete  = 1    " 타이핑 중 자동완성 트리거
 let g:wplus_lsp_complete_delay = 300  " 자동완성 트리거 지연 (ms)
+let g:wplus_lsp_complete_min_chars = 2 " 식별자 자동완성 최소 길이
 ```
 
 **시맨틱 토큰:** 서버가 `semanticTokens`를 지원하면 열기/저장 시 LSP 기반 하이라이트를 자동 적용합니다.

@@ -96,6 +96,7 @@ let g:wplus_lsp_sig_delay = 100         " 시그니처 힌트 지연(ms)
 let g:wplus_lsp_diag_delay = 300        " 진단 갱신 지연(ms)
 let g:wplus_lsp_auto_complete = 1       " 타이핑 중 자동완성 트리거
 let g:wplus_lsp_complete_delay = 300    " 자동완성 트리거 지연(ms)
+let g:wplus_lsp_complete_min_chars = 2  " 식별자 자동완성 최소 길이
 
 " VS Code 단축키 정렬 레이어 (opt-in): F2/F12/Ctrl+Shift+F 등
 let g:wplus_vscode_keymaps = 0
@@ -249,7 +250,7 @@ let g:wplus_ai_suggest_delay = 400          " 입력 후 대기시간 (ms)
 let g:wplus_ai_suggest_context_lines = 50   " 상단 prefix 라인 수
 let g:wplus_ai_suggest_suffix_lines = 20    " 하단 suffix 라인 수
 let g:wplus_ai_suggest_max_lines = 3        " 표시할 최대 제안 라인 수
-let g:wplus_ai_suggest_max_tokens = 300
+let g:wplus_ai_suggest_max_tokens = 256  " 3줄 UI에 맞춘 빠른 기본값
 let g:wplus_ai_suggest_temperature = 0.2
 let g:wplus_ai_suggest_timeout = 15
 

@@ -6,7 +6,7 @@ let g:autoloaded_wplus_ai_context = 1
 " ── Context cache ─────────────────────────────────────────────────────────────
 " symbols/scope extraction scans ~200 lines per call. Cache by buffer with a
 " short TTL so rapid TextChangedI timer callbacks reuse the same snapshot.
-let s:cache = {}  " bufnr -> {'symbols': [...], 'scope': str, 'ft': str, 'ts': localtime()}
+let s:cache = {}  " bufnr -> {'symbols': [...], 'scope': str, 'ft': str, 'tick': N, 'line': N, 'ts': localtime()}
 let s:cache_ttl = 5  " seconds
 
 " Invalidate cache for a buffer (or all when bufnr <= 0).
@@ -24,6 +24,15 @@ function! s:cache_fresh(bufnr, ft) abort
     if !has_key(s:cache, a:bufnr) | return 0 | endif
     let l:entry = s:cache[a:bufnr]
     if l:entry.ft !=# a:ft | return 0 | endif
+    " Cursor position and changedtick are part of the context. A TTL-only
+    " cache can reuse the previous function/symbol list while the user is
+    " typing, which is especially harmful for short ghost-text requests.
+    if get(l:entry, 'tick', -1) != getbufvar(a:bufnr, 'changedtick', -2)
+        return 0
+    endif
+    if get(l:entry, 'line', -1) != line('.')
+        return 0
+    endif
     return (localtime() - l:entry.ts) < s:cache_ttl
 endfunction
 
@@ -32,6 +41,8 @@ function! s:cache_store(bufnr, ft, symbols, scope) abort
         \ 'symbols': a:symbols,
         \ 'scope': a:scope,
         \ 'ft': a:ft,
+        \ 'tick': getbufvar(a:bufnr, 'changedtick', -1),
+        \ 'line': line('.'),
         \ 'ts': localtime(),
         \ }
 endfunction
@@ -308,6 +319,8 @@ function! wplus#ai#context#get_prefix(line_nr, col, ...) abort
         endfor
     endif
     
+    " Keep the boundary declaration itself. Without it, a completion at the
+    " first body line loses the function signature and its parameter names.
     let l:before_lines = getline(l:boundary_line, a:line_nr - 1)
     let l:current_line_before = a:col > 1 ? strpart(getline(a:line_nr), 0, a:col - 1, 1) : ''
     return join(l:before_lines + [l:current_line_before], "\n")

@@ -83,6 +83,7 @@ function! wplus#ai#http#write_payload_stdin(job, payload) abort
 endfunction
 
 function! wplus#ai#http#send_request(prompt, OnContent, ...) abort
+    let l:purpose = a:0 >= 3 ? a:3 : 'command'
     if g:wplus_ai_provider !=# 'ollama' && empty(g:wplus_ai_api_key)
         call wplus#util#error_msg('ai', 'API key not configured (g:wplus_ai_api_key)')
         return
@@ -92,8 +93,9 @@ function! wplus#ai#http#send_request(prompt, OnContent, ...) abort
         return
     endif
 
-    if empty(g:wplus_ai_model)
-        call wplus#util#error_msg('ai', 'model not configured (g:wplus_ai_model)')
+    let l:model = l:purpose ==# 'suggest' ? wplus#ai#provider#get_completion_model() : g:wplus_ai_model
+    if empty(l:model)
+        call wplus#util#error_msg('ai', l:purpose ==# 'suggest' ? 'completion model not configured' : 'model not configured (g:wplus_ai_model)')
         return
     endif
 
@@ -103,7 +105,7 @@ function! wplus#ai#http#send_request(prompt, OnContent, ...) abort
 
     let l:max_tokens = a:0 >= 1 && a:1 > 0 ? a:1 : get(g:, 'wplus_ai_max_tokens', 2048)
     let l:temperature = a:0 >= 2 ? a:2 : get(g:, 'wplus_ai_temperature', 0.7)
-    let l:payload = wplus#ai#provider#build_request_payload(a:prompt, l:max_tokens, l:temperature)
+    let l:payload = wplus#ai#provider#build_request_payload(a:prompt, l:max_tokens, l:temperature, l:purpose)
     if strlen(l:payload) > g:wplus_ai_request_max_bytes
         call wplus#util#error_msg('ai', 'request exceeds g:wplus_ai_request_max_bytes')
         return
@@ -249,10 +251,13 @@ function! wplus#ai#http#send_suggest_request(prefix, suffix, prompt, OnComplete)
 
     let s:suggest_request = {
         \ 'id': l:request_id,
+        \ 'model': wplus#ai#provider#get_completion_model(),
         \ 'line': line('.'),
         \ 'col': col('.'),
         \ 'bufnr': bufnr('%'),
         \ 'changedtick': b:changedtick,
+        \ 'prefix': a:prefix,
+        \ 'suffix': a:suffix,
         \ 'response_buffer': '',
         \ 'error_buffer': '',
         \ 'fim': l:fim,
@@ -269,8 +274,12 @@ function! wplus#ai#http#send_suggest_request(prefix, suffix, prompt, OnComplete)
         let s:suggest_job = l:job
         call wplus#ai#http#write_payload_stdin(l:job, l:payload)
     else
+        let l:request = copy(s:suggest_request)
         let s:suggest_request = {}
         call wplus#ai#http#cleanup_curl_config(s:suggest_curl_config)
+        if type(l:request.on_complete) == v:t_func
+            call call(l:request.on_complete, [l:request, {'error': {'message': 'failed to start suggestion request'}}])
+        endif
     endif
 endfunction
 
@@ -284,8 +293,7 @@ function! s:on_suggest_response(request_id, channel, msg) abort
             silent! call job_stop(s:suggest_job)
             let s:suggest_job = v:null
         endif
-        let s:suggest_request = {}
-        call wplus#ai#http#cleanup_curl_config(s:suggest_curl_config)
+        let s:suggest_request.error_buffer = 'suggestion response exceeded g:wplus_ai_response_max_bytes'
     endif
 endfunction
 
@@ -305,14 +313,14 @@ function! s:on_suggest_response_complete(request_id, channel) abort
     call wplus#ai#http#cleanup_curl_config(s:suggest_curl_config)
 
     if !empty(l:request.error_buffer) && empty(l:request.response_buffer)
-        return
+        let l:json = {'error': {'message': trim(l:request.error_buffer)}}
+    else
+        try
+            let l:json = json_decode(l:request.response_buffer)
+        catch
+            let l:json = {'error': {'message': 'invalid suggestion response: ' . v:exception}}
+        endtry
     endif
-
-    try
-        let l:json = json_decode(l:request.response_buffer)
-    catch
-        return
-    endtry
 
     if type(l:request.on_complete) == v:t_func
         call call(l:request.on_complete, [l:request, l:json])

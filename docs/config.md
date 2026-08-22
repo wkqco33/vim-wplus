@@ -98,6 +98,7 @@ let g:wplus_lsp_change_delay = 800        " 텍스트 변경 → didChange 지�
 let g:wplus_lsp_diag_delay   = 300        " 진단 갱신 지연 (ms)
 let g:wplus_lsp_auto_complete = 1         " 타이핑 중 자동완성 트리거
 let g:wplus_lsp_complete_delay = 300      " 자동완성 트리거 지연 (ms)
+let g:wplus_lsp_complete_min_chars = 2    " 식별자 자동완성 최소 길이
 
 " ── vscode ────────────────────────────────────────────────────────────────
 " VS Code 단축키 정렬 레이어 (opt-in). 1로 설정하면 F2/F12/Ctrl+Shift+F 등
@@ -176,7 +177,7 @@ let g:wplus_ai_suggest_enabled       = 1
 let g:wplus_ai_suggest_delay         = 500
 let g:wplus_ai_suggest_context_lines = 50
 let g:wplus_ai_suggest_suffix_lines  = 20
-let g:wplus_ai_suggest_max_tokens    = 500
+let g:wplus_ai_suggest_max_tokens    = 256    " 3줄 UI에 맞춘 빠른 기본값
 let g:wplus_ai_suggest_max_lines     = 3
 let g:wplus_ai_suggest_temperature   = 0.2
 let g:wplus_ai_suggest_timeout       = 10

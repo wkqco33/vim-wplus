@@ -33,7 +33,10 @@ let g:wplus_ai_suggest_enabled = get(g:, 'wplus_ai_suggest_enabled', 1)
 let g:wplus_ai_suggest_delay = get(g:, 'wplus_ai_suggest_delay', 500)
 let g:wplus_ai_suggest_context_lines = get(g:, 'wplus_ai_suggest_context_lines', 50)
 let g:wplus_ai_suggest_suffix_lines = get(g:, 'wplus_ai_suggest_suffix_lines', 20)
-let g:wplus_ai_suggest_max_tokens = get(g:, 'wplus_ai_suggest_max_tokens', 500)
+" Three displayed lines rarely need a large generation budget. A smaller
+" default keeps local/chat completion responsive and leaves truncation as a
+" final safety net for providers that ignore the instruction.
+let g:wplus_ai_suggest_max_tokens = get(g:, 'wplus_ai_suggest_max_tokens', 256)
 let g:wplus_ai_suggest_max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
 let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
 let g:wplus_ai_tab_complete = get(g:, 'wplus_ai_tab_complete', 1)
@@ -153,8 +156,9 @@ function! wplus#ai#complete(context_lines) abort
         return
     endif
 
-    let l:prompt = "Complete this code. Respond with only the completion, no explanation:\n\n" . l:context
-    call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#preview_insert_after', [l:bufnr, l:lnum]))
+    let l:language = empty(&filetype) ? 'plain text' : &filetype
+    let l:prompt = "Complete this " . l:language . " code after the final line. Return only the new code, without explanation or markdown.\n\n" . l:context
+    call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#preview_insert_after', [l:bufnr, l:lnum]), g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature, 'suggest')
 endfunction
 
 function! wplus#ai#refactor() abort
@@ -423,6 +427,10 @@ endfunction
 
 function! wplus#ai#_test_build_request_payload(...) abort
     return call('wplus#ai#provider#build_request_payload', a:000)
+endfunction
+
+function! wplus#ai#_test_build_completion_payload(prompt) abort
+    return wplus#ai#provider#build_request_payload(a:prompt, g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature, 'suggest')
 endfunction
 
 function! wplus#ai#_test_truncate_diff(diff, max) abort

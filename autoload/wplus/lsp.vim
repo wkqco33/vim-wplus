@@ -23,6 +23,9 @@ let g:wplus_lsp_request_timeout = get(g:, 'wplus_lsp_request_timeout', 10)
 let g:wplus_lsp_definition_split = get(g:, 'wplus_lsp_definition_split', 0)
 let g:wplus_lsp_auto_complete   = get(g:, 'wplus_lsp_auto_complete',   1)
 let g:wplus_lsp_complete_delay  = get(g:, 'wplus_lsp_complete_delay',  300)
+" Show identifier completion after a short token, while still relying on
+" server triggerCharacters for punctuation-driven member completion.
+let g:wplus_lsp_complete_min_chars = get(g:, 'wplus_lsp_complete_min_chars', 2)
 let g:wplus_lsp_servers = get(g:, 'wplus_lsp_servers', {
     \ 'go': ['gopls'],
     \ 'c': ['clangd'],
@@ -997,13 +1000,22 @@ endfunction
 
 function! s:auto_completion_trigger_available(ft) abort
     if !s:completion_input_available() || !has_key(s:servers, a:ft) | return 0 | endif
+    let l:before = strpart(getline('.'), 0, col('.') - 1)
     let l:provider = get(get(s:servers[a:ft], 'caps', {}), 'completionProvider', {})
     if type(l:provider) != v:t_dict | return 0 | endif
     let l:triggers = get(l:provider, 'triggerCharacters', [])
-    if type(l:triggers) != v:t_list || empty(l:triggers) | return 0 | endif
-    let l:before = strpart(getline('.'), 0, col('.') - 1)
-    let l:last = strpart(l:before, strlen(l:before) - 1)
-    return index(l:triggers, l:last) >= 0
+    if type(l:triggers) == v:t_list && !empty(l:triggers)
+        let l:last = strpart(l:before, strlen(l:before) - 1)
+        if index(l:triggers, l:last) >= 0
+            return 1
+        endif
+    endif
+
+    " Most language servers provide useful global symbols even when they do
+    " not declare a punctuation trigger. Requiring a short identifier avoids
+    " a popup on the first character while keeping completion IDE-like.
+    let l:token = matchstr(l:before, '\k\+$')
+    return strlen(l:token) >= max([1, get(g:, 'wplus_lsp_complete_min_chars', 2)])
 endfunction
 
 function! s:trigger_auto_complete(ft, buf) abort
@@ -1516,6 +1528,51 @@ function! s:completion_context_valid(req) abort
     return !pumvisible()
 endfunction
 
+function! s:completion_item_text(item) abort
+    if type(a:item) != v:t_dict | return '' | endif
+    let l:edit = get(a:item, 'textEdit', {})
+    if type(l:edit) == v:t_dict && has_key(l:edit, 'newText')
+        return l:edit.newText
+    endif
+    return get(a:item, 'insertText', get(a:item, 'label', ''))
+endfunction
+
+" Return the byte-based Vim column for an LSP UTF-16 character offset.
+" ASCII source is the common case, but this prevents completion from starting
+" in the middle of a multibyte identifier.
+function! s:lsp_character_to_col(text, character) abort
+    let l:units = 0
+    let l:bytes = 0
+    for l:char in split(a:text, '\zs')
+        if l:units >= a:character | break | endif
+        let l:units += char2nr(l:char) > 0xffff ? 2 : 1
+        let l:bytes += strlen(l:char)
+    endfor
+    return l:bytes + 1
+endfunction
+
+function! s:completion_start(items) abort
+    let l:line_text = getline('.')
+    let l:fallback = col('.') - 1
+    while l:fallback > 0 && strpart(l:line_text, l:fallback - 1, 1) =~# '\k'
+        let l:fallback -= 1
+    endwhile
+    let l:start = l:fallback
+    let l:has_edit = 0
+    for l:item in a:items
+        let l:edit = type(l:item) == v:t_dict ? get(l:item, 'textEdit', {}) : {}
+        if type(l:edit) != v:t_dict | continue | endif
+        let l:range = get(l:edit, 'range', get(l:edit, 'insert', {}))
+        if type(l:range) != v:t_dict | continue | endif
+        let l:position = get(l:range, 'start', {})
+        if type(l:position) != v:t_dict || !has_key(l:position, 'character') | continue | endif
+        let l:candidate = s:lsp_character_to_col(l:line_text, l:position.character) - 1
+        let l:start = l:has_edit ? min([l:start, l:candidate]) : l:candidate
+        let l:has_edit = 1
+    endfor
+    return max([0, l:start])
+endfunction
+
 function! s:show_completion(result, req) abort
     if empty(a:result) || !s:completion_context_valid(a:req) | return | endif
     if exists('*wplus#ai#suggest#has_suggestion') && wplus#ai#suggest#has_suggestion()
@@ -1527,12 +1584,24 @@ function! s:show_completion(result, req) abort
     call setbufvar(bufnr('%'), 'wplus_lsp_completion_tick', b:changedtick)
     " Keep the raw items so CompleteDone can re-parse snippet insertText.
     call setbufvar(bufnr('%'), 'wplus_lsp_completion_items', l:items)
+    let l:completion_start = s:completion_start(l:items)
+    call setbufvar(bufnr('%'), 'wplus_lsp_completion_start', l:completion_start)
+    call setbufvar(bufnr('%'), 'wplus_lsp_completion_start_line', line('.'))
+    call setbufvar(bufnr('%'), 'wplus_lsp_completion_start_col', l:completion_start)
     let l:matches = []
     let l:kind_map = {1: 'v', 2: 'f', 3: 'm', 4: 'f', 5: 'f', 6: 'c', 7: 'i', 8: 's', 9: 'm', 10: 'p', 11: 'u', 12: 'e', 13: 'k', 14: 's', 15: 's'}
-    for l:item in l:items | call add(l:matches, {'word': get(l:item, 'insertText', l:item.label), 'abbr': l:item.label, 'kind': get(l:kind_map, get(l:item, 'kind', 0), 't'), 'menu': get(l:item, 'detail', '')}) | endfor
-    let l:start = col('.') - 1
-    while l:start > 0 && getline('.')[l:start - 1] =~# '\k' | let l:start -= 1 | endwhile
-    call complete(l:start + 1, l:matches)
+    let l:item_index = 0
+    for l:item in l:items
+        let l:word = s:completion_item_text(l:item)
+        if empty(l:word)
+            let l:item_index += 1
+            continue
+        endif
+        call add(l:matches, {'word': l:word, 'abbr': get(l:item, 'label', l:word), 'kind': get(l:kind_map, get(l:item, 'kind', 0), 't'), 'menu': get(l:item, 'detail', ''), 'user_data': string(l:item_index)})
+        let l:item_index += 1
+    endfor
+    if empty(l:matches) | return | endif
+    call complete(get(b:, 'wplus_lsp_completion_start', col('.') - 1) + 1, l:matches)
 endfunction
 
 " ── Snippet support ─────────────────────────────────────────────────────────
@@ -1644,7 +1713,15 @@ endfunction
 function! s:snippet_goto(stop) abort
     call cursor(a:stop.lnum, a:stop.col)
     if !empty(a:stop.placeholder)
-        execute 'normal! v' . len(a:stop.placeholder) . 'l'
+        " Visual mode already selects the character under the cursor. Move
+        " only len-1 times; len l used to include one character after the
+        " placeholder and made typing replace surrounding code.
+        let l:count = strchars(a:stop.placeholder)
+        if l:count > 1
+            execute 'normal! v' . (l:count - 1) . 'l'
+        else
+            normal! v
+        endif
     endif
 endfunction
 
@@ -1686,13 +1763,26 @@ endfunction
 function! s:apply_snippet(snippet) abort
     let l:segs = s:parse_snippet(a:snippet)
     let l:word = get(v:completed_item, 'word', '')
-    let l:lnum = line('.')
-    let l:col = col('.')
-    if !empty(l:word) && l:col > len(l:word)
-        let l:cur = getline(l:lnum)
-        let l:start = l:col - len(l:word)
-        call setline(l:lnum, l:cur[: l:start - 2] . l:cur[l:col - 1 :])
-        call cursor(l:lnum, l:start)
+    let l:lnum = get(b:, 'wplus_lsp_completion_start_line', line('.'))
+    let l:col = get(b:, 'wplus_lsp_completion_start_col', 0) + 1
+    if empty(l:word)
+        let l:lnum = line('.')
+        let l:col = max([1, col('.') - strlen(a:snippet)])
+    else
+        " CompleteDone may leave a multiline snippet on several lines. Remove
+        " the exact inserted range, not just bytes on the final line.
+        let l:word_lines = split(l:word, "\n", 1)
+        let l:end_line = l:lnum + len(l:word_lines) - 1
+        let l:end_col = len(l:word_lines) == 1 ? l:col + strlen(l:word_lines[0]) : strlen(l:word_lines[-1]) + 1
+        let l:start_text = getline(l:lnum)
+        let l:end_text = getline(l:end_line)
+        let l:prefix = strpart(l:start_text, 0, l:col - 1)
+        let l:suffix = strpart(l:end_text, l:end_col - 1)
+        if l:end_line > l:lnum
+            call deletebufline(bufnr('%'), l:lnum + 1, l:end_line)
+        endif
+        call setline(l:lnum, l:prefix . l:suffix)
+        call cursor(l:lnum, l:col)
     endif
     let l:stops = s:insert_snippet(l:segs)
     if empty(l:stops)
@@ -1710,20 +1800,37 @@ endfunction
 
 function! s:on_complete_done() abort
     let l:item = get(v:, 'completed_item', {})
-    if empty(l:item) | return | endif
     let l:items = get(b:, 'wplus_lsp_completion_items', [])
-    if empty(l:items) | return | endif
+    if empty(l:item) || empty(l:items)
+        silent! unlet b:wplus_lsp_completion_items b:wplus_lsp_completion_start b:wplus_lsp_completion_start_line b:wplus_lsp_completion_start_col
+        return
+    endif
     let l:word = get(l:item, 'word', '')
-    for l:raw in l:items
-        let l:raw_word = get(l:raw, 'insertText', get(l:raw, 'label', ''))
-        if l:raw_word ==# l:word && get(l:raw, 'insertTextFormat', 1) == 2
-            let l:snippet = get(l:raw, 'insertText', '')
-            if !empty(l:snippet)
-                call s:apply_snippet(l:snippet)
+    let l:raw = {}
+    let l:index = get(l:item, 'user_data', '')
+    if type(l:index) == v:t_string && l:index =~# '^\d\+$'
+        let l:raw = get(l:items, str2nr(l:index), {})
+    endif
+    if empty(l:raw)
+        for l:candidate in l:items
+            if s:completion_item_text(l:candidate) ==# l:word
+                let l:raw = l:candidate
+                break
             endif
-            break
+        endfor
+    endif
+    if !empty(l:raw)
+        let l:raw_word = s:completion_item_text(l:raw)
+        if get(l:raw, 'insertTextFormat', 1) == 2 && !empty(l:raw_word)
+            call s:apply_snippet(l:raw_word)
         endif
-    endfor
+        let l:additional = get(l:raw, 'additionalTextEdits', [])
+        if type(l:additional) == v:t_list && !empty(l:additional)
+            let l:path = s:decode_uri_path(s:get_buf_uri(bufnr('%')))
+            call s:apply_text_edits(l:path, l:additional)
+        endif
+    endif
+    silent! unlet b:wplus_lsp_completion_items b:wplus_lsp_completion_start b:wplus_lsp_completion_start_line b:wplus_lsp_completion_start_col
 endfunction
 
 function! s:apply_workspace_edit(edit) abort
@@ -1869,6 +1976,14 @@ function! wplus#lsp#_test_auto_completion_trigger_available(ft) abort
     return s:auto_completion_trigger_available(a:ft)
 endfunction
 
+function! wplus#lsp#_test_completion_item_text(item) abort
+    return s:completion_item_text(a:item)
+endfunction
+
+function! wplus#lsp#_test_lsp_character_to_col(text, character) abort
+    return s:lsp_character_to_col(a:text, a:character)
+endfunction
+
 function! wplus#lsp#_test_parse_snippet(snippet) abort
     return s:parse_snippet(a:snippet)
 endfunction
@@ -1968,6 +2083,8 @@ function! wplus#lsp#setup() abort
         autocmd BufReadPost * call s:did_open(&filetype)
         autocmd InsertEnter * call s:on_insert_enter()
         autocmd InsertLeave * call s:cancel_auto_complete_timer()
+        autocmd InsertLeave * call s:snippet_clear()
+        autocmd BufLeave * call s:snippet_clear()
         autocmd TextChanged,TextChangedI * call s:did_change(&filetype, bufnr('%'))
         autocmd TextChangedI * call s:trigger_auto_complete(&filetype, bufnr('%'))
         autocmd CompleteDone * call s:on_complete_done()
