@@ -348,7 +348,7 @@ nnoremap <leader>cb :WconflictBoth<CR>       " 둘 다 채택
 " ]q / [q     : 다음/이전 Quickfix 항목
 " <leader>xr  : Quickfix 목록 기반 프로젝트 일괄 치환
 " <leader>tq  : TODO 목록 Quickfix (:WtodoQuickfix)
-" <leader>ft  : TODO 목록 Finder (:WtodoFinder)
+" <leader>ft  : TODO 목록 Finder (:WtodoFind)
 " <C-n>       : 다음 일치 단어 멀티커서 추가
 " <leader>vx  : 현재 멀티커서 건너뛰기
 " <leader>va  : 모든 일치 단어 멀티커서 일괄 선택
