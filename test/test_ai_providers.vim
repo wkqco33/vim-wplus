@@ -28,7 +28,85 @@ function! Test_ai_providers_payload_tokens_and_temp() abort
     endfor
 endfunction
 
-function! Test_ai_ollama_thinking_setting_is_in_payload() abort
+function! Test_ai_suggest_payload_includes_scope_and_symbols() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_provider = 'openai'
+    let g:wplus_ai_model = 'test-model'
+    let g:wplus_ai_api_key = 'dummy-key'
+    let g:wplus_ai_ollama_fim = 0
+
+    enew
+    setlocal buftype=nofile bufhidden=wipe noswapfile filetype=python
+    call setline(1, [
+        \ 'def helper():',
+        \ '    return 1',
+        \ '',
+        \ 'def foo():',
+        \ '    x = helper()',
+        \ '    ',
+        \ ])
+    call cursor(6, 1)
+
+    let l:payload_str = wplus#ai#_test_build_suggest_payload('def foo():', '')
+    let l:data = json_decode(l:payload_str)
+    let l:user = l:data['messages'][-1].content
+    call assert_match('def foo', l:user, 'Current scope should be injected into the suggest prompt')
+    call assert_match('helper', l:user, 'Workspace symbols should be injected into the suggest prompt')
+
+    bwipeout!
+endfunction
+
+function! Test_ai_completion_model_separate_from_default() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_provider = 'openai'
+    let g:wplus_ai_model = 'deepseek-v4-flash'
+    let g:wplus_ai_api_key = 'dummy-key'
+    let g:wplus_ai_completion_model = 'qwen2.5-coder:3b'
+    let g:wplus_ai_ollama_fim = 0
+
+    " Command payload (commit/comment/refactor) must use the default model.
+    let l:cmd_str = wplus#ai#_test_build_request_payload('Explain this code')
+    let l:cmd = json_decode(l:cmd_str)
+    call assert_equal('deepseek-v4-flash', l:cmd.model, 'Command requests should use the default model')
+
+    " Suggest payload (chat path) must use the completion model.
+    let l:sug_str = wplus#ai#_test_build_suggest_payload('def foo():', '')
+    let l:sug = json_decode(l:sug_str)
+    call assert_equal('qwen2.5-coder:3b', l:sug.model, 'Suggest (chat) should use the completion model')
+
+    let g:wplus_ai_completion_model = ''
+endfunction
+
+function! Test_ai_completion_model_falls_back_to_default() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_provider = 'openai'
+    let g:wplus_ai_model = 'deepseek-v4-flash'
+    let g:wplus_ai_api_key = 'dummy-key'
+    let g:wplus_ai_ollama_fim = 0
+    let g:wplus_ai_completion_model = ''
+
+    let l:sug_str = wplus#ai#_test_build_suggest_payload('def foo():', '')
+    let l:sug = json_decode(l:sug_str)
+    call assert_equal('deepseek-v4-flash', l:sug.model, 'Suggest should fall back to default model when completion model unset')
+endfunction
+
+function! Test_ai_completion_model_used_in_ollama_fim() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_provider = 'ollama'
+    let g:wplus_ai_model = 'deepseek-v4-flash'
+    let g:wplus_ai_completion_model = 'qwen2.5-coder:3b'
+    let g:wplus_ai_ollama_fim = 1
+
+    let l:payload_str = wplus#ai#_test_build_suggest_payload('def foo():', '    return')
+    let l:data = json_decode(l:payload_str)
+    call assert_equal('qwen2.5-coder:3b', l:data.model, 'Ollama FIM should use the completion model')
+    call assert_equal('def foo():', l:data.prompt, 'FIM prompt should be the prefix')
+    call assert_equal('    return', l:data.suffix, 'FIM suffix should be preserved')
+
+    let g:wplus_ai_completion_model = ''
+endfunction
+
+function! Test_ai_ollama_thinking_setting_is_enabled_in_payload() abort
     call wplus#ai#setup()
     let g:wplus_ai_provider = 'ollama'
     let g:wplus_ai_model = 'thinking-model'

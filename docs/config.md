@@ -149,7 +149,8 @@ let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
 " ── 공통 ─────────────────────────────────────────────────────────────────
 let g:wplus_ai_provider    = 'openai'     " 'openai' | 'claude' | 'azure' | 'ollama'
 let g:wplus_ai_api_key     = ''           " API 키 (환경변수 권장: $OPENAI_API_KEY)
-let g:wplus_ai_model       = ''           " 모델명 (필수)
+let g:wplus_ai_model       = ''           " 모델명 (필수, 커맨드용)
+let g:wplus_ai_completion_model = ''      " 코드 완성 전용 모델 (미설정 시 wplus_ai_model 폴백)
 let g:wplus_ai_temperature = 0.7
 let g:wplus_ai_max_tokens  = 2000
 let g:wplus_ai_commit_diff_max_bytes = 32768  " 커밋 메시지 diff 최대 바이트 (32KB)

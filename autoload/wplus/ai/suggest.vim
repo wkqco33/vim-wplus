@@ -234,14 +234,8 @@ function! s:on_suggest_timer(timer) abort
         call s:suggest_debug('skipped empty context')
         return
     endif
-    
-    let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
-    let l:prompt = "Complete the following code. Return only the completion without explanation or markdown. Keep your suggestion short (maximum " . l:max_lines . " lines):\n\n"
-          \ . "Prefix:\n" . l:prefix . "\n\n"
-          \ . "Suffix:\n" . l:suffix . "\n\n"
-          \ . "Completion:"
-    
-    call wplus#ai#http#send_suggest_request(l:prefix, l:suffix, l:prompt, function('s:on_suggest_complete'))
+
+    call wplus#ai#http#send_suggest_request(l:prefix, l:suffix, '', function('s:on_suggest_complete'))
 endfunction
 
 function! s:on_suggest_complete(request, json) abort
@@ -255,7 +249,7 @@ function! s:on_suggest_complete(request, json) abort
         let l:error_msg = wplus#ai#provider#extract_error(a:json)
         if l:error_msg =~? 'does not support insert'
             let g:wplus_ai_ollama_fim = 0
-            call wplus#ai#provider#mark_fim_unsupported(g:wplus_ai_model)
+            call wplus#ai#provider#mark_fim_unsupported(wplus#ai#provider#get_completion_model())
             call s:report_suggest_error('Model does not support FIM -> fallback to chat (g:wplus_ai_ollama_fim=0)')
             if line('.') == a:request.line && col('.') == a:request.col && bufnr('%') == a:request.bufnr
                 let l:prefix = wplus#ai#context#get_prefix(a:request.line, a:request.col, g:wplus_ai_suggest_context_lines)

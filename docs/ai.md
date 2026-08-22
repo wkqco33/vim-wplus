@@ -159,6 +159,28 @@ let g:wplus_ai_suggest_timeout       = 10    " 자동완성 타임아웃 (초)
 let g:wplus_ai_suggest_debug         = 0     " 디버그 로그
 ```
 
+### 완성 전용 모델 분리
+
+코드 완성(ghost text)은 커맨드(commit/comment/refactor 등)와 모델을 따로 지정할 수 있습니다.
+`g:wplus_ai_completion_model`을 설정하면 완성만 해당 모델로, 그 외 명령은 `g:wplus_ai_model`로 실행됩니다.
+미설정 시 `g:wplus_ai_model`을 그대로 사용하므로 단일 모델 구성은 변경 없이 동작합니다.
+
+```vim
+let g:wplus_ai_model             = 'deepseek-v4-flash'  " 커맨드(commit/comment/refactor/review)용
+let g:wplus_ai_completion_model  = 'kimi-k2.7-code:cloud'   " 코드 완성(ghost text)용
+```
+
+클라우드 chat 완성 모델(예: `kimi-k2.7-code:cloud`)은 추론을 비활성화하고 FIM을 끄는 것이 안정적입니다:
+
+```vim
+let g:wplus_ai_ollama_think = 0   " 완성 속도 극대화
+let g:wplus_ai_ollama_fim = 0     " chat 방식 (클라우드/chat 완성 모델)
+```
+
+로컬 FIM 지원 모델(예: `qwen2.5-coder`)을 완성 전용으로 쓰면:
+- 완성 요청이 로컬에서 저지연 처리되고, 커맨드는 큰 클라우드 모델로 품질을 유지합니다.
+- `g:wplus_ai_completion_model`이 FIM을 지원하면 `g:wplus_ai_ollama_fim = 1`일 때 자동으로 FIM 방식이 적용됩니다.
+
 ### Adaptive Delay
 
 빠르게 타이핑할 때 불필요한 API 호출을 줄이기 위해 5회 연속 타이핑 이후 `delay`가 자동으로 2배로 늘어납니다.

@@ -697,6 +697,7 @@ Provider configuration: >
     let g:wplus_ai_provider = 'openai'   " 'openai'|'claude'|'azure'|'ollama'
     let g:wplus_ai_api_key  = $OPENAI_API_KEY
     let g:wplus_ai_model    = 'gpt-4o'
+    let g:wplus_ai_completion_model = 'qwen2.5-coder:3b'  " optional; completion only, falls back to wplus_ai_model
 <
 Ghost Text configuration: >
     let g:wplus_ai_suggest_enabled = 1

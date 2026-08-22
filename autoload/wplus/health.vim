@@ -24,7 +24,7 @@ let s:known_options = [
     \ 'wplus_lsp_diag_delay', 'wplus_lsp_request_timeout', 'wplus_lsp_inlay_hints', 'wplus_finder_enabled',
     \ 'wplus_explorer_enabled', 'wplus_explorer_max_entries', 'wplus_explorer_max_depth', 'wplus_session_enabled',
     \ 'wplus_todo_enabled', 'wplus_conflict_enabled', 'wplus_ai_enabled', 'wplus_ai_provider',
-    \ 'wplus_ai_model', 'wplus_ai_api_key', 'wplus_ai_temperature', 'wplus_ai_max_tokens',
+    \ 'wplus_ai_model', 'wplus_ai_completion_model', 'wplus_ai_api_key', 'wplus_ai_temperature', 'wplus_ai_max_tokens',
     \ 'wplus_ai_azure_resource', 'wplus_ai_azure_deployment', 'wplus_ai_azure_api_version',
     \ 'wplus_ai_ollama_host', 'wplus_ai_ollama_think', 'wplus_ai_ollama_keep_alive', 'wplus_ai_ollama_fim',
     \ 'wplus_ai_ollama_options', 'wplus_ai_suggest_enabled', 'wplus_ai_suggest_delay',

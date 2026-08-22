@@ -216,6 +216,11 @@ let g:wplus_ai_commit_diff_max_bytes = 32768
 let g:wplus_ai_commit_max_tokens = 2048       " 커밋 메시지 최대 토큰 수
 let g:wplus_ai_tab_complete = 1               " <Tab> 스마트 완성 체이닝 활성화 (Ghost text -> 팝업 -> 인덴트)
 
+" 코드 완성 전용 모델 (Ghost text). 미설정 시 g:wplus_ai_model 폴백.
+" FIM 지원 로컬 코더 모델로 분리하면 완성 저지연 + 커맨드 고품질을 동시에 확보.
+" 클라우드 chat 모델은 FIM off(chat 방식), 로컬 FIM 모델은 fim=1.
+" let g:wplus_ai_completion_model = 'kimi-k2.7-code:cloud'  " 또는 'qwen2.5-coder:3b'
+
 " Claude 설정 예시 (provider='claude'일 때)
 " let g:wplus_ai_provider = 'claude'
 " let g:wplus_ai_api_key = $ANTHROPIC_API_KEY
@@ -230,11 +235,12 @@ let g:wplus_ai_tab_complete = 1               " <Tab> 스마트 완성 체이닝
 
 " Ollama 설정 예시 (provider='ollama'일 때 — API 키 불필요)
 " let g:wplus_ai_provider = 'ollama'
-" let g:wplus_ai_model = 'qwen2.5-coder:7b'  " deepseek-v4-flash:cloud 등
+" let g:wplus_ai_model = 'deepseek-v4-flash:0731-cloud'  " 커맨드용
+" let g:wplus_ai_completion_model = 'kimi-k2.7-code:cloud'  " 완성 전용 (클라우드 chat)
 " let g:wplus_ai_ollama_host = 'http://localhost:11434'
 " let g:wplus_ai_ollama_think = 0            " 0=추론 과정 숨김(속도 극대화)
 " let g:wplus_ai_ollama_keep_alive = '30m'   " 세션 메모리 유지 시간
-" let g:wplus_ai_ollama_fim = 0              " 0=chat 방식(안정적, 권장), 1=로컬 FIM 전용 모델용
+" let g:wplus_ai_ollama_fim = 0              " 0=chat 방식(클라우드/chat 모델 권장)
 " let g:wplus_ai_ollama_options = {}
 
 " Ghost Text 인라인 자동완성 및 보안 설정

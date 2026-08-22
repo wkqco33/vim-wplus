@@ -62,8 +62,12 @@ function! wplus#ai#provider#extract_error(json) abort
     return ''
 endfunction
 
+function! wplus#ai#provider#get_completion_model() abort
+    return !empty(g:wplus_ai_completion_model) ? g:wplus_ai_completion_model : g:wplus_ai_model
+endfunction
+
 function! wplus#ai#provider#use_ollama_fim() abort
-    return g:wplus_ai_provider ==# 'ollama' && g:wplus_ai_ollama_fim && !get(s:fim_unsupported_models, g:wplus_ai_model, 0)
+    return g:wplus_ai_provider ==# 'ollama' && g:wplus_ai_ollama_fim && !get(s:fim_unsupported_models, wplus#ai#provider#get_completion_model(), 0)
 endfunction
 
 function! wplus#ai#provider#mark_fim_unsupported(model) abort
@@ -84,7 +88,7 @@ endfunction
 
 function! wplus#ai#provider#build_ollama_fim_payload(prefix, suffix, max_tokens, temperature) abort
     return json_encode({
-        \ 'model': g:wplus_ai_model,
+        \ 'model': wplus#ai#provider#get_completion_model(),
         \ 'think': g:wplus_ai_ollama_think ? v:true : v:false,
         \ 'stream': v:false,
         \ 'keep_alive': g:wplus_ai_ollama_keep_alive,
@@ -100,15 +104,33 @@ function! wplus#ai#provider#build_suggest_payload(prefix, suffix) abort
     endif
     let l:prov = wplus#ai#provider#get(g:wplus_ai_provider)
     if empty(l:prov) | return '' | endif
-    let l:prompt = "Complete this code:\n\n"
+
+    " extract_symbols() must run first: it fills the cache with symbols, and
+    " get_scope() then reuses that cached entry. The reverse order would cache
+    " an empty symbol list and starve the suggestion prompt.
+    let l:symbols = wplus#ai#context#extract_symbols()
+    let l:scope = wplus#ai#context#get_scope()
+    let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
+
+    let l:prompt = "Complete the code that directly follows the code before the cursor.\n"
+        \ . "Keep the suggestion short (at most " . l:max_lines . " lines).\n\n"
+    if !empty(l:scope)
+        let l:prompt .= "You are currently inside: " . l:scope . "\n\n"
+    endif
+    if !empty(l:symbols)
+        let l:prompt .= "Relevant symbols available in the workspace: " . join(l:symbols, ', ') . "\n\n"
+    endif
     if !empty(a:prefix)
-        let l:prompt .= "Prefix:\n" . a:prefix . "\n\n"
+        let l:prompt .= "Code before the cursor (prefix):\n" . a:prefix . "\n\n"
     endif
     if !empty(a:suffix)
-        let l:prompt .= "Suffix:\n" . a:suffix . "\n\n"
+        let l:prompt .= "Code after the cursor (suffix):\n" . a:suffix . "\n\n"
+            \ . "Your completion must end exactly where the suffix begins and must NOT repeat the suffix itself.\n\n"
     endif
+    let l:prompt .= "Output ONLY the completion that follows the prefix. No explanation, no markdown, no duplicate of the prefix or suffix."
+
     let l:spec = {
-        \ 'system': 'You are a code completion engine. Return ONLY the code that directly follows the prefix up to the suffix. Do NOT include markdown code blocks, think tags, explanations, or duplicates.',
+        \ 'system': 'You are a precise code completion engine. Infer the surrounding function, types, and style from the provided context and return ONLY the next code directly following the cursor, in the same language and style.',
         \ 'user': l:prompt,
         \ 'max_tokens': g:wplus_ai_suggest_max_tokens,
         \ 'temperature': g:wplus_ai_suggest_temperature,
@@ -184,6 +206,21 @@ function! wplus#ai#provider#build_request_payload(prompt, ...) abort
     return call(l:prov.payload, [l:spec])
 endfunction
 
+function! s:resolve_model(spec) abort
+    let l:model = get(a:spec, 'purpose', '') ==# 'suggest'
+        \ ? wplus#ai#provider#get_completion_model()
+        \ : g:wplus_ai_model
+    if !empty(l:model)
+        return l:model
+    endif
+    if g:wplus_ai_provider ==# 'claude'
+        return 'claude-3-sonnet-20240229'
+    elseif g:wplus_ai_provider ==# 'ollama'
+        return 'codellama'
+    endif
+    return 'gpt-3.5-turbo'
+endfunction
+
 function! s:uses_max_completion_tokens() abort
     if g:wplus_ai_provider ==# 'claude'
         return v:false
@@ -207,7 +244,7 @@ function! s:ollama_endpoint(spec) abort
 endfunction
 
 function! s:build_openai_payload(spec) abort
-    let l:model = !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'gpt-3.5-turbo'
+    let l:model = s:resolve_model(a:spec)
     let l:msgs = []
     if !empty(a:spec.system)
         call add(l:msgs, {'role': 'system', 'content': a:spec.system})
@@ -227,7 +264,7 @@ function! s:build_openai_payload(spec) abort
 endfunction
 
 function! s:build_claude_payload(spec) abort
-    let l:model = !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'claude-3-sonnet-20240229'
+    let l:model = s:resolve_model(a:spec)
     let l:body = {
         \ 'model': l:model,
         \ 'max_tokens': a:spec.max_tokens,
@@ -247,7 +284,7 @@ function! s:build_ollama_payload_spec(spec) abort
     endif
     call add(l:msgs, {'role': 'user', 'content': a:spec.user})
     let l:body = {
-        \ 'model': !empty(g:wplus_ai_model) ? g:wplus_ai_model : 'codellama',
+        \ 'model': s:resolve_model(a:spec),
         \ 'think': g:wplus_ai_ollama_think ? v:true : v:false,
         \ 'stream': v:false,
         \ 'keep_alive': g:wplus_ai_ollama_keep_alive,

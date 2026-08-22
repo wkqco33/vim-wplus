@@ -8,6 +8,10 @@ let g:autoloaded_wplus_ai = 1
 let g:wplus_ai_enabled = get(g:, 'wplus_ai_enabled', 1)
 let g:wplus_ai_provider = get(g:, 'wplus_ai_provider', 'openai') " 'openai', 'claude', 'azure', or 'ollama'
 let g:wplus_ai_model = get(g:, 'wplus_ai_model', '')
+" Model used for code completion (ghost text). Defaults to g:wplus_ai_model
+" when unset, so a single-model setup keeps working unchanged. Set it to a
+" fast FIM-capable model (e.g. a local qwen2.5-coder) to offload completion.
+let g:wplus_ai_completion_model = get(g:, 'wplus_ai_completion_model', '')
 let g:wplus_ai_api_key = get(g:, 'wplus_ai_api_key', '')
 let g:wplus_ai_temperature = get(g:, 'wplus_ai_temperature', 0.7)
 let g:wplus_ai_max_tokens = get(g:, 'wplus_ai_max_tokens', 2048)
@@ -415,6 +419,10 @@ endfunction
 
 function! wplus#ai#_test_build_commit_prompt(stat, diff) abort
     return wplus#ai#provider#build_commit_prompt(a:stat, a:diff)
+endfunction
+
+function! wplus#ai#_test_build_request_payload(...) abort
+    return call('wplus#ai#provider#build_request_payload', a:000)
 endfunction
 
 function! wplus#ai#_test_truncate_diff(diff, max) abort
