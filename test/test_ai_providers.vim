@@ -77,6 +77,16 @@ function! Test_ai_completion_model_separate_from_default() abort
     let g:wplus_ai_completion_model = ''
 endfunction
 
+function! Test_ai_suggest_accepts_completion_only_model() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_provider = 'openai'
+    let g:wplus_ai_api_key = 'dummy-key'
+    let g:wplus_ai_model = ''
+    let g:wplus_ai_completion_model = 'qwen2.5-coder:3b'
+    call assert_true(wplus#ai#http#_test_suggest_ready(), 'Ghost Text should work when only the completion model is configured')
+    let g:wplus_ai_completion_model = ''
+endfunction
+
 function! Test_ai_completion_model_falls_back_to_default() abort
     call wplus#ai#setup()
     let g:wplus_ai_provider = 'openai'
@@ -214,6 +224,12 @@ function! Test_ai_smart_tab_and_plug_mappings() abort
     call assert_true(!empty(maparg('<Plug>WaiAcceptSuggest', 'i')), '<Plug>WaiAcceptSuggest should be defined')
     call assert_true(!empty(maparg('<Plug>WaiAcceptWord', 'i')), '<Plug>WaiAcceptWord should be defined')
     call assert_true(!empty(maparg('<Plug>WaiSmartTab', 'i')), '<Plug>WaiSmartTab should be defined')
+endfunction
+
+function! Test_ai_suggest_rejects_stale_and_noise_content() abort
+    call wplus#ai#setup()
+    call assert_equal('', wplus#ai#security#clean_suggest_content('@'), 'A lone @ is not a useful ghost-text suggestion')
+    call assert_equal('', wplus#ai#security#clean_suggest_content('  @  '), 'Whitespace around noise must also be rejected')
 endfunction
 
 function! Test_ai_clean_commit_message() abort

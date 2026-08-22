@@ -200,11 +200,15 @@ function! s:on_response_complete(request_id, channel) abort
     endif
 endfunction
 
-function! wplus#ai#http#send_suggest_request(prefix, suffix, prompt, OnComplete) abort
+function! s:suggest_ready() abort
     if g:wplus_ai_provider !=# 'ollama' && empty(g:wplus_ai_api_key)
-        return
+        return 0
     endif
-    if empty(g:wplus_ai_model)
+    return !empty(wplus#ai#provider#get_completion_model())
+endfunction
+
+function! wplus#ai#http#send_suggest_request(prefix, suffix, prompt, OnComplete) abort
+    if !s:suggest_ready()
         return
     endif
 
@@ -248,6 +252,7 @@ function! wplus#ai#http#send_suggest_request(prefix, suffix, prompt, OnComplete)
         \ 'line': line('.'),
         \ 'col': col('.'),
         \ 'bufnr': bufnr('%'),
+        \ 'changedtick': b:changedtick,
         \ 'response_buffer': '',
         \ 'error_buffer': '',
         \ 'fim': l:fim,
@@ -312,6 +317,19 @@ function! s:on_suggest_response_complete(request_id, channel) abort
     if type(l:request.on_complete) == v:t_func
         call call(l:request.on_complete, [l:request, l:json])
     endif
+endfunction
+
+function! wplus#ai#http#_test_suggest_ready() abort
+    return s:suggest_ready()
+endfunction
+
+function! wplus#ai#http#cancel_suggest() abort
+    if type(s:suggest_job) == v:t_job
+        silent! call job_stop(s:suggest_job)
+    endif
+    let s:suggest_job = v:null
+    let s:suggest_request = {}
+    call wplus#ai#http#cleanup_curl_config(s:suggest_curl_config)
 endfunction
 
 function! wplus#ai#http#cancel_all() abort

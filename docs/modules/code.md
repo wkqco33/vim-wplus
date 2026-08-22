@@ -9,7 +9,7 @@
 복잡한 설정 없이 `gopls` 등 언어 서버의 핵심 기능을 활용합니다.
 
 | 키 | 동작 |
-|----|------|
+| ---- | ------ |
 | `gd` | 정의 이동 (Go to Definition) |
 | `gy` | 타입 정의 이동 (Type Definition) |
 | `<leader>gi` | 구현 이동 (Implementation) |
@@ -30,7 +30,7 @@
 
 진단은 sign 컬럼에 `E`, `W`, `I`, `H`로 표시되며 상태바에 `E:n W:n` 형식으로도 표시됩니다.
 
-**자동완성 & 스니펫:** 타이핑 중 잠시 멈추면 자동으로 완성 목록이 뜹니다. 서버가 스니펫(`insertTextFormat: 2`)을 제공하면 선택 후 `<Tab>`/`<S-Tab>`으로 탭스톱을 이동하며 채울 수 있습니다.
+**자동완성 & 스니펫:** 일반 식별자 입력 중에는 LSP 완성 팝업을 자동으로 띄우지 않으며, 수동 완성은 `:WlspCompletion`으로 실행할 수 있습니다. 서버 트리거 문자(예: `.`)를 입력하면 멤버 완성 팝업을 잠시 표시하고, 선택하지 않은 채 대기하면 팝업을 닫고 AI Ghost Text 제안으로 넘깁니다. 서버가 스니펫(`insertTextFormat: 2`)을 제공하면 선택 후 `<Tab>`/`<S-Tab>`으로 탭스톱을 이동하며 채울 수 있습니다.
 
 ```vim
 let g:wplus_lsp_auto_complete  = 1    " 타이핑 중 자동완성 트리거
@@ -87,7 +87,7 @@ let g:wplus_lsp_cache_ttl    = 300  " 캐시 유효시간 (초)
 **우선순위:** LSP formatter → 외부 도구 → ALE → `gg=G`
 
 | 언어 | 도구 |
-|------|------|
+| ------ | ------ |
 | Go | `goimports` (없으면 `gofmt`) |
 | Rust | `rustfmt` |
 | Python | `autopep8 -` |
@@ -109,7 +109,7 @@ ctags를 사용하여 현재 파일 내 클래스·함수·구조체 등을 사�
 **ctags 설치 필요** (universal-ctags 권장).
 
 | 키 / 명령 | 동작 |
-|-----------|------|
+| ----------- | ------ |
 | `<leader>o` / `:WoutlineToggle` | 아웃라인 사이드바 토글 |
 | `<CR>` | 선택된 심볼 위치로 이동 |
 | `R` | 수동 새로고침 |
@@ -122,7 +122,7 @@ ctags를 사용하여 현재 파일 내 클래스·함수·구조체 등을 사�
 들여쓰기 기반 또는 LSP `foldingRange` 기반의 자동 폴드를 제공합니다.
 
 | 키 / 명령 | 동작 |
-|-----------|------|
+| ----------- | ------ |
 | `<leader>zz` / `:WfoldToggle` | 커서 위치 폴드 토글 |
 | `<leader>za` / `:WfoldOpenAll` | 모든 폴드 펼치기 |
 | `<leader>zc` / `:WfoldCloseAll` | 모든 폴드 닫기 |
@@ -143,7 +143,7 @@ let g:wplus_fold_column   = 0         " foldcolumn 너비
 파일타입별 실행 명령과 프로젝트 빌드 시스템을 자동 감지합니다.
 
 | 키 / 명령 | 동작 |
-|-----------|------|
+| ----------- | ------ |
 | `<leader>rr` / `:Wrun` | 현재 파일 실행 |
 | `<leader>rb` / `:Wbuild` | 프로젝트 빌드 |
 | `<leader>rt` / `:Wtest` | 프로젝트 테스트 |
@@ -187,7 +187,7 @@ let g:wplus_run_use_terminal = 1   " 1=터미널, 0=quickfix
 프로젝트 루트 단위로 편집 세션을 저장하고 Vim 시작 시 자동 복원합니다.
 
 | 명령 | 동작 |
-|------|------|
+| ------ | ------ |
 | `:WsessionSave` | 현재 세션 수동 저장 |
 | `:WsessionLoad` | 현재 세션 수동 로드 |
 | `:WsessionDelete` | 현재 프로젝트의 세션 파일 삭제 |
@@ -246,7 +246,7 @@ let g:wplus_scratch_ft     = 'markdown'
 Vim 내장 마크(a–z)를 Sign 컬럼에 노란 알파벳으로 표시합니다.
 
 | 키 / 명령 | 동작 |
-|-----------|------|
+| ----------- | ------ |
 | `<leader>ml` / `:WmarksList` | 설정된 마크 목록 팝업 |
 | `<leader>md` / `:WmarksDelete` | 커서 줄의 마크 삭제 |
 | `:WmarksRefresh` | Sign 컬럼 마크 수동 새로고침 |
@@ -277,7 +277,7 @@ let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
 `ripgrep`(rg) 또는 `git grep`을 활용하여 프로젝트 전체를 검색합니다.
 
 | 키 / 명령 | 모드 | 동작 |
-|-----------|------|------|
+| ----------- | ------ | ------ |
 | `:Wgrep {pattern}` | Normal | 패턴 검색 후 Quickfix 오픈 |
 | `<leader>fg` | Normal | 커서 아래 단어로 검색 |
 | `<leader>fg` | Visual | 선택 영역으로 검색 |

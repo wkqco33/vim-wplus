@@ -471,7 +471,7 @@ function! s:handle_request_result(ft, method, result, ...) abort
     elseif a:method ==# 'textDocument/references'
         call s:show_references(a:result)
     elseif a:method ==# 'textDocument/completion'
-        call s:show_completion(a:result)
+        call s:show_completion(a:result, l:req)
     elseif a:method ==# 'textDocument/rename'
         call s:preview_rename(a:result)
     elseif a:method ==# 'textDocument/prepareRename'
@@ -951,13 +951,14 @@ function! wplus#lsp#references() abort
     call s:send(l:ft, 'textDocument/references', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}, 'context': {'includeDeclaration': v:true}}, 0, 1)
 endfunction
 
-function! wplus#lsp#completion() abort
+function! wplus#lsp#completion(...) abort
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
     if empty(l:uri) | return | endif
     let l:pos = getcurpos()
-    call s:send(l:ft, 'textDocument/completion', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}})
+    let l:tag = a:0 > 0 ? a:1 : ''
+    call s:send(l:ft, 'textDocument/completion', {'textDocument': {'uri': l:uri}, 'position': {'line': l:pos[1] - 1, 'character': l:pos[2] - 1}}, 0, 0, l:tag)
 endfunction
 
 " Whether auto-completion should fire for a filetype. Gated on the user config
@@ -972,22 +973,56 @@ endfunction
 
 " Debounced auto-completion trigger for TextChangedI. Restarts the timer on
 " every keystroke so completion only fires once the user pauses typing.
-function! s:trigger_auto_complete(ft, buf) abort
-    if !s:auto_complete_enabled(a:ft) | return | endif
+function! s:cancel_auto_complete_timer() abort
     if s:auto_complete_timer != -1
         silent! call timer_stop(s:auto_complete_timer)
+        let s:auto_complete_timer = -1
     endif
+endfunction
+
+function! s:on_insert_enter() abort
+    call s:cancel_auto_complete_timer()
+    let b:wplus_lsp_insert_enter_tick = b:changedtick
+endfunction
+
+function! s:insert_changed(buf) abort
+    if bufnr('%') != a:buf || !bufloaded(a:buf) | return 0 | endif
+    return getbufvar(a:buf, 'changedtick', -1) != getbufvar(a:buf, 'wplus_lsp_insert_enter_tick', -2)
+endfunction
+
+function! s:completion_input_available() abort
+    let l:before = strpart(getline('.'), 0, col('.') - 1)
+    return !empty(l:before) && l:before =~# '\S$'
+endfunction
+
+function! s:auto_completion_trigger_available(ft) abort
+    if !s:completion_input_available() || !has_key(s:servers, a:ft) | return 0 | endif
+    let l:provider = get(get(s:servers[a:ft], 'caps', {}), 'completionProvider', {})
+    if type(l:provider) != v:t_dict | return 0 | endif
+    let l:triggers = get(l:provider, 'triggerCharacters', [])
+    if type(l:triggers) != v:t_list || empty(l:triggers) | return 0 | endif
+    let l:before = strpart(getline('.'), 0, col('.') - 1)
+    let l:last = strpart(l:before, strlen(l:before) - 1)
+    return index(l:triggers, l:last) >= 0
+endfunction
+
+function! s:trigger_auto_complete(ft, buf) abort
+    " Always cancel the previous timer first. A deletion or whitespace input
+    " must not leave a timer armed from an earlier completion prefix.
+    call s:cancel_auto_complete_timer()
+    if !s:auto_complete_enabled(a:ft) || !s:insert_changed(a:buf) || !s:auto_completion_trigger_available(a:ft) | return | endif
     let s:auto_complete_timer = timer_start(g:wplus_lsp_complete_delay, {-> s:do_auto_complete(a:ft, a:buf)})
 endfunction
 
 function! s:do_auto_complete(ft, buf) abort
     let s:auto_complete_timer = -1
-    if !s:auto_complete_enabled(a:ft) | return | endif
+    if !s:auto_complete_enabled(a:ft) || mode() !~# '^i' | return | endif
+    if !s:insert_changed(a:buf) || !s:auto_completion_trigger_available(a:ft) | return | endif
     " Never interrupt an already-open completion menu.
     if pumvisible() | return | endif
     " Only complete while the triggering buffer is still the current one.
     if bufnr('%') != a:buf || !bufloaded(a:buf) | return | endif
-    call wplus#lsp#completion()
+    call wplus#lsp#completion('auto')
 endfunction
 
 function! wplus#lsp#rename() abort
@@ -1459,9 +1494,37 @@ function! s:show_references(result) abort
     botright copen
 endfunction
 
-function! s:show_completion(result) abort
-    if empty(a:result) | return | endif
-    let l:items = type(a:result) == v:t_list ? a:result : a:result.items
+function! s:completion_context_valid(req) abort
+    if type(a:req) != v:t_dict || mode() !~# '^i' | return 0 | endif
+    let l:buf = get(a:req, 'bufnr', -1)
+    let l:uri = get(a:req, 'uri', '')
+    if l:buf <= 0 || bufnr('%') != l:buf || !bufloaded(l:buf) || empty(l:uri)
+        return 0
+    endif
+    if s:get_buf_uri(l:buf) !=# l:uri
+        return 0
+    endif
+    if getbufvar(l:buf, 'changedtick', -1) != get(a:req, 'changedtick', -2)
+        return 0
+    endif
+    if line('.') != get(a:req, 'lnum', -1) || col('.') != get(a:req, 'col', -1)
+        return 0
+    endif
+    if get(a:req, 'tag', '') ==# 'auto' && !s:completion_input_available()
+        return 0
+    endif
+    return !pumvisible()
+endfunction
+
+function! s:show_completion(result, req) abort
+    if empty(a:result) || !s:completion_context_valid(a:req) | return | endif
+    if exists('*wplus#ai#suggest#has_suggestion') && wplus#ai#suggest#has_suggestion()
+        return
+    endif
+    let l:items = type(a:result) == v:t_list ? a:result : get(a:result, 'items', [])
+    if empty(l:items) | return | endif
+    call setbufvar(bufnr('%'), 'wplus_lsp_completion_auto', get(a:req, 'tag', '') ==# 'auto')
+    call setbufvar(bufnr('%'), 'wplus_lsp_completion_tick', b:changedtick)
     " Keep the raw items so CompleteDone can re-parse snippet insertText.
     call setbufvar(bufnr('%'), 'wplus_lsp_completion_items', l:items)
     let l:matches = []
@@ -1790,6 +1853,22 @@ function! wplus#lsp#_test_auto_complete_enabled(ft) abort
     return s:auto_complete_enabled(a:ft)
 endfunction
 
+function! wplus#lsp#_test_completion_context_valid(req) abort
+    return s:completion_context_valid(a:req)
+endfunction
+
+function! wplus#lsp#_test_insert_changed(buf) abort
+    return s:insert_changed(a:buf)
+endfunction
+
+function! wplus#lsp#_test_completion_input_available() abort
+    return s:completion_input_available()
+endfunction
+
+function! wplus#lsp#_test_auto_completion_trigger_available(ft) abort
+    return s:auto_completion_trigger_available(a:ft)
+endfunction
+
 function! wplus#lsp#_test_parse_snippet(snippet) abort
     return s:parse_snippet(a:snippet)
 endfunction
@@ -1887,6 +1966,8 @@ function! wplus#lsp#setup() abort
         autocmd!
         autocmd FileType * call s:start_server(&filetype)
         autocmd BufReadPost * call s:did_open(&filetype)
+        autocmd InsertEnter * call s:on_insert_enter()
+        autocmd InsertLeave * call s:cancel_auto_complete_timer()
         autocmd TextChanged,TextChangedI * call s:did_change(&filetype, bufnr('%'))
         autocmd TextChangedI * call s:trigger_auto_complete(&filetype, bufnr('%'))
         autocmd CompleteDone * call s:on_complete_done()

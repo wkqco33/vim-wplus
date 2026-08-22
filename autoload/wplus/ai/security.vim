@@ -26,7 +26,14 @@ function! wplus#ai#security#clean_suggest_content(content) abort
     " Remove markdown code blocks
     let l:txt = substitute(l:txt, '```.*\n', '', 'g')
     let l:txt = substitute(l:txt, '```', '', 'g')
-    return trim(l:txt)
+    let l:txt = trim(l:txt)
+    " Some completion models emit the FIM/decorator marker by itself when
+    " there is not enough context. It is not useful ghost text and can cause
+    " the same one-character suggestion to be rendered repeatedly.
+    if l:txt ==# '@'
+        return ''
+    endif
+    return l:txt
 endfunction
 
 function! wplus#ai#security#clean_commit_message(content) abort

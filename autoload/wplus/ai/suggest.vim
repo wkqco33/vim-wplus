@@ -8,6 +8,7 @@ let s:suggest_line = 0
 let s:suggest_col = 0
 let s:suggest_bufnr = 0
 let s:suggest_timer = v:null
+let s:suggest_changedtick = 0
 let s:suggest_keystroke_count = 0
 let s:last_suggest_error = ''
 let s:last_suggest_error_at = 0
@@ -100,6 +101,7 @@ function! wplus#ai#suggest#dismiss() abort
         call timer_stop(s:suggest_timer)
         let s:suggest_timer = v:null
     endif
+    call wplus#ai#http#cancel_suggest()
 
     if l:bufnr > 0 && bufloaded(l:bufnr)
         call prop_remove({'type': 'WplusAISuggest', 'all': 1, 'bufnr': l:bufnr})
@@ -214,8 +216,32 @@ function! wplus#ai#suggest#toggle() abort
     endif
 endfunction
 
+function! s:handoff_lsp_popup() abort
+    if !pumvisible()
+        return 1
+    endif
+    " An automatically-triggered LSP popup is only a preview. If the user
+    " waits without typing, hand control to ghost text instead of keeping
+    " both completion UIs active at once.
+    if !get(b:, 'wplus_lsp_completion_auto', 0) || get(b:, 'wplus_lsp_completion_tick', -1) != b:changedtick
+        return 0
+    endif
+    call feedkeys("\<C-e>", 'nx')
+    if pumvisible()
+        return 0
+    endif
+    let b:wplus_lsp_completion_auto = 0
+    return 1
+endfunction
+
 function! s:on_suggest_timer(timer) abort
-    if line('.') != s:suggest_line || col('.') != s:suggest_col
+    if mode() !~# '^i' || bufnr('%') != s:suggest_bufnr
+        return
+    endif
+    if b:changedtick != s:suggest_changedtick || line('.') != s:suggest_line || col('.') != s:suggest_col
+        return
+    endif
+    if !s:handoff_lsp_popup()
         return
     endif
     
@@ -239,6 +265,19 @@ function! s:on_suggest_timer(timer) abort
 endfunction
 
 function! s:on_suggest_complete(request, json) abort
+    if mode() !~# '^i' || bufnr('%') != get(a:request, 'bufnr', -1)
+        return
+    endif
+    if !s:handoff_lsp_popup()
+        return
+    endif
+    if b:changedtick != get(a:request, 'changedtick', -1)
+        call s:suggest_debug('dropped stale suggestion response')
+        return
+    endif
+    if line('.') != get(a:request, 'line', -1) || col('.') != get(a:request, 'col', -1)
+        return
+    endif
     if get(a:request, 'fim', 0)
         let l:content = get(a:json, 'response', '')
     else
@@ -266,6 +305,9 @@ function! s:on_suggest_complete(request, json) abort
     endif
 
     let l:content = wplus#ai#security#clean_suggest_content(l:content)
+    if empty(l:content)
+        return
+    endif
     let l:max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
     let l:lines = split(l:content, "\n", 1)
     if len(l:lines) > l:max_lines
@@ -289,10 +331,14 @@ function! s:on_text_changed() abort
     endif
 
     let s:suggest_keystroke_count += 1
+    if get(b:, 'wplus_lsp_completion_auto', 0) && get(b:, 'wplus_lsp_completion_tick', -1) != b:changedtick
+        let b:wplus_lsp_completion_auto = 0
+    endif
     call wplus#ai#suggest#dismiss()
     let s:suggest_line = line('.')
     let s:suggest_col = col('.')
     let s:suggest_bufnr = bufnr('%')
+    let s:suggest_changedtick = b:changedtick
     
     let l:delay = g:wplus_ai_suggest_delay
     if s:suggest_keystroke_count > 5
@@ -304,6 +350,7 @@ endfunction
 
 function! s:on_insert_enter() abort
     let s:suggest_keystroke_count = 0
+    let s:suggest_changedtick = b:changedtick
 endfunction
 
 function! s:suggest_debug(message) abort
