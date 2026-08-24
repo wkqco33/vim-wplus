@@ -1,5 +1,11 @@
 " test_ai_suggest.vim — Ghost Text context and output quality.
 
+function! Test_ai_suggest_rapid_window_accepts_float_calculation() abort
+    " Regression: max([0.5, ...]) passed a Float to Vim's Number-only max().
+    call assert_equal(0.5, wplus#ai#suggest#_test_rapid_window(100))
+    call assert_equal(0.8, wplus#ai#suggest#_test_rapid_window(400))
+endfunction
+
 function! Test_ai_suggest_prompt_has_language_and_cursor_contract() abort
     call wplus#ai#setup()
     let g:wplus_ai_provider = 'openai'

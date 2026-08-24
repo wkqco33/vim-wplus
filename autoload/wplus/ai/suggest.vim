@@ -329,13 +329,20 @@ function! s:on_suggest_complete(request, json) abort
     endif
 endfunction
 
+function! s:rapid_window(delay) abort
+    " max() only accepts Numbers in Vim; using it with the Float produced by
+    " / 1000.0 raises E805 on every TextChangedI event.
+    let l:window = a:delay / 1000.0 * 2.0
+    return l:window < 0.5 ? 0.5 : l:window
+endfunction
+
 function! s:on_text_changed() abort
     if !g:wplus_ai_suggest_enabled
         return
     endif
 
     let l:now = reltimefloat(reltime())
-    let l:rapid_window = max([0.5, g:wplus_ai_suggest_delay / 1000.0 * 2.0])
+    let l:rapid_window = s:rapid_window(g:wplus_ai_suggest_delay)
     if s:last_suggest_change_at <= 0.0 || l:now - s:last_suggest_change_at > l:rapid_window
         let s:suggest_keystroke_count = 1
     else
@@ -386,4 +393,8 @@ function! wplus#ai#suggest#set_test_content(content) abort
     let s:suggest_line = line('.')
     let s:suggest_col = col('.')
     let s:suggest_bufnr = bufnr('%')
+endfunction
+
+function! wplus#ai#suggest#_test_rapid_window(delay) abort
+    return s:rapid_window(a:delay)
 endfunction
