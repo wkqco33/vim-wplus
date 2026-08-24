@@ -329,11 +329,35 @@ function! s:on_suggest_complete(request, json) abort
     endif
 endfunction
 
-function! s:rapid_window(delay) abort
-    " max() only accepts Numbers in Vim; using it with the Float produced by
-    " / 1000.0 raises E805 on every TextChangedI event.
-    let l:window = a:delay / 1000.0 * 2.0
+" Normalize the configured suggest delay to the integer milliseconds that
+" timer_start() requires. A Float value (e.g. g:wplus_ai_suggest_delay = 500.0)
+" passed straight through would raise E805 "Using a Float as a Number"; a
+" numeric String is likewise coerced so the timer is scheduled reliably.
+function! s:rapid_window(...) abort
+    " This Vim's max() rejects Floats and raises E805 "Using a Float as a
+    " Number", so the window cannot be computed as max([0.5, ...]). Compute it
+    " with arithmetic and a comparison instead. The delay (ms) maps to seconds
+    " and is floored at 0.5s.
+    let l:delay = a:0 > 0 ? a:1 : g:wplus_ai_suggest_delay
+    let l:window = l:delay / 1000.0 * 2.0
     return l:window < 0.5 ? 0.5 : l:window
+endfunction
+
+function! s:normalize_suggest_delay(keystroke_count) abort
+    let l:delay = g:wplus_ai_suggest_delay
+    if a:keystroke_count > 5
+        let l:delay = l:delay * 2
+    endif
+    " timer_start() requires integer milliseconds. A Float value (e.g.
+    " g:wplus_ai_suggest_delay = 500.0) passed straight through would raise
+    " E805 "Using a Float as a Number"; a numeric String is also coerced so
+    " the timer is scheduled reliably.
+    if type(l:delay) == v:t_float
+        return float2nr(l:delay)
+    elseif type(l:delay) == v:t_number
+        return l:delay
+    endif
+    return str2nr(l:delay)
 endfunction
 
 function! s:on_text_changed() abort
@@ -358,11 +382,8 @@ function! s:on_text_changed() abort
     let s:suggest_bufnr = bufnr('%')
     let s:suggest_changedtick = b:changedtick
     
-    let l:delay = g:wplus_ai_suggest_delay
-    if s:suggest_keystroke_count > 5
-        let l:delay = l:delay * 2
-    endif
-    
+    let l:delay = s:normalize_suggest_delay(s:suggest_keystroke_count)
+
     let s:suggest_timer = timer_start(l:delay, function('s:on_suggest_timer'))
 endfunction
 
@@ -395,6 +416,17 @@ function! wplus#ai#suggest#set_test_content(content) abort
     let s:suggest_bufnr = bufnr('%')
 endfunction
 
-function! wplus#ai#suggest#_test_rapid_window(delay) abort
-    return s:rapid_window(a:delay)
+function! wplus#ai#suggest#_test_on_text_changed() abort
+    call s:on_text_changed()
+endfunction
+
+function! wplus#ai#suggest#_test_compute_delay(keystroke_count) abort
+    return s:normalize_suggest_delay(a:keystroke_count)
+endfunction
+
+function! wplus#ai#suggest#_test_rapid_window(...) abort
+    if a:0 > 0
+        return s:rapid_window(a:1)
+    endif
+    return s:rapid_window()
 endfunction

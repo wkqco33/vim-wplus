@@ -66,6 +66,34 @@ function! Test_ai_code_command_uses_completion_model() abort
     let g:wplus_ai_completion_model = ''
 endfunction
 
+function! Test_ai_suggest_accepts_float_delay() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_suggest_enabled = 1
+    " A Float delay (e.g. 500.0) must be normalized to a Number so that
+    " timer_start() never raises E805 "Using a Float as a Number".
+    let g:wplus_ai_suggest_delay = 500.0
+    call assert_equal(500, wplus#ai#suggest#_test_compute_delay(0), 'Float delay must be normalized to integer ms')
+    call assert_equal(v:t_number, type(wplus#ai#suggest#_test_compute_delay(0)), 'Normalized delay must be a Number')
+    " A numeric String config must also coerce safely.
+    let g:wplus_ai_suggest_delay = '300'
+    call assert_equal(300, wplus#ai#suggest#_test_compute_delay(0), 'Numeric string delay must coerce to integer ms')
+    " Doubling on rapid typing must stay an integer.
+    let g:wplus_ai_suggest_delay = 200.0
+    call assert_equal(400, wplus#ai#suggest#_test_compute_delay(6), 'Doubled float delay must stay an integer')
+endfunction
+
+function! Test_ai_suggest_rapid_window_accepts_number_delay() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_suggest_enabled = 1
+    " The rapid window was computed via max([0.5, delay/1000.0*2.0]); this
+    " Vim's max() rejects Floats and raises E805 "Using a Float as a Number",
+    " which fired on every TextChangedI. It must be computed float-safely.
+    let g:wplus_ai_suggest_delay = 450
+    call assert_equal(0.9, wplus#ai#suggest#_test_rapid_window(), 'delay 450 must map to a 0.9s rapid window')
+    let g:wplus_ai_suggest_delay = 100
+    call assert_equal(0.5, wplus#ai#suggest#_test_rapid_window(), 'sub-0.5s window must be floored at 0.5s')
+endfunction
+
 function! Test_ai_completion_model_controls_token_parameter() abort
     call wplus#ai#setup()
     let g:wplus_ai_provider = 'openai'
