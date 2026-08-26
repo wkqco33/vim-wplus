@@ -73,12 +73,21 @@ function! s:coc_ready() abort
 endfunction
 
 function! s:try_lsp() abort
-    if !s:coc_ready()
-        return 0
+    let l:ft = &filetype
+    if get(g:, 'wplus_lsp_enabled', 1) && !empty(l:ft)
+        " Try built-in wplus LSP formatter if available
+        try
+            call wplus#lsp#format(bufnr('%'))
+            return 1
+        catch
+        endtry
     endif
-    call CocAction('format')
-    call wplus#util#info_msg('format', 'formatted (coc/LSP)')
-    return 1
+    if s:coc_ready()
+        call CocAction('format')
+        call wplus#util#info_msg('format', 'formatted (coc/LSP)')
+        return 1
+    endif
+    return 0
 endfunction
 
 function! s:try_external() abort

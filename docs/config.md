@@ -148,8 +148,9 @@ let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
 
 ```vim
 " ── 공통 ─────────────────────────────────────────────────────────────────
-let g:wplus_ai_provider    = 'openai'     " 'openai' | 'claude' | 'azure' | 'ollama'
-let g:wplus_ai_api_key     = ''           " API 키 (환경변수 권장: $OPENAI_API_KEY)
+let g:wplus_ai_provider    = 'openai'     " 'openai' | 'claude' | 'azure' | 'ollama' | 'gemini'
+let g:wplus_ai_api_key     = ''           " API 키 (환경변수 권장: $OPENAI_API_KEY, $GEMINI_API_KEY)
+let g:wplus_ai_endpoint    = ''           " OpenAI-Compatible 커스텀 엔드포인트 URL (DeepSeek/Groq/vLLM 등)
 let g:wplus_ai_model       = ''           " 모델명 (필수, 커맨드용)
 let g:wplus_ai_completion_model = ''      " 코드 완성 전용 모델 (미설정 시 wplus_ai_model 폴백)
 let g:wplus_ai_temperature = 0.7

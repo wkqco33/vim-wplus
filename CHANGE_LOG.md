@@ -1,6 +1,26 @@
 # 변경 이력 (CHANGE LOG)
 
-## [Unreleased] - 2026-08-21
+## [Unreleased] - 2026-08-26
+
+### 🚀 기능 개선 및 안정화
+
+**LSP & 포매터 개선**
+- **요청 전 Flush 동기화**: `definition`, `references`, `rename`, `hover`, `completion`, `codeAction` 등 주요 LSP 요청 직전 대기 중인 `didChange` 버퍼 변경 사항을 즉시 동기화(Flush)하여 Stale State 제거.
+- **LSP 기본 서버 프리셋 확장**: `typescript`, `javascript`, `typescriptreact`, `javascriptreact`, `html`, `css`, `json`, `yaml`, `sh`, `bash`, `lua` 기본 매핑 추가.
+- **포매터 통합**: `autoload/wplus/format.vim`에서 내장 LSP(`wplus#lsp#format`)를 1순위로 자동 시도하도록 개선.
+
+**AI 어시스턴트 확장**
+- **Google Gemini 프로바이더 추가**: `g:wplus_ai_provider = 'gemini'` 지원 (`gemini-2.0-flash` 기본).
+- **OpenAI-Compatible 커스텀 엔드포인트**: `g:wplus_ai_endpoint` 지원으로 DeepSeek, Groq, OpenRouter 등 다양한 모델 및 엔드포인트 연동 간소화.
+
+**파일 탐색 & 네비게이션**
+- **Explorer 창 분할 안정화**: 파일 오픈 시 이전 일반 편집 버퍼 창을 안전하게 탐색하고 없는 경우 `rightbelow vsplit` 생성.
+- **Finder 키맵 편의성**: `<C-j>`, `<C-k>`를 통한 목록 상하 이동 지원.
+
+**테스트 커버리지 확충**
+- 신규 단위 테스트 추가: `test_explorer.vim`, `test_finder.vim`, `test_multicursor.vim`, `test_format.vim`, `test_diffview.vim` (총 27개 테스트 스위트 100% 통과).
+
+## [1.1.0] - 2026-08-21
 
 ### ✨ LSP — IDE 수준 기능 확장
 

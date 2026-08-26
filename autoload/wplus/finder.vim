@@ -80,9 +80,9 @@ function! wplus#finder#filter(winid, key) abort
         endif
         call s:cleanup_state()
         return 1
-    elseif a:key == "\<C-n>" || a:key == "\<Down>"
+    elseif a:key == "\<C-n>" || a:key == "\<Down>" || a:key == "\<C-j>"
         let s:state.selected = min([s:state.selected + 1, len(s:state.filtered) - 1])
-    elseif a:key == "\<C-p>" || a:key == "\<Up>"
+    elseif a:key == "\<C-p>" || a:key == "\<Up>" || a:key == "\<C-k>"
         let s:state.selected = max([s:state.selected - 1, 0])
     elseif a:key == "\<BS>" || a:key == "\<C-h>"
         if !empty(s:state.query)

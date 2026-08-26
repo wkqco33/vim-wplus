@@ -33,6 +33,17 @@ let g:wplus_lsp_servers = get(g:, 'wplus_lsp_servers', {
     \ 'python': ['pyright-langserver', '--stdio'],
     \ 'dart': ['dart', 'language-server', '--protocol=lsp'],
     \ 'rust': ['rust-analyzer'],
+    \ 'typescript': ['typescript-language-server', '--stdio'],
+    \ 'javascript': ['typescript-language-server', '--stdio'],
+    \ 'typescriptreact': ['typescript-language-server', '--stdio'],
+    \ 'javascriptreact': ['typescript-language-server', '--stdio'],
+    \ 'html': ['vscode-html-language-server', '--stdio'],
+    \ 'css': ['vscode-css-language-server', '--stdio'],
+    \ 'json': ['vscode-json-language-server', '--stdio'],
+    \ 'yaml': ['yaml-language-server', '--stdio'],
+    \ 'sh': ['bash-language-server', 'start'],
+    \ 'bash': ['bash-language-server', 'start'],
+    \ 'lua': ['lua-language-server'],
     \ })
 let s:CONTENT_LENGTH_PREFIX     = 'Content-Length: '
 let s:timeout_timer             = -1
@@ -245,6 +256,19 @@ function! s:do_did_change(ft, buf) abort
         \ }
     let l:params = {'textDocument': {'uri': l:uri, 'version': l:ver}, 'contentChanges': [l:content_change]}
     call s:send(a:ft, 'textDocument/didChange', l:params, 1)
+endfunction
+
+function! wplus#lsp#flush_changes(...) abort
+    let l:buf = a:0 > 0 ? a:1 : bufnr('%')
+    let l:timer = getbufvar(l:buf, 'wplus_lsp_change_timer', -1)
+    if l:timer != -1
+        silent! call timer_stop(l:timer)
+        call setbufvar(l:buf, 'wplus_lsp_change_timer', -1)
+        let l:ft = getbufvar(l:buf, '&filetype', '')
+        if !empty(l:ft) && has_key(s:servers, l:ft)
+            call s:do_did_change(l:ft, l:buf)
+        endif
+    endif
 endfunction
 
 function! s:did_save(ft) abort
@@ -837,6 +861,7 @@ function! s:store_cache(cache, uri, lnum, col, result) abort
 endfunction
 
 function! wplus#lsp#hover() abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
@@ -846,6 +871,7 @@ function! wplus#lsp#hover() abort
 endfunction
 
 function! wplus#lsp#definition() abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
@@ -861,6 +887,7 @@ endfunction
 
 " Peek definition: show the definition source in a popup without navigating.
 function! wplus#lsp#peek_definition() abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
@@ -923,6 +950,7 @@ function! wplus#lsp#problems() abort
 endfunction
 
 function! wplus#lsp#type_definition() abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
@@ -932,6 +960,7 @@ function! wplus#lsp#type_definition() abort
 endfunction
 
 function! wplus#lsp#implementation() abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
@@ -941,6 +970,7 @@ function! wplus#lsp#implementation() abort
 endfunction
 
 function! wplus#lsp#references() abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
@@ -955,6 +985,7 @@ function! wplus#lsp#references() abort
 endfunction
 
 function! wplus#lsp#completion(...) abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
@@ -1038,6 +1069,7 @@ function! s:do_auto_complete(ft, buf) abort
 endfunction
 
 function! wplus#lsp#rename() abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
@@ -1115,6 +1147,7 @@ function! s:preview_rename(edit) abort
 endfunction
 
 function! wplus#lsp#code_action() abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))
@@ -1127,6 +1160,7 @@ endfunction
 
 " Request organize-imports over the whole document and apply it directly.
 function! wplus#lsp#organize_imports() abort
+    call wplus#lsp#flush_changes(bufnr('%'))
     let l:ft = &filetype
     if !has_key(s:servers, l:ft) | return | endif
     let l:uri = s:get_buf_uri(bufnr('%'))

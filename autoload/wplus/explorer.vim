@@ -211,6 +211,35 @@ function! s:item_at(lnum) abort
     return s:tree_data[l:idx]
 endfunction
 
+function! s:open_file_in_edit_win(path) abort
+    let l:cur_win = win_getid()
+    let l:target_win = -1
+    
+    " Check previous window if valid for editing
+    wincmd p
+    if win_getid() != l:cur_win && empty(getbufvar(winbufnr(0), '&buftype')) && !getwinvar(0, '&previewwindow')
+        let l:target_win = win_getid()
+    else
+        " Scan windows for normal edit window
+        for l:w in range(1, winnr('$'))
+            let l:buf = winbufnr(l:w)
+            if empty(getbufvar(l:buf, '&buftype')) && bufname(l:buf) !~# 'WplusExplorer'
+                let l:target_win = win_getid(l:w)
+                break
+            endif
+        endfor
+    endif
+    
+    if l:target_win != -1
+        call win_gotoid(l:target_win)
+    else
+        call win_gotoid(l:cur_win)
+        rightbelow vsplit
+    endif
+    
+    execute 'edit' fnameescape(a:path)
+endfunction
+
 function! s:on_enter() abort
     let l:lnum = line('.')
     if l:lnum == 1 | return | endif
@@ -226,8 +255,7 @@ function! s:on_enter() abort
         call s:render(s:current_root)
         execute l:lnum
     else
-        wincmd l
-        execute 'edit' fnameescape(l:item.path)
+        call s:open_file_in_edit_win(l:item.path)
     endif
 endfunction
 

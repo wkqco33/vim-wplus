@@ -225,6 +225,8 @@ function! s:resolve_model(spec) abort
         return 'claude-3-sonnet-20240229'
     elseif g:wplus_ai_provider ==# 'ollama'
         return 'codellama'
+    elseif g:wplus_ai_provider ==# 'gemini'
+        return 'gemini-2.0-flash'
     endif
     return 'gpt-3.5-turbo'
 endfunction
@@ -362,10 +364,57 @@ function! s:error_ollama(json) abort
     return get(a:json, 'error', '')
 endfunction
 
+function! s:gemini_endpoint(spec) abort
+    let l:model = s:resolve_model(a:spec)
+    if has_key(g:, 'wplus_ai_gemini_endpoint') && !empty(g:wplus_ai_gemini_endpoint)
+        return g:wplus_ai_gemini_endpoint
+    endif
+    return 'https://generativelanguage.googleapis.com/v1beta/models/' . l:model . ':generateContent'
+endfunction
+
+function! s:build_gemini_payload(spec) abort
+    let l:contents = []
+    call add(l:contents, {'role': 'user', 'parts': [{'text': a:spec.user}]})
+    let l:body = {
+        \ 'contents': l:contents,
+        \ 'generationConfig': {
+        \   'temperature': a:spec.temperature,
+        \   'maxOutputTokens': a:spec.max_tokens,
+        \ },
+        \ }
+    if !empty(a:spec.system)
+        let l:body.systemInstruction = {'parts': [{'text': a:spec.system}]}
+    endif
+    return json_encode(l:body)
+endfunction
+
+function! s:extract_gemini(json) abort
+    if has_key(a:json, 'candidates') && len(a:json.candidates) > 0
+        let l:candidate = a:json.candidates[0]
+        let l:content = get(l:candidate, 'content', {})
+        let l:parts = get(l:content, 'parts', [])
+        if len(l:parts) > 0 && has_key(l:parts[0], 'text')
+            return l:parts[0].text
+        endif
+    endif
+    return ''
+endfunction
+
+function! s:error_gemini(json) abort
+    if has_key(a:json, 'error')
+        if type(a:json.error) == v:t_dict
+            return get(a:json.error, 'message', string(a:json.error))
+        elseif type(a:json.error) == v:t_string
+            return a:json.error
+        endif
+    endif
+    return ''
+endfunction
+
 " Register default providers
 call wplus#ai#provider#register('openai', {
     \ 'needs_key': 1,
-    \ 'endpoint': {spec -> get(g:, 'wplus_ai_openai_endpoint', 'https://api.openai.com/v1/chat/completions')},
+    \ 'endpoint': {spec -> get(g:, 'wplus_ai_endpoint', get(g:, 'wplus_ai_openai_endpoint', 'https://api.openai.com/v1/chat/completions'))},
     \ 'headers': {key -> ['Content-Type: application/json', 'Authorization: Bearer ' . key]},
     \ 'payload': function('s:build_openai_payload'),
     \ 'extract': function('s:extract_openai'),
@@ -398,3 +447,13 @@ call wplus#ai#provider#register('ollama', {
     \ 'extract': function('s:extract_ollama'),
     \ 'error': function('s:error_ollama'),
     \ })
+
+call wplus#ai#provider#register('gemini', {
+    \ 'needs_key': 1,
+    \ 'endpoint': function('s:gemini_endpoint'),
+    \ 'headers': {key -> ['Content-Type: application/json', 'x-goog-api-key: ' . key]},
+    \ 'payload': function('s:build_gemini_payload'),
+    \ 'extract': function('s:extract_gemini'),
+    \ 'error': function('s:error_gemini'),
+    \ })
+

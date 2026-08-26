@@ -87,6 +87,8 @@ function! wplus#ai#setup() abort
             call wplus#util#warn_msg('ai', 'Claude: Set g:wplus_ai_api_key, g:wplus_ai_model')
         elseif g:wplus_ai_provider ==# 'azure'
             call wplus#util#warn_msg('ai', 'Azure: Set g:wplus_ai_api_key, g:wplus_ai_azure_resource, g:wplus_ai_azure_deployment')
+        elseif g:wplus_ai_provider ==# 'gemini'
+            call wplus#util#warn_msg('ai', 'Gemini: Set g:wplus_ai_api_key, g:wplus_ai_model')
         endif
     endif
 

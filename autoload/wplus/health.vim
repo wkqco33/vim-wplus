@@ -33,7 +33,7 @@ let s:known_options = [
     \ 'wplus_ai_tab_complete', 'wplus_ai_commit_max_tokens', 'wplus_ai_commit_prompt',
     \ 'wplus_ai_timeout', 'wplus_ai_suggest_timeout', 'wplus_ai_response_max_bytes', 'wplus_ai_request_max_bytes',
     \ 'wplus_ai_block_sensitive_context', 'wplus_ai_allow_sensitive_context',
-    \ 'wplus_ai_sensitive_files', 'wplus_ai_openai_endpoint', 'wplus_multicursor_enabled', 'wplus_register_enabled',
+    \ 'wplus_ai_sensitive_files', 'wplus_ai_endpoint', 'wplus_ai_openai_endpoint', 'wplus_ai_gemini_endpoint', 'wplus_multicursor_enabled', 'wplus_register_enabled',
     \ 'wplus_outline_enabled', 'wplus_diffview_enabled', 'wplus_harpoon_enabled', 'wplus_harpoon_max_slots',
     \ 'wplus_marks_enabled', 'wplus_scratch_enabled', 'wplus_scratch_height', 'wplus_run_enabled',
     \ 'wplus_project_enabled', 'wplus_project_trust_all', 'wplus_history_enabled', 'wplus_history_max',

@@ -71,3 +71,23 @@ function! Test_lsp_sync_multi_line_edit() abort
     " old replaced text is lines 1..3 = 'b','c','d' plus 3 newlines
     call assert_equal(6, l:r.rangeLength, 'rangeLength should cover the replaced old block')
 endfunction
+
+function! Test_lsp_sync_flush_changes() abort
+    call wplus#lsp#setup()
+    enew!
+    setlocal buftype=nofile bufhidden=wipe noswapfile filetype=python
+    call setline(1, ['def foo():', '    pass'])
+    let l:buf = bufnr('%')
+    
+    " Set a mock pending timer
+    let l:timer = timer_start(10000, {-> 0})
+    call setbufvar(l:buf, 'wplus_lsp_change_timer', l:timer)
+    
+    call wplus#lsp#flush_changes(l:buf)
+    
+    let l:remaining_timer = getbufvar(l:buf, 'wplus_lsp_change_timer', -1)
+    call assert_equal(-1, l:remaining_timer, 'flush_changes must stop and reset the pending change timer')
+    
+    bwipeout!
+endfunction
+

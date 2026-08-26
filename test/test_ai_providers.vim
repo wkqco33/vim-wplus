@@ -5,7 +5,7 @@ function! Test_ai_providers_payload_tokens_and_temp() abort
     let g:wplus_ai_suggest_max_tokens = 777
     let g:wplus_ai_suggest_temperature = 0.123
 
-    for l:provider in ['openai', 'claude', 'azure', 'ollama']
+    for l:provider in ['openai', 'claude', 'azure', 'ollama', 'gemini']
         let g:wplus_ai_provider = l:provider
         let g:wplus_ai_model = 'test-model'
         let g:wplus_ai_api_key = 'dummy-key'
@@ -20,12 +20,34 @@ function! Test_ai_providers_payload_tokens_and_temp() abort
         if l:provider ==# 'ollama'
             call assert_equal(777, l:data.options.num_predict, 'Ollama num_predict mismatch')
             call assert_equal(0.123, l:data.options.temperature, 'Ollama temperature mismatch')
+        elseif l:provider ==# 'gemini'
+            call assert_equal(777, l:data.generationConfig.maxOutputTokens, 'Gemini maxOutputTokens mismatch')
+            call assert_equal(0.123, l:data.generationConfig.temperature, 'Gemini temperature mismatch')
         else
             let l:max_tok = get(l:data, 'max_tokens', get(l:data, 'max_completion_tokens', 0))
             call assert_equal(777, l:max_tok, l:provider . ' max_tokens mismatch')
             call assert_equal(0.123, l:data.temperature, l:provider . ' temperature mismatch')
         endif
     endfor
+endfunction
+
+function! Test_ai_gemini_extract_and_error() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_provider = 'gemini'
+    let g:wplus_ai_model = 'gemini-2.0-flash'
+    let g:wplus_ai_api_key = 'test-key'
+    
+    let l:sample_resp = {
+        \ 'candidates': [{
+        \   'content': {
+        \     'parts': [{'text': 'print("hello gemini")'}]
+        \   }
+        \ }]
+        \ }
+    call assert_equal('print("hello gemini")', wplus#ai#provider#extract_content(l:sample_resp))
+
+    let l:error_resp = {'error': {'message': 'Invalid API Key'}}
+    call assert_equal('Invalid API Key', wplus#ai#provider#extract_error(l:error_resp))
 endfunction
 
 function! Test_ai_suggest_payload_includes_scope_and_symbols() abort
