@@ -8,13 +8,28 @@
 
 ## 설치
 
+**curl 원라이너** (가장 간편, 플러그인 매니저 불필요):
+
+```bash
+# Vim/NeoVim 자동 감지 후 설치
+curl -fsSL https://raw.githubusercontent.com/wkqco33/vim-wplus/master/install.sh | bash
+
+# 예시 설정(.vimrc)까지 복사
+curl -fsSL https://raw.githubusercontent.com/wkqco33/vim-wplus/master/install.sh | bash -s -- --with-rc
+
+# NeoVim 강제
+curl -fsSL https://raw.githubusercontent.com/wkqco33/vim-wplus/master/install.sh | bash -s -- --nvim
+```
+
+> ⚠ `curl | bash` 는 원격 스크립트를 즉시 실행합니다. 내용 검토는 `curl -fsSL … | less` 로 확인 후 실행하세요.
+
 ```vim
 " vim-plug
 Plug 'wkqco33/vim-wplus'
 ```
 
 ```bash
-# pack 직접 설치
+# pack 직접 설치 (수동)
 git clone https://github.com/wkqco33/vim-wplus.git ~/.vim/pack/user/start/vim-wplus
 ```
 

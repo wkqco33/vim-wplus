@@ -19,7 +19,35 @@ vim-wplus는 모듈형 구성로 구성된 의존성 없는 Vim 올인원 플러
 " 1이 출력되어야 합니다
 ```
 
-### 방법 1 — vim-plug (권장)
+### 방법 1 — curl 원라이너 (가장 간편, 매니저 불필요)
+
+`install.sh` 스크립트를 다운로드하여 바로 실행합니다. Vim/NeoVim 을 자동 감지해
+내장 `pack/` 디렉토리에 설치하므로 플러그인 매니저가 전혀 필요 없습니다.
+
+```bash
+# Vim/NeoVim 자동 감지 후 설치
+curl -fsSL https://raw.githubusercontent.com/wkqco33/vim-wplus/master/install.sh | bash
+
+# 옵션 예시:
+#   --vim       Vim 강제
+#   --nvim      NeoVim 강제
+#   --update    이미 설치된 것을 최신으로 업데이트(git pull)
+#   --with-rc   .vimrc.example 을 사용자 설정에 복사(기존 파일은 자동 백업)
+curl -fsSL https://raw.githubusercontent.com/wkqco33/vim-wplus/master/install.sh | bash -s -- --with-rc
+```
+
+> ⚠ **보안**: `curl | bash` 는 원격 스크립트를 즉시 실행합니다. 실행 전에
+> 아래와 같이 스크립트 내용을 먼저 확인하세요:
+> `curl -fsSL https://raw.githubusercontent.com/wkqco33/vim-wplus/master/install.sh | less`
+
+설치 위치 (자동 결정):
+
+| 편집기 | 경로 |
+|--------|------|
+| Vim | `~/.vim/pack/user/start/vim-wplus` |
+| NeoVim | `~/.local/share/nvim/site/pack/user/start/vim-wplus` |
+
+### 방법 2 — vim-plug
 
 ```vim
 call plug#begin()
@@ -31,7 +59,7 @@ call plug#end()
 
 Vim에서 `:PlugInstall` 실행.
 
-### 방법 2 — pack 직접 설치
+### 방법 3 — pack 직접 설치 (수동)
 
 ```bash
 # Unix / macOS
@@ -43,7 +71,7 @@ git clone https://github.com/wkqco33/vim-wplus.git "$env:USERPROFILE\vimfiles\pa
 
 별도 `source` 없이 자동 로드됩니다.
 
-### 방법 3 — 수동 설치
+### 방법 4 — 수동 설치
 
 ```vim
 " ~/.vimrc (Unix)
@@ -60,6 +88,10 @@ source C:/Users/<user>/vimfiles/pack/user/start/vim-wplus/plugin/wplus.vim
 ### 빠른 시작
 
 ```bash
+# 0. (가장 빠름) curl 원라이너로 설치 + 예시 설정 복사
+curl -fsSL https://raw.githubusercontent.com/wkqco33/vim-wplus/master/install.sh | bash -s -- --with-rc
+
+# 또는 수동 복제 후:
 # 1. 복제
 git clone https://github.com/wkqco33/vim-wplus.git ~/.vim/pack/user/start/vim-wplus
 
