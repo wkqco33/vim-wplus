@@ -55,6 +55,7 @@ endfunction
 
 function! wplus#terminal#setup() abort
     command! WplusTerminalToggle call wplus#terminal#toggle()
+    command! WterminalToggle     call wplus#terminal#toggle()
     
     " Mappings
     nnoremap <silent> <leader>tt :WplusTerminalToggle<CR>

@@ -168,7 +168,7 @@ endfunction
 
 function! wplus#ai#suggest#accept_word() abort
     if empty(s:suggest_content)
-        return "\<Space>"
+        return ''
     endif
     let l:content = s:suggest_content
     let l:match = matchlist(l:content, '^\(\s*\S\+\)\(\s\?\)\(.*\)$')

@@ -106,3 +106,33 @@ function! Test_lsp_completion_prefers_text_edit_and_utf16_position() abort
     call assert_equal('printf(${1})', wplus#lsp#_test_completion_item_text(l:item), 'LSP textEdit.newText should be used over insertText')
     call assert_equal(7, wplus#lsp#_test_lsp_character_to_col('ab😀', 3), 'UTF-16 positions should map to Vim columns')
 endfunction
+
+function! Test_lsp_completion_enforces_noselect_and_restores_completeopt() abort
+    call wplus#lsp#setup()
+    enew!
+    setlocal buftype=nofile bufhidden=wipe noswapfile filetype=python
+    setlocal completeopt=menu,preview
+
+    call wplus#lsp#_test_prepare_completeopt()
+    call assert_match('noinsert', &l:completeopt, 'completeopt must contain noinsert during completion')
+    call assert_match('noselect', &l:completeopt, 'completeopt must contain noselect during completion')
+    call assert_match('menuone', &l:completeopt, 'completeopt must contain menuone during completion')
+
+    call wplus#lsp#_test_restore_completeopt()
+    call assert_equal('menu,preview', &l:completeopt, 'completeopt must be restored to original value after completion')
+    bwipeout!
+endfunction
+
+function! Test_lsp_completion_sorts_and_deduplicates() abort
+    call wplus#lsp#setup()
+    let l:items = [
+        \ {'label': 'beta', 'sortText': '20', 'insertText': 'beta'},
+        \ {'label': 'alpha', 'sortText': '10', 'insertText': 'alpha'},
+        \ {'label': 'alpha', 'sortText': '10', 'insertText': 'alpha'},
+        \ ]
+    let l:matches = wplus#lsp#_test_format_completion_matches(l:items)
+    call assert_equal(2, len(l:matches), 'Duplicate completion items must be removed')
+    call assert_equal('alpha', l:matches[0].word, 'Items must be sorted by sortText')
+    call assert_equal('beta', l:matches[1].word, 'Items must be sorted by sortText')
+endfunction
+

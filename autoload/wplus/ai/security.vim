@@ -97,6 +97,30 @@ function! wplus#ai#security#clean_commit_message(content) abort
 endfunction
 
 " Return true for files or content that should not be sent automatically to an
+function! wplus#ai#security#is_sensitive_file(filepath) abort
+    if !get(g:, 'wplus_ai_block_sensitive_context', 1)
+        return 0
+    endif
+    if get(g:, 'wplus_ai_allow_sensitive_context', 0)
+        return 0
+    endif
+    let l:name = fnamemodify(a:filepath, ':t')
+    if empty(l:name) || l:name ==# 'COMMIT_EDITMSG'
+        return 0
+    endif
+    for l:pattern in get(g:, 'wplus_ai_sensitive_files', [])
+        if exists('*glob2regpat')
+            let l:pat = glob2regpat(l:pattern)
+            if l:name =~# l:pat || a:filepath =~# l:pat
+                return 1
+            endif
+        elseif l:name ==# l:pattern || a:filepath ==# l:pattern
+            return 1
+        endif
+    endfor
+    return 0
+endfunction
+
 " AI provider. This is deliberately fail-closed for common credential files
 " and strong secret assignments, while avoiding broad matches such as the word
 " token in normal prose.
@@ -108,14 +132,8 @@ function! wplus#ai#security#is_sensitive(text) abort
         return 0
     endif
     let l:name = expand('%:t')
-    if !empty(l:name) && l:name !=# 'COMMIT_EDITMSG'
-        for l:pattern in get(g:, 'wplus_ai_sensitive_files', [])
-            if exists('*glob2regpat') && l:name =~# glob2regpat(l:pattern)
-                return 1
-            elseif l:name ==# l:pattern
-                return 1
-            endif
-        endfor
+    if wplus#ai#security#is_sensitive_file(l:name)
+        return 1
     endif
     for l:line in split(a:text, "\n", 1)
         " Match private key envelopes

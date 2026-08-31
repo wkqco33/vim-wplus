@@ -65,11 +65,13 @@ endfunction
 " Called for every line when foldmethod=expr.
 function! wplus#fold#expr(lnum) abort
     for l:r in get(b:, 'wplus_fold_ranges', [])
-        if a:lnum == l:r.start + 1
-            return '>' . 1
+        let l:start = get(l:r, 'startLine', get(l:r, 'start', -1))
+        let l:end = get(l:r, 'endLine', get(l:r, 'end', -1))
+        if a:lnum == l:start + 1
+            return '>1'
         endif
-        if a:lnum == l:r.end + 1
-            return '<' . 1
+        if a:lnum == l:end + 1
+            return '<1'
         endif
     endfor
     return '='
@@ -154,7 +156,15 @@ function! wplus#fold#setup() abort
     augroup WplusFold
         autocmd!
         autocmd FileType * call wplus#fold#setup_buffer()
+        autocmd User WplusLspFoldsUpdate call s:on_lsp_folds_update()
         " Reload LSP folds on file write (server may push new ranges)
         autocmd BufWritePost * if g:wplus_fold_method ==# 'lsp' | call s:request_lsp_ranges() | endif
     augroup END
 endfunction
+
+function! s:on_lsp_folds_update() abort
+    if exists('b:wplus_lsp_fold_ranges')
+        call wplus#fold#on_lsp_ranges(bufnr('%'), b:wplus_lsp_fold_ranges)
+    endif
+endfunction
+

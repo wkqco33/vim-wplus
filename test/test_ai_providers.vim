@@ -307,3 +307,76 @@ function! Test_ai_commit_diff_truncates_at_file_boundary() abort
     call assert_true(l:cut =~# 'diff --git a/a\.rs', 'Truncated diff should keep the first file')
     call assert_false(l:cut =~# 'diff --git a/b\.rs', 'Truncated diff must not cut mid-file into the second file')
 endfunction
+
+function! Test_ai_accept_word_facade_resolves() abort
+    call wplus#ai#setup()
+    " Both word-wise facade helpers must resolve to real functions without E117
+    let l:word = wplus#ai#accept_word_suggestion()
+    call assert_equal('', l:word, 'accept_word_suggestion should return empty string when no suggestion')
+    call wplus#ai#accept_suggestion_insert_word()
+endfunction
+
+function! s:capture_prompt(prompt, ...) abort
+    let s:test_last_prompt = a:prompt
+endfunction
+
+function! Test_ai_ex_range_consistency() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_provider = 'openai'
+    let g:wplus_ai_api_key = 'test-key'
+    let g:wplus_ai_model = 'test-model'
+
+    enew!
+    setlocal buftype=nofile bufhidden=wipe noswapfile filetype=python
+    call setline(1, ['line 1', 'line 2', 'line 3', 'line 4', 'line 5'])
+
+    " Set stale visual marks pointing to lines 4-5
+    call setpos("'<", [bufnr('%'), 4, 1, 0])
+    call setpos("'>", [bufnr('%'), 5, 1, 0])
+
+    let s:test_last_prompt = ''
+    call wplus#ai#_test_set_send_interceptor(function('s:capture_prompt'))
+
+    " Execute WaiComment on 2,3
+    2,3WaiComment
+    call assert_match('line 2\nline 3', s:test_last_prompt, 'WaiComment must use the Ex command range, not visual marks')
+    call assert_notmatch('line 4', s:test_last_prompt, 'WaiComment must not include stale visual marks')
+
+    " Execute WaiReview on single line 2
+    2WaiReview
+    call assert_match('line 2', s:test_last_prompt, 'WaiReview on line 2 must review line 2')
+    call assert_notmatch('line 1', s:test_last_prompt, 'WaiReview on line 2 must not fall back to entire buffer')
+
+    call wplus#ai#_test_clear_send_interceptor()
+    bwipeout!
+endfunction
+
+function! Test_ai_is_sensitive_file() abort
+    call wplus#ai#setup()
+    call assert_true(wplus#ai#security#is_sensitive_file('.env'), '.env must be recognized as sensitive')
+    call assert_true(wplus#ai#security#is_sensitive_file('.env.prod'), '.env.* must be recognized as sensitive')
+    call assert_true(wplus#ai#security#is_sensitive_file('server.key'), '*.key must be recognized as sensitive')
+    call assert_true(wplus#ai#security#is_sensitive_file('cert.pem'), '*.pem must be recognized as sensitive')
+    call assert_true(wplus#ai#security#is_sensitive_file('id_rsa.key'), 'key file must be recognized as sensitive')
+    call assert_true(wplus#ai#security#is_sensitive_file('path/to/.env.local'), 'relative path to sensitive file must be detected')
+    call assert_false(wplus#ai#security#is_sensitive_file('main.rs'), 'normal source files must not be blocked')
+    call assert_false(wplus#ai#security#is_sensitive_file('config.go'), 'config.go must not be blocked')
+endfunction
+
+function! Test_ai_commit_blocks_staged_sensitive_file() abort
+    call wplus#ai#setup()
+    let s:test_last_prompt = ''
+    call wplus#ai#_test_set_send_interceptor(function('s:capture_prompt'))
+
+    " Simulate commit stat with sensitive file
+    let l:stat_lines = [
+        \ ' .env | 5 +++++',
+        \ ' src/main.rs | 2 +- ',
+        \ ' 2 files changed, 6 insertions(+), 1 deletion(-)'
+        \ ]
+    call wplus#ai#_test_on_commit_stat_done('/dummy', l:stat_lines)
+    call assert_equal('', s:test_last_prompt, 'AI request must be blocked when staged changes contain sensitive files')
+
+    call wplus#ai#_test_clear_send_interceptor()
+endfunction
+

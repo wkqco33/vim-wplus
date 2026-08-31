@@ -1019,6 +1019,12 @@ function! s:on_insert_enter() abort
     let b:wplus_lsp_insert_enter_tick = b:changedtick
 endfunction
 
+function! s:on_insert_leave() abort
+    call s:cancel_auto_complete_timer()
+    call s:snippet_clear()
+    call s:restore_completion_completeopt()
+endfunction
+
 function! s:insert_changed(buf) abort
     if bufnr('%') != a:buf || !bufloaded(a:buf) | return 0 | endif
     return getbufvar(a:buf, 'changedtick', -1) != getbufvar(a:buf, 'wplus_lsp_insert_enter_tick', -2)
@@ -1607,6 +1613,56 @@ function! s:completion_start(items) abort
     return max([0, l:start])
 endfunction
 
+function! s:prepare_completion_completeopt() abort
+    if !exists('b:wplus_lsp_saved_completeopt')
+        let b:wplus_lsp_saved_completeopt = &l:completeopt
+    endif
+    let l:opts = split(&l:completeopt, ',')
+    for l:req_opt in ['menuone', 'noinsert', 'noselect']
+        if index(l:opts, l:req_opt) < 0
+            call add(l:opts, l:req_opt)
+        endif
+    endfor
+    let &l:completeopt = join(l:opts, ',')
+endfunction
+
+function! s:restore_completion_completeopt() abort
+    if exists('b:wplus_lsp_saved_completeopt')
+        let &l:completeopt = b:wplus_lsp_saved_completeopt
+        unlet b:wplus_lsp_saved_completeopt
+    endif
+endfunction
+
+function! s:format_completion_matches(items) abort
+    let l:kind_map = {1: 'v', 2: 'f', 3: 'm', 4: 'f', 5: 'f', 6: 'c', 7: 'i', 8: 's', 9: 'm', 10: 'p', 11: 'u', 12: 'e', 13: 'k', 14: 's', 15: 's'}
+    let l:indexed = []
+    let l:idx = 0
+    for l:item in a:items
+        let l:word = s:completion_item_text(l:item)
+        if empty(l:word)
+            let l:idx += 1
+            continue
+        endif
+        let l:sort_key = get(l:item, 'sortText', get(l:item, 'label', l:word))
+        call add(l:indexed, {'sort_key': l:sort_key, 'word': l:word, 'abbr': get(l:item, 'label', l:word), 'kind': get(l:kind_map, get(l:item, 'kind', 0), 't'), 'menu': get(l:item, 'detail', ''), 'user_data': string(l:idx)})
+        let l:idx += 1
+    endfor
+    " Sort items by sortText/label
+    call sort(l:indexed, {a, b -> a.sort_key ==# b.sort_key ? 0 : (a.sort_key ># b.sort_key ? 1 : -1)})
+
+    " Deduplicate by word and abbr while preserving sorted order
+    let l:seen = {}
+    let l:matches = []
+    for l:entry in l:indexed
+        let l:key = l:entry.word . "\t" . l:entry.abbr
+        if !has_key(l:seen, l:key)
+            let l:seen[l:key] = 1
+            call add(l:matches, {'word': l:entry.word, 'abbr': l:entry.abbr, 'kind': l:entry.kind, 'menu': l:entry.menu, 'user_data': l:entry.user_data})
+        endif
+    endfor
+    return l:matches
+endfunction
+
 function! s:show_completion(result, req) abort
     if empty(a:result) || !s:completion_context_valid(a:req) | return | endif
     if exists('*wplus#ai#suggest#has_suggestion') && wplus#ai#suggest#has_suggestion()
@@ -1614,6 +1670,8 @@ function! s:show_completion(result, req) abort
     endif
     let l:items = type(a:result) == v:t_list ? a:result : get(a:result, 'items', [])
     if empty(l:items) | return | endif
+    let l:matches = s:format_completion_matches(l:items)
+    if empty(l:matches) | return | endif
     call setbufvar(bufnr('%'), 'wplus_lsp_completion_auto', get(a:req, 'tag', '') ==# 'auto')
     call setbufvar(bufnr('%'), 'wplus_lsp_completion_tick', b:changedtick)
     " Keep the raw items so CompleteDone can re-parse snippet insertText.
@@ -1622,19 +1680,7 @@ function! s:show_completion(result, req) abort
     call setbufvar(bufnr('%'), 'wplus_lsp_completion_start', l:completion_start)
     call setbufvar(bufnr('%'), 'wplus_lsp_completion_start_line', line('.'))
     call setbufvar(bufnr('%'), 'wplus_lsp_completion_start_col', l:completion_start)
-    let l:matches = []
-    let l:kind_map = {1: 'v', 2: 'f', 3: 'm', 4: 'f', 5: 'f', 6: 'c', 7: 'i', 8: 's', 9: 'm', 10: 'p', 11: 'u', 12: 'e', 13: 'k', 14: 's', 15: 's'}
-    let l:item_index = 0
-    for l:item in l:items
-        let l:word = s:completion_item_text(l:item)
-        if empty(l:word)
-            let l:item_index += 1
-            continue
-        endif
-        call add(l:matches, {'word': l:word, 'abbr': get(l:item, 'label', l:word), 'kind': get(l:kind_map, get(l:item, 'kind', 0), 't'), 'menu': get(l:item, 'detail', ''), 'user_data': string(l:item_index)})
-        let l:item_index += 1
-    endfor
-    if empty(l:matches) | return | endif
+    call s:prepare_completion_completeopt()
     call complete(get(b:, 'wplus_lsp_completion_start', col('.') - 1) + 1, l:matches)
 endfunction
 
@@ -1833,6 +1879,7 @@ function! s:apply_snippet(snippet) abort
 endfunction
 
 function! s:on_complete_done() abort
+    call s:restore_completion_completeopt()
     let l:item = get(v:, 'completed_item', {})
     let l:items = get(b:, 'wplus_lsp_completion_items', [])
     if empty(l:item) || empty(l:items)
@@ -2062,6 +2109,18 @@ function! wplus#lsp#_test_outgoing_calls_to_qf(result) abort
     return s:outgoing_calls_to_qf(a:result)
 endfunction
 
+function! wplus#lsp#_test_prepare_completeopt() abort
+    call s:prepare_completion_completeopt()
+endfunction
+
+function! wplus#lsp#_test_restore_completeopt() abort
+    call s:restore_completion_completeopt()
+endfunction
+
+function! wplus#lsp#_test_format_completion_matches(items) abort
+    return s:format_completion_matches(a:items)
+endfunction
+
 function! wplus#lsp#_test_set_caps(ft, caps) abort
     if !has_key(s:servers, a:ft)
         let s:servers[a:ft] = {'job': v:null, 'channel': v:null, 'last_id': 0, 'requests': {}, 'buffer': '', 'caps': a:caps, 'initialized': 1}
@@ -2116,8 +2175,7 @@ function! wplus#lsp#setup() abort
         autocmd FileType * call s:start_server(&filetype)
         autocmd BufReadPost * call s:did_open(&filetype)
         autocmd InsertEnter * call s:on_insert_enter()
-        autocmd InsertLeave * call s:cancel_auto_complete_timer()
-        autocmd InsertLeave * call s:snippet_clear()
+        autocmd InsertLeave * call s:on_insert_leave()
         autocmd BufLeave * call s:snippet_clear()
         autocmd TextChanged,TextChangedI * call s:did_change(&filetype, bufnr('%'))
         autocmd TextChangedI * call s:trigger_auto_complete(&filetype, bufnr('%'))

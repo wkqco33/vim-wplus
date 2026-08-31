@@ -30,3 +30,14 @@ function! Test_vscode_search_and_ui_mappings() abort
     call assert_true(maparg('<C-S-K>', 'n') =~# 'dd', 'Ctrl+Shift+K should delete the line')
     unlet! g:wplus_vscode_keymaps
 endfunction
+
+function! Test_vscode_terminal_mapping_target_command_exists() abort
+    let g:wplus_vscode_keymaps = 1
+    call wplus#terminal#setup()
+    call wplus#vscode#setup()
+    let l:cmd = matchstr(maparg('<C-`>', 'n'), ':\zs\w\+\ze<CR>')
+    call assert_true(!empty(l:cmd), 'Ctrl+` should map to an ex command')
+    call assert_equal(2, exists(':' . l:cmd), 'Mapped terminal command must exist: :' . l:cmd)
+    unlet! g:wplus_vscode_keymaps
+endfunction
+

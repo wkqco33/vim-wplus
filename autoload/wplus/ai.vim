@@ -58,6 +58,15 @@ let g:wplus_ai_sensitive_files = get(g:, 'wplus_ai_sensitive_files', [
     \ '*credential*', '*credentials*', '*secret*', '*secrets*', '*password*', '*token*',
     \ ])
 
+let s:send_interceptor = v:null
+
+function! s:send_ai_request(...) abort
+    if s:send_interceptor isnot v:null
+        return call(s:send_interceptor, a:000)
+    endif
+    return call('wplus#ai#http#send_request', a:000)
+endfunction
+
 " ── Setup & Registration ──────────────────────────────────────────────────────
 
 function! wplus#ai#setup() abort
@@ -92,9 +101,9 @@ function! wplus#ai#setup() abort
         endif
     endif
 
-    command! -range WaiComment   call wplus#ai#comment('visual')
+    command! -range WaiComment   <line1>,<line2>call wplus#ai#comment()
     command! -nargs=? WaiComplete call wplus#ai#complete(<q-args> != '' ? <q-args> : 5)
-    command! -range WaiRefactor  call wplus#ai#refactor()
+    command! -range WaiRefactor  <line1>,<line2>call wplus#ai#refactor()
     command! WaiFixDiag          call wplus#ai#fix_diagnostic()
     command! WaiCommitMsg        call wplus#ai#commit_message()
     command! WaiToggleSuggest    call wplus#ai#toggle_suggest()
@@ -127,15 +136,10 @@ endfunction
 
 " ── Interactive Commands ──────────────────────────────────────────────────────
 
-function! wplus#ai#comment(range_type) abort
+function! wplus#ai#comment(...) range abort
     let l:bufnr = bufnr('%')
-    let [l:line_start, l:col_start] = getpos("'<")[1:2]
-    let [l:line_end,   l:col_end]   = getpos("'>")[1:2]
-
-    if l:line_start == 0 || l:line_end == 0 || a:range_type ==# 'line'
-        let l:line_start = line('.')
-        let l:line_end   = line('.')
-    endif
+    let l:line_start = a:firstline
+    let l:line_end   = a:lastline
 
     let l:lines = getline(l:line_start, l:line_end)
     let l:code = join(l:lines, "\n")
@@ -145,7 +149,7 @@ function! wplus#ai#comment(range_type) abort
     endif
 
     let l:prompt = "Add concise and informative comments to this code. Return the code with comments added. Do not change code logic:\n\n" . l:code
-    call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#preview_replace_range', [l:bufnr, l:line_start, l:line_end]))
+    call s:send_ai_request(l:prompt, function('wplus#ai#ui#preview_replace_range', [l:bufnr, l:line_start, l:line_end]))
 endfunction
 
 function! wplus#ai#complete(context_lines) abort
@@ -160,18 +164,13 @@ function! wplus#ai#complete(context_lines) abort
 
     let l:language = empty(&filetype) ? 'plain text' : &filetype
     let l:prompt = "Complete this " . l:language . " code after the final line. Return only the new code, without explanation or markdown.\n\n" . l:context
-    call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#preview_insert_after', [l:bufnr, l:lnum]), g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature, 'suggest')
+    call s:send_ai_request(l:prompt, function('wplus#ai#ui#preview_insert_after', [l:bufnr, l:lnum]), g:wplus_ai_suggest_max_tokens, g:wplus_ai_suggest_temperature, 'suggest')
 endfunction
 
-function! wplus#ai#refactor() abort
+function! wplus#ai#refactor() range abort
     let l:bufnr = bufnr('%')
-    let [l:line_start, l:col_start] = getpos("'<")[1:2]
-    let [l:line_end,   l:col_end]   = getpos("'>")[1:2]
-
-    if l:line_start == 0 || l:line_end == 0
-        let l:line_start = line('.')
-        let l:line_end   = line('.')
-    endif
+    let l:line_start = a:firstline
+    let l:line_end   = a:lastline
 
     let l:lines = getline(l:line_start, l:line_end)
     let l:code = join(l:lines, "\n")
@@ -181,7 +180,7 @@ function! wplus#ai#refactor() abort
     endif
 
     let l:prompt = "Refactor this code to improve readability and performance while preserving behavior. Return only the refactored code without explanation or markdown blocks:\n\n" . l:code
-    call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#preview_replace_range', [l:bufnr, l:line_start, l:line_end]))
+    call s:send_ai_request(l:prompt, function('wplus#ai#ui#preview_replace_range', [l:bufnr, l:line_start, l:line_end]))
 endfunction
 
 function! wplus#ai#fix_diagnostic() abort
@@ -217,6 +216,8 @@ function! wplus#ai#fix_diagnostic() abort
     call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#preview_replace_range', [l:bufnr, l:lnum, l:lnum]))
 endfunction
 
+let s:active_git_jobs = []
+
 function! wplus#ai#commit_message() abort
     let l:file = expand('%:p')
     let l:root = !empty(l:file) ? wplus#util#find_git_root(fnamemodify(l:file, ':h')) : ''
@@ -237,11 +238,12 @@ function! wplus#ai#commit_message() abort
     endif
 
     let l:stat_lines = []
-    call job_start(['git', '-C', l:root, 'diff', '--cached', '--stat'], {
+    let l:job = job_start(['git', '-C', l:root, 'diff', '--cached', '--stat'], {
         \ 'out_cb':   {_, l -> add(l:stat_lines, l)},
         \ 'close_cb': {_ -> s:on_commit_stat_done(l:root, l:stat_lines)},
         \ 'err_cb':   {_ch, _msg -> 0},
         \ })
+    call add(s:active_git_jobs, l:job)
     call wplus#util#info_msg('ai', 'reading staged changes...')
 endfunction
 
@@ -251,12 +253,23 @@ function! s:on_commit_stat_done(root, stat_lines) abort
         call wplus#util#warn_msg('ai', 'no staged changes (git add first)')
         return
     endif
+    for l:line in a:stat_lines
+        let l:parts = split(l:line, '\s*|\s*')
+        if len(l:parts) >= 2
+            let l:fname = trim(l:parts[0])
+            if !empty(l:fname) && wplus#ai#security#is_sensitive_file(l:fname)
+                call wplus#util#warn_msg('ai', 'commit message blocked: staged sensitive file (' . l:fname . ')')
+                return
+            endif
+        endif
+    endfor
     let l:diff_lines = []
-    call job_start(['git', '-C', a:root, 'diff', '--cached'], {
+    let l:job = job_start(['git', '-C', a:root, 'diff', '--cached'], {
         \ 'out_cb':   {_, l -> add(l:diff_lines, l)},
         \ 'close_cb': {_ -> s:on_commit_diff_collected(l:stat, l:diff_lines)},
         \ 'err_cb':   {_ch, _msg -> 0},
         \ })
+    call add(s:active_git_jobs, l:job)
 endfunction
 
 function! s:on_commit_diff_collected(stat, lines) abort
@@ -271,7 +284,7 @@ function! s:on_commit_diff_collected(stat, lines) abort
         let l:diff = s:truncate_diff(l:diff, l:max)
     endif
     let l:prompt = wplus#ai#provider#build_commit_prompt(a:stat, l:diff)
-    call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#preview_commit'), g:wplus_ai_commit_max_tokens, 0.3)
+    call s:send_ai_request(l:prompt, function('wplus#ai#ui#preview_commit'), g:wplus_ai_commit_max_tokens, 0.3)
 endfunction
 
 " Truncate a git diff to at most a:max bytes, cutting at a file boundary
@@ -295,13 +308,8 @@ endfunction
 
 function! wplus#ai#review() range abort
     let l:ft = &filetype
-    let [l:line_start, l:col_start] = getpos("'<")[1:2]
-    let [l:line_end,   l:col_end]   = getpos("'>")[1:2]
-
-    if l:line_start == 0 || l:line_end == 0 || l:line_start == l:line_end
-        let l:line_start = 1
-        let l:line_end = line('$')
-    endif
+    let l:line_start = a:firstline
+    let l:line_end   = a:lastline
 
     let l:lines = getline(l:line_start, l:line_end)
     let l:code = join(l:lines, "\n")
@@ -311,18 +319,13 @@ function! wplus#ai#review() range abort
     endif
 
     let l:prompt = "Review the following code for bugs, security issues, performance, and best practices. Format your response in markdown with clear sections:\n\n" . l:code
-    call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#show_review_result', [l:ft, 'AI Code Review']))
+    call s:send_ai_request(l:prompt, function('wplus#ai#ui#show_review_result', [l:ft, 'AI Code Review']))
 endfunction
 
 function! wplus#ai#explain() range abort
     let l:ft = &filetype
-    let [l:line_start, l:col_start] = getpos("'<")[1:2]
-    let [l:line_end,   l:col_end]   = getpos("'>")[1:2]
-
-    if l:line_start == 0 || l:line_end == 0 || l:line_start == l:line_end
-        let l:line_start = 1
-        let l:line_end = line('$')
-    endif
+    let l:line_start = a:firstline
+    let l:line_end   = a:lastline
 
     let l:lines = getline(l:line_start, l:line_end)
     let l:code = join(l:lines, "\n")
@@ -332,7 +335,7 @@ function! wplus#ai#explain() range abort
     endif
 
     let l:prompt = "Explain how the following code works step-by-step. Include key logic, edge cases, and time/space complexity if applicable. Format in markdown:\n\n" . l:code
-    call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#show_review_result', [l:ft, 'AI Code Explanation']))
+    call s:send_ai_request(l:prompt, function('wplus#ai#ui#show_review_result', [l:ft, 'AI Code Explanation']))
 endfunction
 
 " ── Facade & Public API Delegations ───────────────────────────────────────────
@@ -369,21 +372,16 @@ function! wplus#ai#dismiss_suggestion() abort
     call wplus#ai#suggest#dismiss()
 endfunction
 
-" Accept only the next word of the suggestion and keep the rest visible.
-function! wplus#ai#accept_word_suggestion() abort
-    return wplus#ai#suggest#accept_word_suggestion()
-endfunction
-
-function! wplus#ai#accept_suggestion_insert_word() abort
-    call wplus#ai#suggest#accept_suggestion_insert_word()
-endfunction
-
 " Toggle suggestions on/off
 function! wplus#ai#toggle_suggest() abort
     call wplus#ai#suggest#toggle()
 endfunction
 
 function! wplus#ai#cancel() abort
+    for l:job in s:active_git_jobs
+        silent! call job_stop(l:job, 'kill')
+    endfor
+    let s:active_git_jobs = []
     call wplus#ai#http#cancel_all()
     call wplus#ai#suggest#dismiss()
     call wplus#util#info_msg('ai', 'canceled all AI requests')
@@ -438,3 +436,16 @@ endfunction
 function! wplus#ai#_test_truncate_diff(diff, max) abort
     return s:truncate_diff(a:diff, a:max)
 endfunction
+
+function! wplus#ai#_test_on_commit_stat_done(root, stat_lines) abort
+    call s:on_commit_stat_done(a:root, a:stat_lines)
+endfunction
+
+function! wplus#ai#_test_set_send_interceptor(fn) abort
+    let s:send_interceptor = a:fn
+endfunction
+
+function! wplus#ai#_test_clear_send_interceptor() abort
+    let s:send_interceptor = v:null
+endfunction
+
