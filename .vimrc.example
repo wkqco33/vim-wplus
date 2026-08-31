@@ -338,7 +338,7 @@ nnoremap <leader>cb :WconflictBoth<CR>       " 둘 다 채택
 " <leader>sv  : 스크래치 버퍼 수직 분할 (:WscratchVertical)
 " <leader>pe  : 프로젝트 .wplus.vim 설정 편집 (:WprojectEdit)
 " <leader>pr  : 프로젝트 설정 재로드 (:WprojectReload)
-" <leader>tm  : 터미널 토글 (:WplusTerminalToggle)
+" <leader>tt  : 터미널 토글 (:WplusTerminalToggle / :WterminalToggle)
 
 " ── 7. UI / 마크 / 폴드 / Quickfix / 멀티커서 ──
 " <leader>zz / za / zc / zo : 스마트 폴드 토글/모두열기/모두닫기/주변닫기

@@ -50,6 +50,7 @@ let s:commands = [
     \ 'WharpoonAdd',
     \ 'WharpoonRemove',
     \ 'WharpoonList',
+    \ 'WterminalToggle',
     \ ]
 
 for s:cmd in s:commands

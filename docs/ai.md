@@ -30,15 +30,15 @@ nnoremap <leader>am :WaiCommitMsg<CR>
 
 | 명령 | 모드 | 동작 |
 | ------ | ------ | ------ |
-| `:WaiComment` | Normal / Visual | 현재 코드에 주석 생성 |
+| `:WaiComment` (또는 `:'<,'>WaiComment`) | Normal / Visual / Range | 현재 코드(또는 지정 범위)에 주석 생성 |
 | `:WaiComplete` | Normal | 다음 줄 코드 완성 제안 |
-| `:'<,'>WaiRefactor` | Visual | 선택 범위 리팩토링 제안 |
-| `:'<,'>WaiReview` | Visual | 선택 코드 리뷰 (버그·보안·개선점) |
-| `:'<,'>WaiExplain` | Visual | 선택 코드 단계별 설명 |
+| `:'<,'>WaiRefactor` (또는 `:WaiRefactor`) | Visual / Range | 선택 범위(또는 지정 범위) 리팩토링 제안 |
+| `:'<,'>WaiReview` (또는 `:WaiReview`) | Visual / Range | 선택 코드 리뷰 (버그·보안·개선점) |
+| `:'<,'>WaiExplain` (또는 `:WaiExplain`) | Visual / Range | 선택 코드 단계별 설명 |
 | `:WaiCommitMsg` | Normal | 스테이징된 변경으로 커밋 메시지 생성 |
 | `:WaiFixDiag` | Normal | 현재 줄 LSP 진단 자동 수정 |
 | `:WaiToggleSuggest` | Normal | Ghost Text 자동완성 토글 |
-| `:WaiCancel` | Normal | 진행 중인 AI 요청 모두 취소 (`<leader>ac`) |
+| `:WaiCancel` | Normal | 진행 중인 AI 요청 및 Git 작업 모두 취소 (`<leader>ac`) |
 
 `:WaiComplete`와 Ghost Text는 `g:wplus_ai_completion_model`을 사용하고, 리뷰·리팩토링·커밋 같은 명령은 `g:wplus_ai_model`을 사용합니다.
 
@@ -228,7 +228,8 @@ Ghost Text와 명령어는 다음 컨텍스트를 자동으로 수집합니다:
 
 - `WaiFixDiag`는 `lsp.vim`이 해당 파일타입에 대해 LSP 서버가 실행 중이어야 합니다.
 - `WaiCommitMsg`는 git 저장소 안에서 실행해야 하며 스테이징된 변경이 있어야 합니다 (`git add` 먼저).
-- `.env`, 인증서, 키/credential 파일 및 credential-like 패턴이 포함된 컨텍스트는 기본적으로 AI 전송이 차단됩니다.
+- `.env`, 인증서, 키/credential 파일 및 credential-like 패턴이 포함된 컨텍스트는 기본적으로 AI 전송이 차단됩니다. 특히 `WaiCommitMsg` 실행 시 스테이징된 파일 목록에 민감 파일(`.env`, `*.key`, `*.pem` 등)이 포함되어 있으면 diff 전송이 원천 차단됩니다.
+- `WaiCancel`(`<leader>ac`) 실행 시 진행 중인 HTTP 요청뿐만 아니라 백그라운드 Git diff 수집 작업까지 즉시 종료됩니다.
 - `ollama` provider라도 `*-cloud` 모델은 원격 서비스로 코드가 전송될 수 있습니다. 민감한 프로젝트에서는 로컬 모델을 사용하거나 자동 제안을 끄십시오.
 - 응답에는 제어문자를 허용하지 않으며, 최대 응답 크기(`g:wplus_ai_response_max_bytes`)를 초과하면 요청을 중단합니다.
 - API 키는 `.vimrc`에 직접 쓰지 않고 환경 변수를 읽어오는 방식을 권장합니다:

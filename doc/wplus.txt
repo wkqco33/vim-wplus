@@ -571,7 +571,7 @@ Configuration: >
 Toggle a terminal in a bottom split.
 
 Mappings: >
-    <leader>tt  /  :WplusTerminalToggle    Toggle terminal
+    <leader>tt  /  :WplusTerminalToggle (:WterminalToggle)    Toggle terminal
     <Esc><Esc>  (Terminal mode)            Return to Normal mode
 <
 

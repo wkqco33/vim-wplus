@@ -30,7 +30,7 @@
 
 진단은 sign 컬럼에 `E`, `W`, `I`, `H`로 표시되며 상태바에 `E:n W:n` 형식으로도 표시됩니다.
 
-**자동완성 & 스니펫:** 한 글자 식별자에서는 팝업을 열지 않고, 짧은 식별자(기본 2글자)나 서버 트리거 문자(예: `.`) 뒤에는 LSP 완성을 자동으로 표시합니다. 선택하지 않고 대기하면 팝업을 닫고 AI Ghost Text 제안으로 넘깁니다. 서버가 `textEdit` 또는 스니펫(`insertTextFormat: 2`)을 제공하면 해당 삽입 텍스트와 탭스톱을 사용합니다. 수동 완성은 `:WlspCompletion`으로 실행할 수 있습니다.
+**자동완성 & 스니펫:** 한 글자 식별자에서는 팝업을 열지 않고, 짧은 식별자(기본 2글자)나 서버 트리거 문자(예: `.`) 뒤에는 LSP 완성을 자동으로 표시합니다. 자동완성 팝업 실행 시 `completeopt`에 `menuone,noinsert,noselect`를 임시 적용하여 첫 항목이 자동 선택/삽입되는 것을 방지하며, 완성 완료(`CompleteDone`) 또는 Insert 모드 탈출(`InsertLeave`) 시 원래 설정으로 자동 복원됩니다. 후보 목록은 서버의 `sortText`를 기준으로 정렬되고 중복 항목은 자동 제거됩니다. 선택하지 않고 대기하면 팝업을 닫고 AI Ghost Text 제안으로 넘깁니다. 서버가 `textEdit` 또는 스니펫(`insertTextFormat: 2`)을 제공하면 해당 삽입 텍스트와 탭스톱을 사용합니다. 수동 완성은 `:WlspCompletion`으로 실행할 수 있습니다.
 
 ```vim
 let g:wplus_lsp_auto_complete  = 1    " 타이핑 중 자동완성 트리거
@@ -120,7 +120,8 @@ ctags를 사용하여 현재 파일 내 클래스·함수·구조체 등을 사�
 
 ## fold — 스마트 폴드
 
-들여쓰기 기반 또는 LSP `foldingRange` 기반의 자동 폴드를 제공합니다.
+들여쓰기 기반 또는 LSP `foldingRange` 기반의 자동 폴드를 제공합니다.  
+`g:wplus_fold_method = 'lsp'` 설정 시 LSP 서버의 `textDocument/foldingRange` 응답(`WplusLspFoldsUpdate` 이벤트)을 받아 `startLine`/`endLine` 범위로 `foldmethod=expr` 폴드를 자동 갱신합니다.
 
 | 키 / 명령 | 동작 |
 | ----------- | ------ |
@@ -171,7 +172,7 @@ let g:wplus_run_use_terminal = 1   " 1=터미널, 0=quickfix
 
 | 키 / 명령 | 동작 |
 |-----------|------|
-| `<leader>tt` / `:WplusTerminalToggle` | 터미널 토글 |
+| `<leader>tt` / `:WplusTerminalToggle` (`:WterminalToggle`) | 터미널 토글 |
 | `<Esc><Esc>` | 터미널 모드 탈출 (Normal 모드로) |
 
 ---

@@ -1,6 +1,24 @@
 # 변경 이력 (CHANGE LOG)
 
-## [Unreleased] - 2026-08-26
+## [Unreleased] - 2026-08-31
+
+### 🛡️ 안정화 및 핵심 결함 개선 (P0/P1)
+
+**LSP 자동완성 UX 및 격리**
+- **`completeopt` 임시 격리 및 보호**: 자동완성 팝업 실행 시 `&l:completeopt`에 `menuone,noinsert,noselect`를 임시 적용하고 `CompleteDone`/`InsertLeave` 시 사용자의 원래 설정으로 자동 복원하여 타이핑 중 첫 번째 항목이 원치 않게 즉시 선택/삽입되는 문제 해결.
+- **후보 목록 정렬 & 중복 제거**: 서버 응답의 `sortText` 우선 정렬 및 동일 라벨/텍스트 중복 항목을 제거하여 팝업 품질 개선.
+
+**AI 모듈 안정성 & 보안(Fail-Closed)**
+- **단어 단위 수락 Facade 복구**: `wplus#ai#accept_word_suggestion` 및 `wplus#ai#accept_suggestion_insert_word`의 중복 정의 제거 및 유효한 내부 함수 연결, 제안 부재 시 불필요한 공백 삽입 버그 수정.
+- **Ex Range 단일 소스 일원화**: `:WaiComment`, `:WaiRefactor`, `:WaiReview`, `:WaiExplain` 실행 시 이전 visual selection 마크 오염을 방지하고 Ex 명령 범위(`<line1>,<line2>`)를 엄격히 적용.
+- **Git Job 취소 추적 & Staged 민감 파일 자동 차단**: `WaiCommitMsg` 실행 시 비동기 `git diff` 작업을 취소 목록에 등록하여 `WaiCancel` 시 즉시 종료되도록 개선. Staged 파일 중 `.env`, `*.key`, `*.pem` 등 민감 파일이 포함된 경우 AI 전송을 원천 차단.
+
+**LSP Folds & 터미널 연동 복구**
+- **LSP Fold 이벤트 연동**: `fold` 모듈에 `User WplusLspFoldsUpdate` 리스너를 연결하고 LSP 표준 `startLine/endLine` 파싱 지원.
+- **터미널 명령어 별칭**: `terminal` 모듈에 `:WterminalToggle` alias를 추가하여 `vscode` 모듈 단축키 오동작 해소.
+- **테스트 확충**: `test_fold.vim` 신규 작성 및 전체 28개 테스트 스위트 100% 통과.
+
+## [1.2.0] - 2026-08-26
 
 ### 🚀 기능 개선 및 안정화
 
