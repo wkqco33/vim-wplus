@@ -55,7 +55,7 @@ let s:known_options = [
     \ 'wplus_grep_backend', 'wplus_grep_ignore_vcs', 'wplus_grep_max_results',
     \ 'wplus_lsp_debug', 'wplus_lsp_definition_split', 'wplus_lsp_servers',
     \ 'wplus_lsp_auto_complete', 'wplus_lsp_complete_delay', 'wplus_lsp_complete_min_chars',
-    \ 'wplus_vscode_keymaps',
+    \ 'wplus_vscode_keymaps', 'wplus_vscode_enabled',
     \ 'wplus_terminal_height', 'wplus_terminal_position',
     \ ]
 
