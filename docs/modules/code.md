@@ -19,8 +19,8 @@
 | `<leader>ca` | Code Action |
 | `<leader>ci` | Organize Imports |
 | `<leader>gl` | 커서 위치 Document Link 열기 |
-| `]e` / `[e` | 다음/이전 진단 |
-| `<leader>E` | 현재 줄 진단 팝업 |
+| `]d` / `[d` | 다음/이전 진단 |
+| `<leader>d` | 현재 줄 진단 팝업 |
 | `:WlspSymbols {query}` | 워크스페이스 심볼 검색 (Quickfix) |
 | `:WlspPeekDefinition` | 정의 소스 팝업 (이동 없이) |
 | `:WlspProblems` | 모든 버퍼 진단을 Quickfix로 |
@@ -99,8 +99,8 @@ let g:wplus_lsp_cache_ttl    = 300  " 캐시 유효시간 (초)
 
 | 키 | 모드 | 동작 |
 |----|------|------|
-| `<M-F>` | Normal / Insert | 파일 전체 포맷 |
-| `<M-F>` | Visual | 선택 범위 포맷 |
+| `<M-F>` / `<leader>i` | Normal / Insert | 파일 전체 포맷 |
+| `<M-F>` / `<leader>i` | Visual | 선택 범위 포맷 |
 
 ---
 
@@ -283,3 +283,4 @@ let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
 | `:Wgrep {pattern}` | Normal | 패턴 검색 후 Quickfix 오픈 |
 | `<leader>fg` | Normal | 커서 아래 단어로 검색 |
 | `<leader>fg` | Visual | 선택 영역으로 검색 |
+| `<leader>fG` | Normal | 정규식으로 검색 |

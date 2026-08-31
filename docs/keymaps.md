@@ -10,7 +10,7 @@
 ## 탐색
 
 | 키 | 모듈 | 동작 |
-|----|------|------|
+| ---- | ------ | ------ |
 | `<leader>ff` | finder | 파일 찾기 |
 | `<leader>fb` | finder | 버퍼 찾기 |
 | `<leader>fr` | finder | 최근 파일 찾기 |
@@ -29,7 +29,7 @@
 ## 편집
 
 | 키 | 모드 | 모듈 | 동작 |
-|----|------|------|------|
+| ---- | ------ | ------ | ------ |
 | `gcc` | Normal | commentary | 현재 줄 주석 토글 |
 | `gc{motion}` | Normal | commentary | motion 범위 주석 토글 |
 | `gc` | Visual | commentary | 선택 범위 주석 토글 |
@@ -50,8 +50,10 @@
 ## Git
 
 | 키 / 명령 | 모듈 | 동작 |
-|-----------|------|------|
+| ----------- | ------ | ------ |
 | `<leader>hr` | gitgutter | 커서 위치 hunk 원복 |
+| `<leader>hp` | gitgutter | 커서 위치 hunk 미리보기 |
+| `<leader>hs` | gitgutter | 커서 위치 hunk 스테이징 |
 | `]h` / `[h` | gitgutter | 다음/이전 hunk |
 | `:BlamerToggle` | blame | 인라인 blame 토글 |
 | `<leader>gd` | diffview | 현재 파일 Diff |
@@ -65,7 +67,7 @@
 ## 코드
 
 | 키 | 모듈 | 동작 |
-|----|------|------|
+| ---- | ------ | ------ |
 | `gd` | lsp | 정의 이동 |
 | `gy` | lsp | 타입 정의 이동 |
 | `<leader>gi` | lsp | 구현 이동 |
@@ -75,11 +77,12 @@
 | `<leader>ca` | lsp | Code Action |
 | `<leader>ci` | lsp | Organize Imports |
 | `<leader>gl` | lsp | Document Link 열기 |
-| `]e` / `[e` | lsp | 다음/이전 진단 |
-| `<leader>E` | lsp | 현재 줄 진단 팝업 |
+| `]d` / `[d` | lsp | 다음/이전 진단 |
+| `<leader>d` | lsp | 현재 줄 진단 팝업 |
 | `<leader>o` | outline | 코드 아웃라인 토글 |
 | `:WlspSymbols {query}` | lsp | 워크스페이스 심볼 검색 |
 | `<leader>fg` | grep | 커서 단어로 프로젝트 검색 |
+| `<leader>fG` | grep | 정규식으로 프로젝트 검색 |
 | `:Wgrep {pat}` | grep | 패턴 검색 |
 
 ---
@@ -87,7 +90,7 @@
 ## 실행/빌드
 
 | 키 / 명령 | 모듈 | 동작 |
-|-----------|------|------|
+| ----------- | ------ | ------ |
 | `<leader>rr` / `:Wrun` | run | 현재 파일 실행 |
 | `<leader>rb` / `:Wbuild` | run | 프로젝트 빌드 |
 | `<leader>rt` / `:Wtest` | run | 프로젝트 테스트 |
@@ -99,7 +102,7 @@
 ## AI
 
 | 키 / 명령 | 모드 | 동작 |
-|-----------|------|------|
+| ----------- | ------ | ------ |
 | `:'<,'>WaiReview` | Visual | 선택 코드 리뷰 |
 | `:'<,'>WaiExplain` | Visual | 선택 코드 설명 |
 | `:'<,'>WaiRefactor` | Visual | 선택 코드 리팩토링 |
@@ -108,6 +111,7 @@
 | `:WaiFixDiag` | Normal | LSP 진단 수정 |
 | `:WaiCommitMsg` | Normal | 커밋 메시지 생성 |
 | `:WaiToggleSuggest` | Normal | Ghost Text 토글 |
+| `<leader>ac` | Normal | 진행 중인 AI 요청 취소 |
 | `<Tab>` (Insert) | Insert | 스마트 탭 (Ghost Text 수락 → 팝업 메뉴 → 인덴트) |
 | `<Plug>WaiAcceptSuggest` | Insert | Ghost Text 수락 |
 | `<Plug>WaiAcceptWord` | Insert | Ghost Text 다음 단어 수락 |
@@ -119,7 +123,7 @@
 ## 프로젝트·세션
 
 | 키 / 명령 | 모듈 | 동작 |
-|-----------|------|------|
+| ----------- | ------ | ------ |
 | `<leader>pe` | project | 프로젝트 설정 편집 |
 | `<leader>pr` | project | 프로젝트 설정 재로드 |
 | `<leader>sc` | scratch | 스크래치 버퍼 토글 |
@@ -132,7 +136,7 @@
 ## UI·시각화
 
 | 키 / 명령 | 모듈 | 동작 |
-|-----------|------|------|
+| ----------- | ------ | ------ |
 | `<leader>zz` | fold | 폴드 토글 |
 | `<leader>za` | fold | 모든 폴드 열기 |
 | `<leader>zc` | fold | 모든 폴드 닫기 |
@@ -147,12 +151,14 @@
 ## 버퍼·창
 
 | 키 / 명령 | 모듈 | 동작 |
-|-----------|------|------|
+| ----------- | ------ | ------ |
 | `<leader>bd` | bufdelete | 버퍼 삭제 (창 유지) |
 | `<leader>bD` | bufdelete | 버퍼 wipeout |
 | `<leader>xq` | quickfix | Quickfix 토글 |
 | `<leader>xl` | quickfix | Location list 토글 |
 | `]q` / `[q` | quickfix | 다음/이전 에러 |
+| `]Q` / `[Q` | quickfix | 마지막/첫 번째 에러 |
+| `]l` / `[l` | quickfix | Location list 다음/이전 |
 | `<leader>xr` | quickfix | 프로젝트 전체 치환 |
 | `"` | register | 레지스터 미리보기 팝업 |
 | `@` | register | 매크로 레지스터 팝업 |
@@ -193,7 +199,7 @@ nnoremap <C-l> <C-w>l
 기본값은 `0`(꺼짐)이라 기존 사용자에게 영향을 주지 않습니다.
 
 | VS Code | 동작 |
-|---------|------|
+| --------- | ------ |
 | `F12` | 정의 이동 |
 | `Shift+F12` | 참조 찾기 |
 | `Alt+F12` | Peek Definition (팝업) |

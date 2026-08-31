@@ -9,7 +9,7 @@
 git 변경사항을 sign 컬럼에 실시간 표시 (비동기).
 
 | 기호 | 의미 |
-|------|------|
+| ------ | ------ |
 | `┃` (녹색) | 추가된 줄 |
 | `┃` (노란색) | 수정된 줄 |
 | `▁` (빨간색) | 삭제된 줄 |
@@ -17,9 +17,11 @@ git 변경사항을 sign 컬럼에 실시간 표시 (비동기).
 파일 저장 및 `CursorHold` 이벤트에 자동 갱신됩니다.
 
 | 키 / 명령 | 동작 |
-|-----------|------|
-| `<leader>hr` / `:WplusGitRevertHunk` | 커서 위치 hunk 원복 |
+| ----------- | ------ |
 | `]h` / `[h` | 다음/이전 hunk 이동 |
+| `<leader>hp` | 커서 위치 hunk 미리보기 |
+| `<leader>hs` | 커서 위치 hunk 스테이징 |
+| `<leader>hr` / `:WplusGitRevertHunk` | 커서 위치 hunk 원복 |
 
 ```vim
 let g:wplus_gitgutter_sign_add    = '┃'
@@ -53,12 +55,12 @@ let g:wplus_blame_date_format = '%y/%m/%d'
 현재 파일 또는 저장소 전체의 Git 변경사항을 시각적으로 확인합니다.
 
 | 키 / 명령 | 동작 |
-|-----------|------|
+| ----------- | ------ |
 | `<leader>gd` | 현재 파일의 Git Diff 열기 |
 | `<leader>gD` | 저장소 전체의 Git Diff 열기 |
-| `]h` | 다음 hunk로 이동 |
-| `[h` | 이전 hunk로 이동 |
 | `q` | Diff 뷰어 닫기 |
+
+> `]h` / `[h` hunk 이동은 gitgutter 모듈이 담당합니다 (diffview는 순수 뷰어).
 
 ---
 
@@ -67,7 +69,7 @@ let g:wplus_blame_date_format = '%y/%m/%d'
 Git merge 충돌(`<<<<<<<`, `=======`, `>>>>>>>`)을 시각적으로 감지하고 해결합니다.
 
 | 명령 | 동작 |
-|------|------|
+| ------ | ------ |
 | `:WconflictNext` | 다음 충돌로 이동 |
 | `:WconflictPrev` | 이전 충돌로 이동 |
 | `:WconflictOurs` | ours(HEAD) 버전 선택 |
