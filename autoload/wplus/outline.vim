@@ -23,9 +23,43 @@ let s:kind_icon = {
     \ 'n': 'n', 'p': 'f', 'i': 'i',
     \ }
 
+let s:lsp_kind_map = {
+    \ 2: 'm', 3: 'n', 4: 'f', 5: 'c', 6: 'm', 7: 'v', 8: 'v',
+    \ 9: 'm', 10: 'e', 11: 'i', 12: 'f', 13: 'v', 14: 'v',
+    \ 22: 'e', 23: 's',
+    \ }
+
+function! s:parse_lsp_symbols(raw_list, ...) abort
+    let l:level = a:0 > 0 ? a:1 : 0
+    let l:out = []
+    for l:item in a:raw_list
+        let l:name = get(l:item, 'name', '')
+        let l:kind_nr = get(l:item, 'kind', 0)
+        let l:kind = get(s:lsp_kind_map, l:kind_nr, '?')
+        
+        let l:lnum = 0
+        if has_key(l:item, 'range') && has_key(l:item.range, 'start')
+            let l:lnum = l:item.range.start.line + 1
+        elseif has_key(l:item, 'location') && has_key(l:item.location, 'range')
+            let l:lnum = l:item.location.range.start.line + 1
+        endif
+
+        if !empty(l:name) && l:lnum > 0
+            let l:indent = repeat('  ', l:level)
+            call add(l:out, {'name': l:indent . l:name, 'kind': l:kind, 'lnum': l:lnum})
+        endif
+
+        if has_key(l:item, 'children') && type(l:item.children) == v:t_list && !empty(l:item.children)
+            let l:child_syms = s:parse_lsp_symbols(l:item.children, l:level + 1)
+            call extend(l:out, l:child_syms)
+        endif
+    endfor
+    return l:out
+endfunction
+
 " ── Ctags Parsing ────────────────────────────────────────────────────────────
 
-function! s:get_symbols(file) abort
+function! s:get_symbols_ctags(file) abort
     if !executable('ctags') | return [] | endif
     let l:raw = systemlist(
         \ 'ctags -f - --sort=no --fields=+nK ' . shellescape(a:file) . ' ' . wplus#util#null_redirect())
@@ -51,6 +85,22 @@ function! s:get_symbols(file) abort
         endif
     endfor
     return sort(l:syms, {a, b -> a.lnum - b.lnum})
+endfunction
+
+function! s:get_symbols(bufnr, file) abort
+    if exists('*wplus#lsp#get_symbols')
+        let l:lsp_syms = wplus#lsp#get_symbols(a:bufnr)
+        if !empty(l:lsp_syms)
+            let l:parsed = s:parse_lsp_symbols(l:lsp_syms)
+            if !empty(l:parsed)
+                return l:parsed
+            endif
+        endif
+        if exists('*wplus#lsp#request_document_symbols')
+            call wplus#lsp#request_document_symbols(a:bufnr)
+        endif
+    endif
+    return s:get_symbols_ctags(a:file)
 endfunction
 
 " ── Rendering ────────────────────────────────────────────────────────────────
@@ -111,7 +161,7 @@ endfunction
 
 function! s:on_refresh() abort
     let l:file = expand('#' . s:src_buf . ':p')
-    let s:symbols = s:get_symbols(l:file)
+    let s:symbols = s:get_symbols(s:src_buf, l:file)
     call s:render()
 endfunction
 
@@ -133,7 +183,7 @@ endfunction
 function! s:open() abort
     let s:src_buf = bufnr('%')
     let l:file    = expand('%:p')
-    let s:symbols = s:get_symbols(l:file)
+    let s:symbols = s:get_symbols(s:src_buf, l:file)
 
     let l:existing = bufnr(s:buf_name)
     execute 'topleft 30vsplit'
@@ -156,8 +206,18 @@ endfunction
 function! wplus#outline#refresh() abort
     if s:src_buf == -1 | return | endif
     let l:file = expand('#' . s:src_buf . ':p')
-    let s:symbols = s:get_symbols(l:file)
+    let s:symbols = s:get_symbols(s:src_buf, l:file)
     call s:render()
+endfunction
+
+function! s:on_lsp_update() abort
+    if s:outline_buf != -1 && bufwinid(s:outline_buf) != -1 && s:src_buf != -1
+        call wplus#outline#refresh()
+    endif
+endfunction
+
+function! wplus#outline#_test_parse_lsp_symbols(raw_list) abort
+    return s:parse_lsp_symbols(a:raw_list)
 endfunction
 
 " ── setup ─────────────────────────────────────────────────────────────────
@@ -165,4 +225,9 @@ endfunction
 function! wplus#outline#setup() abort
     command! WoutlineToggle call wplus#outline#toggle()
     nnoremap <silent> <leader>o :WoutlineToggle<CR>
+
+    augroup wplus_outline
+        autocmd!
+        autocmd User WplusLspSymbolsUpdate call s:on_lsp_update()
+    augroup END
 endfunction

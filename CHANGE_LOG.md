@@ -1,6 +1,26 @@
 # 변경 이력 (CHANGE LOG)
 
-## [Unreleased] - 2026-08-31
+## [Unreleased] - 2026-09-06
+
+### 🛡️ 안정성 강화 및 버그 수정 (P0/P1)
+- **`todo` 모듈 정규식 이스케이프 버그 수정**: 큰따옴표 내 `\b`가 ASCII 8(Backspace)로 왜곡되던 문제를 해결하고 리스트 명령어 인자 및 `g:wplus_todo_keywords` 설정 지원.
+- **`run` 모듈 Quickfix 에러 점프 복구**: `valid: 0` 고정 대신 `setqflist(..., {'lines': [line]})`를 적용하여 `&errorformat` 기반의 파일/줄번호 자동 구조화 및 `<CR>` 에러 라인 즉시 점프 지원. 커스텀 테스트 설정을 위한 `g:wplus_test_commands` 추가.
+- **`conflict` 모듈 `diff3` / `zdiff3` 지원 & 커서 블록 타깃팅**: `|||||||` (base) 마커를 인식하여 3-way 병합 충돌을 안전하게 해결하도록 개선하고, 현재 커서가 속한 충돌 블록을 우선 타깃팅하도록 개선.
+- **`multicursor` & `quickfix` 안내 문구 정정**: multicursor 상태바 안내 문구를 `<leader>vx=skip`으로 바로잡고, quickfix 프로젝트 치환 빈 목록 경고를 `:Wgrep`으로 일원화.
+
+### ⚡ 성능 및 구조 최적화
+- **`fold` 모듈 LSP 중첩 폴드 & $O(1)$ 라인 조회 캐싱**: 함수/조건문/반복문 등의 중첩 폴드 깊이(`>1`, `>2`...)를 계산하도록 알고리즘을 개선하고, 라인별 룩업 사전 캐시(`b:wplus_fold_index`)를 도입하여 $O(N \times M)$ 병목 제거.
+- **`grep` 모듈 비동기 배치 버퍼링**: `out_cb`에서 매 라인마다 발생하던 UI 부하를 50라인 단위 배치 `caddexpr` 버퍼링으로 완화하고 `g:wplus_grep_max_results` 제한 적용.
+
+### 🚀 도구 간 시너지 & UX 확장
+- **`outline` ↔ LSP `documentSymbol` 하이브리드 연동**: 외부 `ctags` 바이너리 없이도 LSP 버퍼의 계층형 심볼을 1순위로 파싱하여 아웃라인을 렌더링하고, LSP 부재 시 `ctags`로 안전 폴백.
+- **`explorer` 열기 키맵 확장 & 현재 파일 추적 (`reveal`)**: 버퍼 내 `s`(split), `v`(vsplit), `t`(tabedit) 열기 키맵 추가 및 `:WexplorerFind`(`wplus#explorer#reveal()`)로 현재 파일 위치 자동 전개 및 커서 포커스 지원.
+- **`diffview` diff 소스 라인 점프 & Staged Diff**: diff 버퍼에서 `<CR>` 누를 시 실제 소스 파일의 변경 라인으로 즉시 점프하는 내비게이션 추가, 커밋 대상 변경사항만 검토하는 `:WdiffviewStaged` 추가.
+- **`marks` 대문자 글로벌 마크(`A-Z`) 지원**: 파일 간 빠른 이동을 위해 글로벌 마크(`A-Z`)를 사인 컬럼 및 `:WmarksList` 검색 팝업에 완전 통합.
+- **`statusline` AI 작업 인디케이터**: 비동기 AI 요청 실행 중 상태표시줄에 `[AI ⟳]` 시각 피드백 추가 및 완료 시 자동 갱신.
+- **테스트 확충**: 신규 테스트 6개 추가 (`test_conflict`, `test_grep`, `test_marks`, `test_outline`, `test_run`, `test_todo`), 전체 34개 테스트 스위트 100% 통과.
+
+## [1.2.1] - 2026-08-31
 
 ### 🛡️ 안정화 및 핵심 결함 개선 (P0/P1)
 

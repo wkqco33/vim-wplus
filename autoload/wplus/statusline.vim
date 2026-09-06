@@ -87,6 +87,13 @@ function! s:fileflags() abort
     return flags
 endfunction
 
+function! s:ai_indicator() abort
+    if exists('*wplus#ai#http#is_busy') && wplus#ai#http#is_busy()
+        return '%#WplusSlWarn# [AI ⟳] %#WplusSlMid#'
+    endif
+    return ''
+endfunction
+
 " ── build functions (called via %{} in statusline) ────────────────────────
 
 function! wplus#statusline#active() abort
@@ -98,6 +105,7 @@ function! wplus#statusline#active() abort
     if !empty(branch) | let sl .= branch . '  ' | endif
     let sl .= '%f '   " filename relative to cwd
     let sl .= s:fileflags()
+    let sl .= s:ai_indicator()
     let sl .= '%='    " right-align from here
     let sl .= s:diagnostics()
     let sl .= '%#WplusSlRight# '

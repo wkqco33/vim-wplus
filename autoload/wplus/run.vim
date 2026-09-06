@@ -38,6 +38,7 @@ let s:default_build = {
 
 let g:wplus_run_commands   = get(g:, 'wplus_run_commands', {})
 let g:wplus_build_commands = get(g:, 'wplus_build_commands', {})
+let g:wplus_test_commands  = get(g:, 'wplus_test_commands', {})
 let g:wplus_run_use_terminal = get(g:, 'wplus_run_use_terminal', 1)
 
 " ── helpers ───────────────────────────────────────────────────────────────
@@ -117,10 +118,7 @@ function! s:run_in_quickfix(cmd) abort
 endfunction
 
 function! s:qf_add(line) abort
-    " 'a' appends. This used to getqflist() -> add() -> setqflist(..., 'r'),
-    " rebuilding the entire list for every single line of output: O(n^2) over a
-    " chatty build.
-    call setqflist([{'text': a:line, 'valid': 0}], 'a')
+    call setqflist([], 'a', {'lines': [a:line]})
     " Scroll to bottom
     let l:qfwin = getqflist({'winid': 1}).winid
     if l:qfwin > 0
@@ -186,35 +184,55 @@ function! wplus#run#build() abort
     call wplus#util#warn_msg('run', 'no build system detected in ' . l:root)
 endfunction
 
+let s:default_test = {
+    \ 'package.json':  'npm test',
+    \ 'Cargo.toml':    'cargo test',
+    \ 'go.mod':        'go test ./...',
+    \ 'Makefile':      'make test',
+    \ 'pytest.ini':    'pytest',
+    \ 'setup.py':      'python -m pytest',
+    \ 'pyproject.toml': 'python -m pytest',
+    \ }
+
+function! s:resolve_test_cmd(root, ...) abort
+    let l:test_cmds = extend(copy(s:default_test), get(g:, 'wplus_test_commands', {}))
+    let l:available = a:0 > 0 ? a:1 : []
+    for [l:marker, l:cmd] in items(l:test_cmds)
+        if (!empty(l:available) && index(l:available, l:marker) >= 0) ||
+            \ (empty(l:available) && (filereadable(a:root . '/' . l:marker) || isdirectory(a:root . '/' . l:marker)))
+            return l:cmd
+        endif
+    endfor
+    return ''
+endfunction
+
 function! wplus#run#test() abort
     if &modified | silent write | endif
 
     let l:root = wplus#root#find_root()
     if empty(l:root) | let l:root = getcwd() | endif
 
-    let l:test_map = {
-        \ 'package.json':  'npm test',
-        \ 'Cargo.toml':    'cargo test',
-        \ 'go.mod':        'go test ./...',
-        \ 'Makefile':      'make test',
-        \ 'pytest.ini':    'pytest',
-        \ 'setup.py':      'python -m pytest',
-        \ 'pyproject.toml': 'python -m pytest',
-        \ }
-    for [l:marker, l:cmd] in items(l:test_map)
-        if filereadable(l:root . '/' . l:marker) || isdirectory(l:root . '/' . l:marker)
-            let l:full_cmd = 'cd ' . shellescape(l:root) . ' && ' . l:cmd
-            call wplus#util#info_msg('run', 'test: ' . l:cmd)
-            if g:wplus_run_use_terminal
-                call s:run_in_terminal(l:full_cmd)
-            else
-                call s:run_in_quickfix(l:full_cmd)
-            endif
-            return
+    let l:cmd = s:resolve_test_cmd(l:root)
+    if !empty(l:cmd)
+        let l:full_cmd = 'cd ' . shellescape(l:root) . ' && ' . l:cmd
+        call wplus#util#info_msg('run', 'test: ' . l:cmd)
+        if g:wplus_run_use_terminal
+            call s:run_in_terminal(l:full_cmd)
+        else
+            call s:run_in_quickfix(l:full_cmd)
         endif
-    endfor
+        return
+    endif
 
     call wplus#util#warn_msg('run', 'no test system detected in ' . l:root)
+endfunction
+
+function! wplus#run#_test_qf_add(line) abort
+    call s:qf_add(a:line)
+endfunction
+
+function! wplus#run#_test_resolve_test_cmd(root, available) abort
+    return s:resolve_test_cmd(a:root, a:available)
 endfunction
 
 " ── setup ─────────────────────────────────────────────────────────────────

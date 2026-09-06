@@ -77,7 +77,31 @@ function! s:add_to_history(query) abort
     endif
 endfunction
 
+let g:wplus_grep_max_results = get(g:, 'wplus_grep_max_results', 5000)
 let s:grep_job = v:null
+let s:grep_buffer = []
+let s:grep_count = 0
+
+function! s:flush_grep_buffer() abort
+    if empty(s:grep_buffer) | return | endif
+    call setqflist([], 'a', {'lines': s:grep_buffer})
+    let s:grep_buffer = []
+endfunction
+
+function! s:on_grep_out(ch, msg) abort
+    if s:grep_count >= g:wplus_grep_max_results
+        if s:grep_job != v:null
+            silent! call job_stop(s:grep_job)
+            let s:grep_job = v:null
+        endif
+        return
+    endif
+    call add(s:grep_buffer, a:msg)
+    let s:grep_count += 1
+    if len(s:grep_buffer) >= 50
+        call s:flush_grep_buffer()
+    endif
+endfunction
 
 function! wplus#grep#search_async(args) abort
     call s:configure_grep()
@@ -86,6 +110,8 @@ function! wplus#grep#search_async(args) abort
         let s:grep_job = v:null
     endif
     call setqflist([], 'r')
+    let s:grep_buffer = []
+    let s:grep_count = 0
     call s:add_to_history(a:args)
     call wplus#util#info_msg('grep', 'Searching for: ' . a:args . '...')
 
@@ -107,12 +133,13 @@ function! wplus#grep#search_async(args) abort
     endif
 
     let s:grep_job = job_start(l:cmd, {
-        \ 'out_cb': {ch, msg -> caddexpr(msg)},
+        \ 'out_cb': function('s:on_grep_out'),
         \ 'close_cb': {ch -> s:on_grep_complete()},
         \ })
 endfunction
 
 function! s:on_grep_complete() abort
+    call s:flush_grep_buffer()
     let s:grep_job = v:null
     let l:qf = getqflist()
     if empty(l:qf)
@@ -122,6 +149,14 @@ function! s:on_grep_complete() abort
         botright copen
         call wplus#util#info_msg('grep', 'Found ' . len(l:qf) . ' match(es)')
     endif
+endfunction
+
+function! wplus#grep#_test_push_line(line) abort
+    call add(s:grep_buffer, a:line)
+endfunction
+
+function! wplus#grep#_test_flush() abort
+    call s:flush_grep_buffer()
 endfunction
 
 function! wplus#grep#search(args) abort

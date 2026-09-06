@@ -78,7 +78,7 @@ function! s:find_next_after(lnum, col) abort
 endfunction
 
 function! s:show_status() abort
-    echo '[wplus] ' . len(s:cursors) . ' cursors  c=change  d=delete  <C-n>=next  <C-x>=skip  <Esc>=cancel'
+    echo '[wplus] ' . len(s:cursors) . ' cursors  c=change  d=delete  <C-n>=next  <leader>vx=skip  <Esc>=cancel'
 endfunction
 
 " ── public API ────────────────────────────────────────────────────────────

@@ -116,6 +116,7 @@ let g:wplus_fold_ft_exclude = ['help', 'quickfix', 'qf', 'undotree']
 " %s = 파일 경로, %r = 확장자 없는 파일명
 let g:wplus_run_commands     = {}         " 파일타입별 실행 명령 오버라이드
 let g:wplus_build_commands   = {}         " 빌드 마커별 명령 오버라이드
+let g:wplus_test_commands    = {}         " 테스트 마커별 명령 오버라이드
 let g:wplus_run_use_terminal = 1          " 1=터미널, 0=quickfix
 
 " ── session ──────────────────────────────────────────────────────────────

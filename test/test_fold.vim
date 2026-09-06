@@ -41,3 +41,22 @@ function! Test_fold_listens_to_lsp_folds_update_event() abort
     let g:wplus_fold_method = 'indent'
     bwipeout!
 endfunction
+
+function! Test_fold_nested_levels() abort
+    call wplus#fold#setup()
+    enew!
+    setlocal buftype=nofile bufhidden=wipe noswapfile filetype=python
+
+    let b:wplus_fold_ranges = [
+        \ {'startLine': 0, 'endLine': 10},
+        \ {'startLine': 2, 'endLine': 6},
+        \ ]
+
+    call assert_equal('>1', wplus#fold#expr(1), 'Outer fold should start at level >1')
+    call assert_equal('=',  wplus#fold#expr(2), 'Between start lines should be =')
+    call assert_equal('>2', wplus#fold#expr(3), 'Inner fold should start at level >2')
+    call assert_equal('<2', wplus#fold#expr(7), 'Inner fold should end at level <2')
+    call assert_equal('<1', wplus#fold#expr(11), 'Outer fold should end at level <1')
+
+    bwipeout!
+endfunction

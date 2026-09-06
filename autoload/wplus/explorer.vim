@@ -105,7 +105,10 @@ function! s:init_buffer() abort
     highlight default link WplusExplorerDir  Directory
     highlight default link WplusExplorerDirOpen Directory
 
-    nnoremap <buffer> <CR>  :call <SID>on_enter()<CR>
+    nnoremap <buffer> <CR>  :call <SID>on_open('edit')<CR>
+    nnoremap <buffer> s     :call <SID>on_open('split')<CR>
+    nnoremap <buffer> v     :call <SID>on_open('vsplit')<CR>
+    nnoremap <buffer> t     :call <SID>on_open('tabedit')<CR>
     nnoremap <buffer> a     :call <SID>on_add()<CR>
     " dd, not d: a single keypress should not start a delete, and bare 'd' would
     " also swallow every d{motion} inside the sidebar.
@@ -211,7 +214,13 @@ function! s:item_at(lnum) abort
     return s:tree_data[l:idx]
 endfunction
 
-function! s:open_file_in_edit_win(path) abort
+function! s:open_file_in_edit_win(path, ...) abort
+    let l:cmd = a:0 > 0 ? a:1 : 'edit'
+    if l:cmd ==# 'tabedit'
+        execute 'tabedit' fnameescape(a:path)
+        return
+    endif
+
     let l:cur_win = win_getid()
     let l:target_win = -1
     
@@ -232,6 +241,11 @@ function! s:open_file_in_edit_win(path) abort
     
     if l:target_win != -1
         call win_gotoid(l:target_win)
+        if l:cmd ==# 'split'
+            split
+        elseif l:cmd ==# 'vsplit'
+            vsplit
+        endif
     else
         call win_gotoid(l:cur_win)
         rightbelow vsplit
@@ -240,7 +254,7 @@ function! s:open_file_in_edit_win(path) abort
     execute 'edit' fnameescape(a:path)
 endfunction
 
-function! s:on_enter() abort
+function! s:on_open(cmd) abort
     let l:lnum = line('.')
     if l:lnum == 1 | return | endif
     let l:item = s:item_at(l:lnum)
@@ -255,8 +269,40 @@ function! s:on_enter() abort
         call s:render(s:current_root)
         execute l:lnum
     else
-        call s:open_file_in_edit_win(l:item.path)
+        call s:open_file_in_edit_win(l:item.path, a:cmd)
     endif
+endfunction
+
+function! wplus#explorer#reveal(...) abort
+    let l:file = a:0 > 0 ? a:1 : expand('%:p')
+    if empty(l:file) | return | endif
+    let l:norm_file = resolve(s:normalize_dir(l:file))
+    
+    let l:root = wplus#root#find_root()
+    if empty(l:root) | let l:root = getcwd() | endif
+    let l:root = resolve(s:normalize_dir(l:root))
+
+    let l:parent = resolve(fnamemodify(l:norm_file, ':h'))
+    while l:parent !=# l:root && len(l:parent) >= len(l:root)
+        let s:expanded[l:parent] = 1
+        let l:parent = resolve(fnamemodify(l:parent, ':h'))
+    endwhile
+
+    let l:winid = bufwinid(s:explorer_buf)
+    if l:winid == -1
+        call s:open_explorer()
+    else
+        call win_gotoid(l:winid)
+        call s:render(s:current_root)
+    endif
+
+    for l:i in range(len(s:tree_data))
+        if resolve(s:normalize_dir(s:tree_data[l:i].path)) ==# l:norm_file
+            execute (l:i + 2)
+            normal! zz
+            return
+        endif
+    endfor
 endfunction
 
 function! s:on_add() abort
@@ -344,6 +390,7 @@ endfunction
 
 function! wplus#explorer#setup() abort
     command! WexplorerToggle call wplus#explorer#toggle()
+    command! WexplorerFind   call wplus#explorer#reveal()
     nnoremap <silent> <leader>e :WexplorerToggle<CR>
 
     augroup WplusExplorer

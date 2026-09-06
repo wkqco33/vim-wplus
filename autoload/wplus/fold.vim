@@ -62,19 +62,60 @@ function! s:apply_lsp(bufnr) abort
     endif
 endfunction
 
-" Called for every line when foldmethod=expr.
-function! wplus#fold#expr(lnum) abort
-    for l:r in get(b:, 'wplus_fold_ranges', [])
-        let l:start = get(l:r, 'startLine', get(l:r, 'start', -1))
-        let l:end = get(l:r, 'endLine', get(l:r, 'end', -1))
-        if a:lnum == l:start + 1
-            return '>1'
-        endif
-        if a:lnum == l:end + 1
-            return '<1'
+function! s:rebuild_fold_index() abort
+    let l:ranges = get(b:, 'wplus_fold_ranges', [])
+    let b:wplus_fold_ranges_cached = l:ranges
+    let b:wplus_fold_index = {}
+    if empty(l:ranges) | return | endif
+
+    let l:items = []
+    for l:r in l:ranges
+        let l:s = get(l:r, 'startLine', get(l:r, 'start', -1))
+        let l:e = get(l:r, 'endLine', get(l:r, 'end', -1))
+        if l:s >= 0 && l:e >= l:s
+            call add(l:items, {'start': l:s + 1, 'end': l:e + 1})
         endif
     endfor
-    return '='
+    if empty(l:items) | return | endif
+
+    " Sort: start ascending, end descending (outer ranges first)
+    call sort(l:items, {a, b -> a.start != b.start ? a.start - b.start : b.end - a.end})
+
+    " Calculate depth for each item
+    for l:i in range(len(l:items))
+        let l:item = l:items[l:i]
+        let l:depth = 1
+        for l:j in range(0, l:i - 1)
+            let l:prev = l:items[l:j]
+            if l:prev.start <= l:item.start && l:prev.end >= l:item.end && (l:prev.start != l:item.start || l:prev.end != l:item.end)
+                let l:depth += 1
+            endif
+        endfor
+        let l:item.depth = l:depth
+    endfor
+
+    " Populate index
+    for l:item in l:items
+        let l:cur_start = get(b:wplus_fold_index, l:item.start, '')
+        if empty(l:cur_start) || str2nr(l:cur_start[1:]) < l:item.depth
+            let b:wplus_fold_index[l:item.start] = '>' . l:item.depth
+        endif
+
+        let l:cur_end = get(b:wplus_fold_index, l:item.end, '')
+        if empty(l:cur_end) || str2nr(l:cur_end[1:]) < l:item.depth
+            let b:wplus_fold_index[l:item.end] = '<' . l:item.depth
+        endif
+    endfor
+endfunction
+
+" Called for every line when foldmethod=expr.
+function! wplus#fold#expr(lnum) abort
+    let l:ranges = get(b:, 'wplus_fold_ranges', [])
+    if empty(l:ranges) | return '=' | endif
+    if !exists('b:wplus_fold_index') || get(b:, 'wplus_fold_ranges_cached', []) isnot l:ranges
+        call s:rebuild_fold_index()
+    endif
+    return get(b:wplus_fold_index, a:lnum, '=')
 endfunction
 
 " ── request LSP fold ranges ───────────────────────────────────────────────

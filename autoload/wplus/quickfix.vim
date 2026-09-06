@@ -147,7 +147,7 @@ function! wplus#quickfix#project_replace() abort
     let l:qflist = getqflist()
     if empty(l:qflist)
         echohl WarningMsg
-        echomsg '[wplus] quickfix list is empty. Run :Rg or :grep first.'
+        echomsg '[wplus] quickfix list is empty. Run :Wgrep first.'
         echohl None
         return
     endif

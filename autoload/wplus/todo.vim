@@ -84,13 +84,31 @@ endfunction
 function! s:parse_grep_line(line) abort
     let l:m = matchlist(a:line, '^\(.*\):\(\d\+\):\(\d\+\):\(.*\)$')
     if !empty(l:m)
-        return {'file': l:m[1], 'lnum': str2nr(l:m[2]), 'col': str2nr(l:m[3]), 'text': l:m[4]}
+        return {'file': l:m[1], 'lnum': str2nr(l:m[2]), 'col': str2nr(l:m[3]), 'text': trim(l:m[4])}
     endif
     let l:m = matchlist(a:line, '^\(.*\):\(\d\+\):\(.*\)$')
     if !empty(l:m)
-        return {'file': l:m[1], 'lnum': str2nr(l:m[2]), 'col': 1, 'text': l:m[3]}
+        return {'file': l:m[1], 'lnum': str2nr(l:m[2]), 'col': 1, 'text': trim(l:m[3])}
     endif
     return {}
+endfunction
+
+let g:wplus_todo_keywords = get(g:, 'wplus_todo_keywords', ['TODO', 'FIXME', 'XXX', 'NOTE', 'BUG', 'HACK', 'WARN'])
+
+function! s:build_search_cmd(backend_name) abort
+    let l:keywords = get(g:, 'wplus_todo_keywords', ['TODO', 'FIXME', 'XXX', 'NOTE', 'BUG', 'HACK', 'WARN'])
+    let l:joined = join(l:keywords, '|')
+
+    if a:backend_name ==# 'rg'
+        return ['rg', '--vimgrep', '--smart-case', '\b(' . l:joined . ')\b']
+    elseif a:backend_name ==# 'git'
+        return ['git', 'grep', '-n', '-E', '\b(' . l:joined . ')\b']
+    elseif a:backend_name ==# 'grep'
+        return ['grep', '-rn', '\(' . substitute(l:joined, '|', '\\|', 'g') . '\)', '.']
+    elseif a:backend_name ==# 'findstr'
+        return ['findstr', '/S', '/N', '/I', join(l:keywords, ' '), '*']
+    endif
+    return []
 endfunction
 
 function! s:get_todos() abort
@@ -100,17 +118,12 @@ function! s:get_todos() abort
         return []
     endif
 
-    if l:b.name ==# 'rg'
-        let l:items = systemlist('rg --vimgrep --smart-case "\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b"')
-    elseif l:b.name ==# 'git'
-        let l:items = systemlist(['git', 'grep', '-n', '-E', '\b(TODO|FIXME|XXX|NOTE|BUG|HACK|WARN)\b'])
-    elseif l:b.name ==# 'grep'
-        let l:items = systemlist('grep -rn "TODO\|FIXME\|XXX\|NOTE\|BUG\|HACK\|WARN" .')
-    elseif l:b.name ==# 'findstr'
-        let l:items = systemlist('findstr /S /N /I "TODO FIXME XXX NOTE BUG HACK WARN" *')
-    else
-        let l:items = []
+    let l:cmd = s:build_search_cmd(l:b.name)
+    if empty(l:cmd)
+        return []
     endif
+
+    let l:items = systemlist(l:cmd)
     return filter(l:items, '!empty(v:val)')
 endfunction
 
@@ -119,5 +132,13 @@ function! s:jump_to_todo(item) abort
     if !empty(l:parsed)
         execute 'edit +' . l:parsed.lnum . ' ' . fnameescape(l:parsed.file)
     endif
+endfunction
+
+function! wplus#todo#_test_parse_grep_line(line) abort
+    return s:parse_grep_line(a:line)
+endfunction
+
+function! wplus#todo#_test_build_cmd(backend_name) abort
+    return s:build_search_cmd(a:backend_name)
 endfunction
 

@@ -22,6 +22,21 @@ function! s:current() abort
     return get(b:, 'wplus_conflict_current', 0)
 endfunction
 
+function! s:target_conflict_index() abort
+    let l:list = s:list()
+    if empty(l:list) | return -1 | endif
+    let l:cur = line('.')
+    for l:i in range(len(l:list))
+        let l:conf = l:list[l:i]
+        if l:cur >= l:conf.lnum_start && l:cur <= l:conf.lnum_end
+            let b:wplus_conflict_current = l:i
+            return l:i
+        endif
+    endfor
+    let l:idx = s:current()
+    return (l:idx >= 0 && l:idx < len(l:list)) ? l:idx : 0
+endfunction
+
 function! s:find_conflicts() abort
     let b:wplus_conflicts = []
     let b:wplus_conflict_current = get(b:, 'wplus_conflict_current', 0)
@@ -33,23 +48,37 @@ function! s:find_conflicts() abort
         let l:line = l:lines[l:idx]
         
         if l:line =~# '^<<<<<<<'
-            " Found conflict start
             let l:start = l:idx + 1
             let l:ours_start = l:idx + 1
             let l:ours_lines = []
+            let l:base_lines = []
+            let l:base_start = 0
             let l:theirs_lines = []
             let l:theirs_start = -1
+            let l:sep_lnum = -1
             
-            " Collect ours
+            " Collect ours until ||||||| or =======
             let l:idx += 1
-            while l:idx < len(l:lines) && l:lines[l:idx] !~# '^======='
+            while l:idx < len(l:lines) && l:lines[l:idx] !~# '^|||||||' && l:lines[l:idx] !~# '^======='
                 call add(l:ours_lines, l:lines[l:idx])
                 let l:idx += 1
             endwhile
             
-            " Skip ======= marker
-            let l:sep_lnum = l:idx + 1
-            let l:idx += 1
+            " Collect diff3 base if present
+            if l:idx < len(l:lines) && l:lines[l:idx] =~# '^|||||||'
+                let l:base_start = l:idx + 1
+                let l:idx += 1
+                while l:idx < len(l:lines) && l:lines[l:idx] !~# '^======='
+                    call add(l:base_lines, l:lines[l:idx])
+                    let l:idx += 1
+                endwhile
+            endif
+            
+            " Separator =======
+            if l:idx < len(l:lines) && l:lines[l:idx] =~# '^======='
+                let l:sep_lnum = l:idx + 1
+                let l:idx += 1
+            endif
             
             " Collect theirs
             let l:theirs_start = l:idx + 1
@@ -63,10 +92,12 @@ function! s:find_conflicts() abort
             call add(b:wplus_conflicts, {
                 \ 'lnum_start': l:start,
                 \ 'lnum_ours': l:ours_start,
+                \ 'lnum_base': l:base_start,
                 \ 'lnum_sep': l:sep_lnum,
                 \ 'lnum_theirs': l:theirs_start,
                 \ 'lnum_end': l:end,
                 \ 'ours_lines': l:ours_lines,
+                \ 'base_lines': l:base_lines,
                 \ 'theirs_lines': l:theirs_lines,
                 \ })
             
@@ -80,13 +111,16 @@ function! s:find_conflicts() abort
 endfunction
 
 function! wplus#conflict#resolve_ours() abort
-    if s:current() >= len(s:list()) | return | endif
+    if empty(s:list()) && s:find_conflicts() == 0 | return | endif
+    let l:target_idx = s:target_conflict_index()
+    if l:target_idx < 0 || l:target_idx >= len(s:list()) | return | endif
     
-    let l:conf = s:list()[s:current()]
+    let l:conf = s:list()[l:target_idx]
     let l:bufnr = bufnr('%')
     
-    " Keep ours, remove start marker and separator..end range.
-    call deletebufline(l:bufnr, l:conf.lnum_sep, l:conf.lnum_end)
+    " Remove base/separator..end, then remove start marker
+    let l:del_start = l:conf.lnum_base > 0 ? l:conf.lnum_base : l:conf.lnum_sep
+    call deletebufline(l:bufnr, l:del_start, l:conf.lnum_end)
     call deletebufline(l:bufnr, l:conf.lnum_start, l:conf.lnum_start)
     
     " Recalculate remaining conflicts
@@ -95,12 +129,14 @@ function! wplus#conflict#resolve_ours() abort
 endfunction
 
 function! wplus#conflict#resolve_theirs() abort
-    if s:current() >= len(s:list()) | return | endif
+    if empty(s:list()) && s:find_conflicts() == 0 | return | endif
+    let l:target_idx = s:target_conflict_index()
+    if l:target_idx < 0 || l:target_idx >= len(s:list()) | return | endif
     
-    let l:conf = s:list()[s:current()]
+    let l:conf = s:list()[l:target_idx]
     let l:bufnr = bufnr('%')
     
-    " Remove start marker..separator, then remove the shifted end marker.
+    " Remove start marker..separator (including ours and base), then remove shifted end marker
     call deletebufline(l:bufnr, l:conf.lnum_start, l:conf.lnum_sep)
     let l:new_end = l:conf.lnum_end - (l:conf.lnum_sep - l:conf.lnum_start + 1)
     call deletebufline(l:bufnr, l:new_end, l:new_end)
@@ -111,14 +147,20 @@ function! wplus#conflict#resolve_theirs() abort
 endfunction
 
 function! wplus#conflict#resolve_both() abort
-    if s:current() >= len(s:list()) | return | endif
+    if empty(s:list()) && s:find_conflicts() == 0 | return | endif
+    let l:target_idx = s:target_conflict_index()
+    if l:target_idx < 0 || l:target_idx >= len(s:list()) | return | endif
     
-    let l:conf = s:list()[s:current()]
+    let l:conf = s:list()[l:target_idx]
     let l:bufnr = bufnr('%')
     
     " Remove markers from bottom to top so line numbers stay valid.
     call deletebufline(l:bufnr, l:conf.lnum_end, l:conf.lnum_end)
-    call deletebufline(l:bufnr, l:conf.lnum_sep, l:conf.lnum_sep)
+    if l:conf.lnum_base > 0
+        call deletebufline(l:bufnr, l:conf.lnum_base, l:conf.lnum_sep)
+    else
+        call deletebufline(l:bufnr, l:conf.lnum_sep, l:conf.lnum_sep)
+    endif
     call deletebufline(l:bufnr, l:conf.lnum_start, l:conf.lnum_start)
     
     " Recalculate

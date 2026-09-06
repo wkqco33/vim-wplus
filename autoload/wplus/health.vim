@@ -44,7 +44,7 @@ let s:known_options = [
     \ 'wplus_gitgutter_sign_add', 'wplus_gitgutter_sign_change', 'wplus_gitgutter_sign_delete',
     \ 'wplus_health_enabled', 'wplus_history_project_only', 'wplus_illuminate_ft_block',
     \ 'wplus_indent_ft_exclude', 'wplus_marks_sign_prefix', 'wplus_project_config',
-    \ 'wplus_project_verbose', 'wplus_run_commands', 'wplus_run_use_terminal',
+    \ 'wplus_project_verbose', 'wplus_run_commands', 'wplus_build_commands', 'wplus_test_commands', 'wplus_run_use_terminal',
     \ 'wplus_scratch_file', 'wplus_scratch_ft', 'wplus_scratch_position',
     \ 'wplus_session_autoload', 'wplus_session_autosave', 'wplus_session_max_files',
     \ 'wplus_theme_auto', 'wplus_todo_grep_backend', 'wplus_todo_keywords',

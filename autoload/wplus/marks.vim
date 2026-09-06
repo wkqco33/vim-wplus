@@ -8,11 +8,13 @@ let g:wplus_marks_sign_prefix = get(g:, 'wplus_marks_sign_prefix', '')
 let s:sign_group = 'wplus_marks'
 let s:update_timer = -1
 
+let s:all_marks = split('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', '\zs')
+
 " ── sign definitions ──────────────────────────────────────────────────────
 
 function! s:define_signs() abort
     highlight default WplusMarkSign ctermfg=214 guifg=#fabd2f gui=bold
-    for l:c in split('abcdefghijklmnopqrstuvwxyz', '\zs')
+    for l:c in s:all_marks
         call sign_define('WplusMark_' . l:c, {
             \ 'text':   g:wplus_marks_sign_prefix . l:c,
             \ 'texthl': 'WplusMarkSign'
@@ -28,15 +30,15 @@ function! s:refresh_marks(bufnr) abort
 
     call sign_unplace(s:sign_group, {'buffer': l:bufnr})
 
-    for l:c in split('abcdefghijklmnopqrstuvwxyz', '\zs')
+    for l:c in s:all_marks
         let l:pos = getpos("'" . l:c)
-        " pos[0]==0 means mark not set; pos[1] is line (0 = unset for global)
+        " pos[0]==0 means mark not set or current buffer; pos[1] is line
         if l:pos[0] == 0 && l:pos[1] > 0 && l:pos[3] == 0
             " Local mark in current buffer
             call sign_place(0, s:sign_group, 'WplusMark_' . l:c, l:bufnr,
                         \ {'lnum': l:pos[1], 'priority': 5})
         elseif l:pos[0] == l:bufnr && l:pos[1] > 0
-            " Mark set in this exact buffer
+            " Global or explicit buffer mark set in this exact buffer
             call sign_place(0, s:sign_group, 'WplusMark_' . l:c, l:bufnr,
                         \ {'lnum': l:pos[1], 'priority': 5})
         endif
@@ -52,9 +54,9 @@ endfunction
 
 " ── list popup ────────────────────────────────────────────────────────────
 
-function! wplus#marks#list() abort
+function! s:get_mark_items() abort
     let l:items = []
-    for l:c in split('abcdefghijklmnopqrstuvwxyz', '\zs')
+    for l:c in s:all_marks
         let l:pos = getpos("'" . l:c)
         if l:pos[1] > 0
             let l:bufnr = l:pos[0] == 0 ? bufnr('%') : l:pos[0]
@@ -68,6 +70,11 @@ function! wplus#marks#list() abort
             call add(l:items, l:display)
         endif
     endfor
+    return l:items
+endfunction
+
+function! wplus#marks#list() abort
+    let l:items = s:get_mark_items()
     if empty(l:items)
         call wplus#util#info_msg('marks', 'no marks set')
         return
@@ -85,7 +92,7 @@ endfunction
 " Delete mark at cursor line.
 function! wplus#marks#delete_at_cursor() abort
     let l:lnum = line('.')
-    for l:c in split('abcdefghijklmnopqrstuvwxyz', '\zs')
+    for l:c in s:all_marks
         let l:pos = getpos("'" . l:c)
         if l:pos[1] == l:lnum && (l:pos[0] == 0 || l:pos[0] == bufnr('%'))
             execute 'delmarks ' . l:c
@@ -95,6 +102,10 @@ function! wplus#marks#delete_at_cursor() abort
         endif
     endfor
     call wplus#util#warn_msg('marks', 'no mark on line ' . l:lnum)
+endfunction
+
+function! wplus#marks#_test_get_mark_items() abort
+    return s:get_mark_items()
 endfunction
 
 " ── setup ─────────────────────────────────────────────────────────────────

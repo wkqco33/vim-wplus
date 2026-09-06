@@ -147,6 +147,7 @@ let g:wplus_run_enabled = 1
 let g:wplus_run_use_terminal = 1        " 1=터미널 실행, 0=quickfix 출력
 let g:wplus_run_commands = {}           " 파일타입별 커스텀 실행 명령 ({'python': 'python3 %s'})
 let g:wplus_build_commands = {}         " 빌드 마커별 커스텀 빌드 명령
+let g:wplus_test_commands = {}          " 테스트 마커별 커스텀 테스트 명령
 
 let g:wplus_scratch_enabled = 1
 let g:wplus_scratch_file = expand('~/.vim/scratch.txt')

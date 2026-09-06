@@ -45,3 +45,25 @@ function! Test_explorer_ignore_files() abort
     call delete(l:tmpdir, 'rf')
     let g:wplus_explorer_ignore = []
 endfunction
+
+function! Test_explorer_reveal_current_file() abort
+    call wplus#explorer#setup()
+    let l:tmpdir = tempname()
+    let l:nested = l:tmpdir . '/sub/deep'
+    call mkdir(l:nested, 'p')
+    let l:file = l:nested . '/target.txt'
+    call writefile(['target'], l:file)
+
+    let l:save_cwd = getcwd()
+    execute 'cd' fnameescape(l:tmpdir)
+
+    " Reveal target file
+    call wplus#explorer#reveal(l:file)
+    let l:buf = bufnr('^WplusExplorer$')
+    call assert_true(l:buf != -1, 'Explorer should open on reveal')
+    call assert_true(getline('.') =~# 'target\.txt', 'Cursor should land on the revealed target file')
+
+    call wplus#explorer#toggle()
+    execute 'cd' fnameescape(l:save_cwd)
+    call delete(l:tmpdir, 'rf')
+endfunction

@@ -142,6 +142,7 @@ function! wplus#ai#http#send_request(prompt, OnContent, ...) abort
     let s:command_requests[l:request_id].job = l:job
     call wplus#ai#http#write_payload_stdin(l:job, l:payload)
     call wplus#util#info_msg('ai', 'sending request...')
+    silent! redrawstatus
 endfunction
 
 function! s:on_response(request_id, channel, msg) abort
@@ -157,6 +158,7 @@ function! s:on_response(request_id, channel, msg) abort
         endif
         call wplus#ai#http#cleanup_curl_config(l:req.curl_config)
         call remove(s:command_requests, a:request_id)
+        silent! redrawstatus
     endif
 endfunction
 
@@ -172,6 +174,7 @@ function! s:on_response_complete(request_id, channel) abort
     endif
     let l:req = remove(s:command_requests, a:request_id)
     call wplus#ai#http#cleanup_curl_config(l:req.curl_config)
+    silent! redrawstatus
 
     if !empty(l:req.error_buffer) && empty(l:req.response_buffer)
         call wplus#util#error_msg('ai', 'request error: ' . trim(l:req.error_buffer))
@@ -348,6 +351,7 @@ function! wplus#ai#http#cancel_all() abort
         call wplus#ai#http#cleanup_curl_config(l:req.curl_config)
     endfor
     let s:command_requests = {}
+    silent! redrawstatus
 
     if type(s:suggest_job) == v:t_job
         silent! call job_stop(s:suggest_job)
@@ -355,4 +359,8 @@ function! wplus#ai#http#cancel_all() abort
     endif
     let s:suggest_request = {}
     call wplus#ai#http#cleanup_curl_config(s:suggest_curl_config)
+endfunction
+
+function! wplus#ai#http#is_busy() abort
+    return !empty(s:command_requests)
 endfunction
