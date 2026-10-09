@@ -3,7 +3,7 @@
 if exists('g:autoloaded_wplus_health') | finish | endif
 let g:autoloaded_wplus_health = 1
 
-let s:native_keys = ['.', "\<C-a>", "\<C-x>"]
+let s:native_keys = ['.', "\<C-a>", "\<C-x>", "\<Tab>"]
 
 let s:owners = {
     \ ']h': 'gitgutter#next_hunk',

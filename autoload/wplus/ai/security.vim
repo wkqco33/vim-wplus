@@ -196,6 +196,16 @@ function! s:value_is_literal_secret(value) abort
     if a:value =~? 'your-\|example\|placeholder\|secret-api-key\|not-a-real-key\|allowed-by-explicit-override\|sk-\.\.\.'
         return 0
     endif
+    " Credential formats must be checked before treating snake_case or
+    " uppercase identifiers as references. Several real tokens use exactly
+    " those shapes (for example AWS access-key IDs and GitHub PATs).
+    if a:value =~# '^AKIA[A-Z0-9]\{16}$' || a:value =~# '^ASIA[A-Z0-9]\{16}$'
+                \ || a:value =~? '^gh[pousr]_[A-Za-z0-9_]\{20,}$'
+                \ || a:value =~? '^github_pat_[A-Za-z0-9_+]\{20,}$'
+                \ || a:value =~? '^glpat-[A-Za-z0-9_-]\{20,}$'
+                \ || a:value =~? '^xox[baprs]-[A-Za-z0-9-]\{20,}$'
+        return 1
+    endif
     " Shell / environment variable references ($VAR).
     if a:value =~# '^\$'
         return 0

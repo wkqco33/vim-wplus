@@ -9,10 +9,16 @@ let s:ai_preview_apply = v:null
 " a:ApplyFn (a zero-arg partial with all context already bound); on
 " discard, drop it. Used by every AI command below so a
 " response is never written to a buffer/register without explicit accept.
+function! s:missing_preview(ApplyFn) abort
+    " Never apply generated code just because this editor lacks Vim popups.
+    call wplus#util#warn_msg('ai', 'preview UI unavailable; response discarded without applying')
+endfunction
+
 function! wplus#ai#ui#open_preview(ft, lines, ApplyFn) abort
     let s:ai_preview_apply = a:ApplyFn
     if !exists('*popup_create')
-        if !empty(a:ApplyFn) | call a:ApplyFn() | endif
+        call s:missing_preview(a:ApplyFn)
+        let s:ai_preview_apply = v:null
         return
     endif
     let l:header = '[wplus-ai] Enter/a = apply   Esc/q = discard'
@@ -114,4 +120,8 @@ endfunction
 
 function! wplus#ai#ui#show_review_result(ft, content, title) abort
     call wplus#ai#ui#open_result_split('markdown', split(a:content, "\n"), a:title)
+endfunction
+
+function! wplus#ai#ui#_test_missing_popup(ApplyFn) abort
+    call s:missing_preview(a:ApplyFn)
 endfunction

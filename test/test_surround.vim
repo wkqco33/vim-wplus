@@ -4,14 +4,15 @@
 " ys( gives "( x )"), but matching against buffer text must use the bare
 " one-character delimiters. Conflating the two broke ds/cs on every bracket.
 
-call wplus#surround#setup()
-
 function! s:buf(text, col) abort
     enew!
     setlocal buftype=nofile noswapfile
     call setline(1, a:text)
     call cursor(1, a:col)
 endfunction
+
+function! Test_surround_behavior() abort
+call wplus#surround#setup()
 
 " ── delete surrounding ────────────────────────────────────────────────────
 
@@ -67,3 +68,4 @@ call feedkeys('dst', 'x')
 call assert_equal(s:before, getline(1), 'dst does not corrupt the line')
 
 bwipeout!
+endfunction

@@ -39,7 +39,8 @@ let g:wplus_ai_suggest_suffix_lines = get(g:, 'wplus_ai_suggest_suffix_lines', 2
 let g:wplus_ai_suggest_max_tokens = get(g:, 'wplus_ai_suggest_max_tokens', 256)
 let g:wplus_ai_suggest_max_lines = get(g:, 'wplus_ai_suggest_max_lines', 3)
 let g:wplus_ai_suggest_debug = get(g:, 'wplus_ai_suggest_debug', 0)
-let g:wplus_ai_tab_complete = get(g:, 'wplus_ai_tab_complete', 1)
+" Kept for backwards compatibility; Tab is never globally remapped by wplus.
+let g:wplus_ai_tab_complete = get(g:, 'wplus_ai_tab_complete', 0)
 
 " Network timeouts (seconds). Commands wait longer; suggestions abort faster.
 let g:wplus_ai_timeout = get(g:, 'wplus_ai_timeout', 30)
@@ -129,9 +130,6 @@ function! wplus#ai#setup() abort
     inoremap <silent> <expr> <Plug>WaiSmartTab wplus#ai#smart_tab()
     nnoremap <silent> <leader>ac :WaiCancel<CR>
 
-    if g:wplus_ai_tab_complete && empty(mapcheck('<Tab>', 'i'))
-        imap <expr> <Tab> wplus#ai#smart_tab()
-    endif
 endfunction
 
 " ── Interactive Commands ──────────────────────────────────────────────────────
@@ -237,14 +235,36 @@ function! wplus#ai#commit_message() abort
         return
     endif
 
-    let l:stat_lines = []
-    let l:job = job_start(['git', '-C', l:root, 'diff', '--cached', '--stat'], {
-        \ 'out_cb':   {_, l -> add(l:stat_lines, l)},
-        \ 'close_cb': {_ -> s:on_commit_stat_done(l:root, l:stat_lines)},
+    let l:path_lines = []
+    let l:job = job_start(['git', '-C', l:root, 'diff', '--cached', '--name-only'], {
+        \ 'out_cb':   {_, l -> add(l:path_lines, l)},
+        \ 'close_cb': {_ -> s:on_commit_paths_done(l:root, l:path_lines)},
         \ 'err_cb':   {_ch, _msg -> 0},
         \ })
     call add(s:active_git_jobs, l:job)
-    call wplus#util#info_msg('ai', 'reading staged changes...')
+    call wplus#util#info_msg('ai', 'checking staged file paths...')
+endfunction
+
+function! s:on_commit_paths_done(root, path_lines) abort
+    let l:paths = filter(copy(a:path_lines), '!empty(v:val)')
+    if empty(l:paths)
+        call wplus#util#warn_msg('ai', 'no staged changes (git add first)')
+        return
+    endif
+    for l:path in l:paths
+        if wplus#ai#security#is_sensitive_file(l:path)
+            call wplus#util#warn_msg('ai', 'commit message blocked: staged sensitive file (' . l:path . ')')
+            return
+        endif
+    endfor
+
+    let l:stat_lines = []
+    let l:job = job_start(['git', '-C', a:root, 'diff', '--cached', '--stat'], {
+        \ 'out_cb':   {_, l -> add(l:stat_lines, l)},
+        \ 'close_cb': {_ -> s:on_commit_stat_done(a:root, l:stat_lines)},
+        \ 'err_cb':   {_ch, _msg -> 0},
+        \ })
+    call add(s:active_git_jobs, l:job)
 endfunction
 
 function! s:on_commit_stat_done(root, stat_lines) abort
@@ -253,16 +273,6 @@ function! s:on_commit_stat_done(root, stat_lines) abort
         call wplus#util#warn_msg('ai', 'no staged changes (git add first)')
         return
     endif
-    for l:line in a:stat_lines
-        let l:parts = split(l:line, '\s*|\s*')
-        if len(l:parts) >= 2
-            let l:fname = trim(l:parts[0])
-            if !empty(l:fname) && wplus#ai#security#is_sensitive_file(l:fname)
-                call wplus#util#warn_msg('ai', 'commit message blocked: staged sensitive file (' . l:fname . ')')
-                return
-            endif
-        endif
-    endfor
     let l:diff_lines = []
     let l:job = job_start(['git', '-C', a:root, 'diff', '--cached'], {
         \ 'out_cb':   {_, l -> add(l:diff_lines, l)},
@@ -439,6 +449,10 @@ endfunction
 
 function! wplus#ai#_test_on_commit_stat_done(root, stat_lines) abort
     call s:on_commit_stat_done(a:root, a:stat_lines)
+endfunction
+
+function! wplus#ai#_test_on_commit_paths_done(root, path_lines) abort
+    call s:on_commit_paths_done(a:root, a:path_lines)
 endfunction
 
 function! wplus#ai#_test_set_send_interceptor(fn) abort

@@ -1,5 +1,25 @@
 " test/test_lsp_project_config.vim — Test project-scoped LSP server resolution
 
+function! Test_lsp_setup_does_not_duplicate_timeout_timer() abort
+    call wplus#lsp#setup()
+    let l:first = wplus#lsp#_test_timeout_timer_id()
+    call wplus#lsp#setup()
+    call assert_equal(l:first, wplus#lsp#_test_timeout_timer_id(),
+        \ 'Repeated setup must reuse the request-timeout timer')
+endfunction
+
+function! Test_lsp_uri_round_trips_paths_with_reserved_characters() abort
+    call wplus#lsp#setup()
+    let l:path = '/tmp/wplus project/#file%20.vim'
+    let l:uri = wplus#lsp#_test_get_uri(l:path)
+    call assert_equal('file:///tmp/wplus%20project/%23file%2520.vim', l:uri)
+    call assert_equal(l:path, wplus#lsp#_test_decode_uri_path(l:uri))
+
+    let l:unicode_path = '/tmp/wplus-한.vim'
+    let l:unicode_uri = wplus#lsp#_test_get_uri(l:unicode_path)
+    call assert_equal(l:unicode_path, wplus#lsp#_test_decode_uri_path(l:unicode_uri))
+endfunction
+
 function! Test_lsp_project_config_simple_list() abort
     call wplus#lsp#setup()
     let g:wplus_lsp_servers = {'go': ['gopls']}

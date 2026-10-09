@@ -11,12 +11,13 @@ vim-wplus는 모듈형 구성로 구성된 의존성 없는 Vim 올인원 플러
 
 ### 요구사항
 
-- **Vim 9.1+** (또는 NeoVim 0.7+)
-- 필수 기능 확인:
+- **공식 지원: Vim 9.1+** (`+job +channel +popupwin +signs +textprop`)
+- NeoVim은 설치 스크립트가 설치 위치를 지원하지만, Vim의 `popup_*` / `textprop` API와 호환되지 않아 전체 기능을 지원하지 않습니다. 특히 팝업 미리보기를 사용할 수 없으면 AI 응답은 자동 적용하지 않고 폐기합니다.
+- Vim 기능 확인:
 
 ```vim
 :echo has('job') && has('channel') && has('popupwin') && has('signs') && has('textprop')
-" 1이 출력되어야 합니다
+" Vim에서 1이 출력되어야 합니다
 ```
 
 ### 방법 1 — curl 원라이너 (가장 간편, 매니저 불필요)
@@ -212,16 +213,15 @@ let g:wplus_ai_ollama_keep_alive = '30m'
 
 **Ghost Text 수락 키 설정:**
 
-`<Tab>`은 기본적으로 스마트 탭(`g:wplus_ai_tab_complete = 1`)으로 작동하여 AI 제안이 있으면 자동 수락합니다.
-수동 매핑을 원할 경우:
+플러그인은 기본 `<Tab>` 동작을 보존하며 전역 매핑을 만들지 않습니다. AI 제안 수락을 `<Tab>`에 연결하려면 사용자 설정에서 직접 선택하세요:
 
 ```vim
-inoremap <expr> <Tab> wplus#ai#smart_tab()
-" 또는 <Plug> 매핑 사용:
 imap <Tab> <Plug>WaiSmartTab
-" Tab 대신 다른 키 사용 시:
+" 또는 Tab 대신 다른 키 사용:
 inoremap <expr> <C-g> wplus#ai#accept_suggestion()
 ```
+
+`g:wplus_ai_tab_complete`는 이전 버전 호환을 위해 남아 있지만, 더 이상 기본 키를 매핑하지 않습니다.
 
 ---
 

@@ -152,6 +152,7 @@ let g:wplus_todo_keywords = ['TODO', 'FIXME', 'HACK', 'BUG', 'XXX']
 let g:wplus_ai_provider    = 'openai'     " 'openai' | 'claude' | 'azure' | 'ollama' | 'gemini'
 let g:wplus_ai_api_key     = ''           " API 키 (환경변수 권장: $OPENAI_API_KEY, $GEMINI_API_KEY)
 let g:wplus_ai_endpoint    = ''           " OpenAI-Compatible 커스텀 엔드포인트 URL (DeepSeek/Groq/vLLM 등)
+let g:wplus_ai_gemini_endpoint = ''       " 선택: Gemini 호환 endpoint override
 let g:wplus_ai_model       = ''           " 모델명 (필수, 커맨드용)
 let g:wplus_ai_completion_model = ''      " 코드 완성 전용 모델 (미설정 시 wplus_ai_model 폴백)
 let g:wplus_ai_temperature = 0.7
@@ -159,7 +160,8 @@ let g:wplus_ai_max_tokens  = 2000
 let g:wplus_ai_commit_diff_max_bytes = 32768  " 커밋 메시지 diff 최대 바이트 (32KB)
 let g:wplus_ai_commit_max_tokens = 2048       " 커밋 메시지 최대 토큰 수
 let g:wplus_ai_commit_prompt = ''             " 커스텀 커밋 프롬프트 ({stat}, {diff} 치환)
-let g:wplus_ai_tab_complete = 1               " 스마트 탭 활성화 (Ghost text -> 팝업 -> 인덴트)
+" <Tab>은 자동 매핑하지 않습니다. 필요하면 사용자 설정에서 직접 연결:
+" imap <Tab> <Plug>WaiSmartTab
 let g:wplus_ai_timeout     = 30           " 명령어 타임아웃 (초)
 
 " ── Azure ────────────────────────────────────────────────────────────────

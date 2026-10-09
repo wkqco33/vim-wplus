@@ -165,11 +165,35 @@ function! Test_ai_blocks_sensitive_context() abort
     call assert_true(wplus#ai#_test_is_sensitive("-----BEGIN PRIVATE KEY-----\nbase64-secret-material\n-----END PRIVATE KEY-----"), 'Private keys must be blocked')
     let g:wplus_ai_allow_sensitive_context = 1
     call assert_false(wplus#ai#_test_is_sensitive("api_key = 'allowed-by-explicit-override'"), 'Explicit override should be honored')
+    let g:wplus_ai_allow_sensitive_context = 0
     call assert_false(wplus#ai#_test_is_sensitive("let g:wplus_ai_api_key = ''               \" API 키 필수 설정"), 'Empty quotes with inline comments must not be blocked')
     call assert_false(wplus#ai#_test_is_sensitive("let g:wplus_ai_api_key = $OPENAI_API_KEY  \" 환경 변수 권장"), 'Environment variable references with comments must not be blocked')
     call assert_false(wplus#ai#_test_is_sensitive("g:wplus_ai_api_key\nAuthorization: Bearer ollama\nsecret-api-key-12345"), 'Documentation/config references must not be blocked')
-    let g:wplus_ai_allow_sensitive_context = 1
     unlet! g:wplus_ai_allow_sensitive_context
+endfunction
+
+function! Test_ai_blocks_common_credential_formats() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_block_sensitive_context = 1
+    let g:wplus_ai_allow_sensitive_context = 0
+
+    for l:secret in [
+        \ 'aws_access_key_id = AKIA1234567890ABCDEF',
+        \ 'api_key = ghp_abcdefghijklmnopqrstuvwxyz0123456789',
+        \ 'api_key = github_pat_abcdefghijklmnopqrstuvwxyz0123456789',
+        \ ]
+        call assert_true(wplus#ai#_test_is_sensitive(l:secret), 'Credential format must be blocked: ' . l:secret)
+    endfor
+endfunction
+
+function! Test_ai_allows_safe_secret_references_when_protection_is_enabled() abort
+    call wplus#ai#setup()
+    let g:wplus_ai_block_sensitive_context = 1
+    let g:wplus_ai_allow_sensitive_context = 0
+
+    call assert_false(wplus#ai#_test_is_sensitive("let g:wplus_ai_api_key = ''"), 'Empty values are not secrets')
+    call assert_false(wplus#ai#_test_is_sensitive('api_key = $OPENAI_API_KEY'), 'Environment references are safe')
+    call assert_false(wplus#ai#_test_is_sensitive('api_key = config.api_key'), 'Member references are safe')
 endfunction
 
 function! Test_ai_unknown_provider_fails_loudly() abort
@@ -368,13 +392,10 @@ function! Test_ai_commit_blocks_staged_sensitive_file() abort
     let s:test_last_prompt = ''
     call wplus#ai#_test_set_send_interceptor(function('s:capture_prompt'))
 
-    " Simulate commit stat with sensitive file
-    let l:stat_lines = [
-        \ ' .env | 5 +++++',
-        \ ' src/main.rs | 2 +- ',
-        \ ' 2 files changed, 6 insertions(+), 1 deletion(-)'
-        \ ]
-    call wplus#ai#_test_on_commit_stat_done('/dummy', l:stat_lines)
+    " Paths with spaces or separators must be checked as file paths, not parsed
+    " from the human-readable `git diff --stat` layout.
+    let l:paths = ['src/main.rs', 'config with | delimiter/.env']
+    call wplus#ai#_test_on_commit_paths_done('/dummy', l:paths)
     call assert_equal('', s:test_last_prompt, 'AI request must be blocked when staged changes contain sensitive files')
 
     call wplus#ai#_test_clear_send_interceptor()

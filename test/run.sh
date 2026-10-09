@@ -54,6 +54,11 @@ for file in "${files[@]}"; do
     while IFS= read -r fn; do
         tests+=("$fn")
     done < <(sed -n 's/^function! \(Test_[A-Za-z0-9_]*\)().*/\1/p' "$file")
+    if [ "${#tests[@]}" -eq 0 ]; then
+        echo "FAIL $name (contains no Test_* functions)"
+        failed=1
+        continue
+    fi
     runner="$out/$name.runner.vim"
     {
         printf 'let v:errors = []\n'

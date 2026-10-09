@@ -112,7 +112,7 @@
 | `:WaiCommitMsg` | Normal | 커밋 메시지 생성 |
 | `:WaiToggleSuggest` | Normal | Ghost Text 토글 |
 | `<leader>ac` | Normal | 진행 중인 AI 요청 취소 |
-| `<Tab>` (Insert) | Insert | 스마트 탭 (Ghost Text 수락 → 팝업 메뉴 → 인덴트) |
+| `<Tab>` (Insert) | Insert | 기본 매핑 없음 — Vim 기본 동작 보존 |
 | `<Plug>WaiAcceptSuggest` | Insert | Ghost Text 수락 |
 | `<Plug>WaiAcceptWord` | Insert | Ghost Text 다음 단어 수락 |
 | `<Plug>WaiSmartTab` | Insert | 스마트 탭 수락/완성 |
@@ -187,9 +187,7 @@ nnoremap <C-k> <C-w>k
 nnoremap <C-l> <C-w>l
 ```
 
-> **`<Tab>` 동작 방식**: `g:wplus_ai_tab_complete = 1`(기본값) 설정 시, `<Tab>`은
-> AI Ghost Text 수락 → 팝업 메뉴 선택(`pumvisible()`) → 일반 탭/들여쓰기 순으로 스마트하게 체이닝됩니다.
-> 원치 않을 경우 `let g:wplus_ai_tab_complete = 0`으로 비활성화하거나 `<Plug>WaiSmartTab`을 원하는 키에 매핑할 수 있습니다.
+> 플러그인은 네이티브 `<Tab>`을 덮어쓰지 않습니다. AI 제안 수락을 원하면 `imap <Tab> <Plug>WaiSmartTab`처럼 사용자 설정에서 직접 연결하세요.
 
 ---
 

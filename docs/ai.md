@@ -21,7 +21,8 @@ vnoremap <leader>ar :WaiReview<CR>
 vnoremap <leader>ae :WaiExplain<CR>
 vnoremap <leader>af :WaiRefactor<CR>
 nnoremap <leader>am :WaiCommitMsg<CR>
-" <Tab>은 기본 내장 스마트 탭으로 자동 지원됩니다. (g:wplus_ai_tab_complete=1)
+" <Tab>은 기본 동작을 유지합니다. 원할 때만 직접 매핑하세요:
+" imap <Tab> <Plug>WaiSmartTab
 ```
 
 ---
@@ -97,6 +98,16 @@ let g:wplus_ai_azure_deployment    = 'gpt-4-deployment'    " 배포명
 let g:wplus_ai_azure_api_version   = '2024-02-15-preview'
 ```
 
+### Gemini (Google)
+
+```vim
+let g:wplus_ai_provider = 'gemini'
+let g:wplus_ai_api_key  = $GEMINI_API_KEY
+let g:wplus_ai_model    = 'gemini-2.0-flash'
+" 선택: 커스텀 Gemini 호환 endpoint
+" let g:wplus_ai_gemini_endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+```
+
 ### Ollama (로컬)
 
 ```vim
@@ -120,18 +131,12 @@ InsertMode에서 타이핑을 멈추면 AI가 다음 코드를 회색 ghost text
 
 1. 타이핑 후 `suggest_delay` ms 경과 → API 요청
 2. 응답 도착 → 커서 뒤에 회색 ghost text 표시
-3. `<Tab>` → 제안 수락 (전체 또는 단어 단위)
+3. 설정한 수락 키(기본값 없음) → 제안 수락 (전체 또는 단어 단위)
 4. 다른 키 / `<Esc>` → 제안 취소
 
 ### 수락 키 설정
 
-기본적으로 `g:wplus_ai_tab_complete = 1`이 설정되어 있어 `<Tab>`을 누르면:
-
-1. Ghost Text가 표시 중이면 제안을 즉시 수락합니다.
-2. 팝업 메뉴가 열려 있으면 다음 항목을 선택합니다 (`<C-n>`).
-3. 그 외에는 일반 탭/들여쓰기를 수행합니다.
-
-수동으로 매핑하거나 다른 키를 사용하려면:
+플러그인은 네이티브 `<Tab>` 동작을 보존하기 위해 기본 매핑을 등록하지 않습니다. 수락 동작을 `<Tab>`에 직접 연결하려면:
 
 ```vim
 " 스마트 탭 수락
@@ -232,6 +237,7 @@ Ghost Text와 명령어는 다음 컨텍스트를 자동으로 수집합니다:
 - `WaiCancel`(`<leader>ac`) 실행 시 진행 중인 HTTP 요청뿐만 아니라 백그라운드 Git diff 수집 작업까지 즉시 종료됩니다.
 - `ollama` provider라도 `*-cloud` 모델은 원격 서비스로 코드가 전송될 수 있습니다. 민감한 프로젝트에서는 로컬 모델을 사용하거나 자동 제안을 끄십시오.
 - 응답에는 제어문자를 허용하지 않으며, 최대 응답 크기(`g:wplus_ai_response_max_bytes`)를 초과하면 요청을 중단합니다.
+- Vim 팝업 미리보기를 사용할 수 없는 환경에서는 AI가 만든 변경을 자동 적용하지 않고 폐기합니다. 공식 지원 환경은 Vim 9.1+입니다.
 - API 키는 `.vimrc`에 직접 쓰지 않고 환경 변수를 읽어오는 방식을 권장합니다:
 
 ```vim

@@ -3,6 +3,7 @@
 " A plain "duplicate LHS" scan cannot catch the ]h/[h collision: :nmap output
 " shows only the winner. Ownership is asserted explicitly instead.
 
+function! Test_keymaps_hygiene() abort
 " ── native keys must stay native ─────────────────────────────────────────
 " Phase 0 baseline: RED for '.' (repeat.vim:12), <C-a> and <C-x>
 " (multicursor.vim:236-237).
@@ -10,6 +11,10 @@
 let s:hijacked = wplus#health#hijacked_native_keys()
 call assert_equal([], s:hijacked,
     \ 'native keys must not be globally remapped: ' . string(s:hijacked))
+call assert_true(index(wplus#health#native_keys(), "\<Tab>") >= 0,
+    \ '<Tab> must be included in the native-key hygiene check')
+call assert_equal('', maparg('<Tab>', 'i'),
+    \ 'wplus must not globally replace native <Tab> behavior by default')
 
 " ── contested keys must belong to the canonical owner ────────────────────
 " Phase 0 baseline: RED. Both gitgutter.vim:350-351 and diffview.vim:130-131
@@ -57,3 +62,4 @@ for s:cmd in s:commands
     call assert_true(exists(':' . s:cmd) == 2,
         \ 'command :' . s:cmd . ' should be defined')
 endfor
+endfunction

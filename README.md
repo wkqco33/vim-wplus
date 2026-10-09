@@ -22,6 +22,8 @@ curl -fsSL https://raw.githubusercontent.com/wkqco33/vim-wplus/master/install.sh
 ```
 
 > ⚠ `curl | bash` 는 원격 스크립트를 즉시 실행합니다. 내용 검토는 `curl -fsSL … | less` 로 확인 후 실행하세요.
+>
+> 공식 지원 런타임은 Vim 9.1+입니다. `--nvim`은 설치 위치를 지정할 뿐이며, Vim 전용 팝업/텍스트 속성 기능 때문에 Neovim은 현재 완전 지원되지 않습니다.
 
 ```vim
 " vim-plug

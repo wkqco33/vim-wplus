@@ -4,7 +4,11 @@
 if exists('g:autoloaded_wplus_lsp') | finish | endif
 let g:autoloaded_wplus_lsp = 1
 
-let s:servers   = {} " ft -> {job, channel, last_id, requests, buffer, caps, initialized}
+let s:servers   = {} " active alias: ft -> server instance for current buffer
+let s:root_servers = {} " (ft, root) key -> persistent server instance
+let s:active_root_keys = {} " ft -> active root-server key
+let s:callback_server_key = ''
+let s:callback_server_ft = ''
 let s:diag_timers = {} " uri -> timer_id
 let s:hover_winid = -1
 let s:sig_winid   = -1
@@ -64,13 +68,75 @@ function! s:log(ft, type, msg) abort
     call writefile([l:line], l:log_file, 'a')
 endfunction
 
+function! s:encode_uri_path(path) abort
+    let l:out = ''
+    for l:char in split(a:path, '\zs')
+        let l:cp = char2nr(l:char)
+        if (l:cp >= 48 && l:cp <= 57) || (l:cp >= 65 && l:cp <= 90)
+                    \ || (l:cp >= 97 && l:cp <= 122) || index(['-', '.', '_', '~', '/', ':'], l:char) >= 0
+            let l:out .= l:char
+        else
+            if l:cp < 128
+                let l:bytes = [l:cp]
+            elseif l:cp < 2048
+                let l:bytes = [192 + float2nr(l:cp / 64), 128 + (l:cp % 64)]
+            elseif l:cp < 65536
+                let l:bytes = [224 + float2nr(l:cp / 4096), 128 + (float2nr(l:cp / 64) % 64), 128 + (l:cp % 64)]
+            else
+                let l:bytes = [240 + float2nr(l:cp / 262144), 128 + (float2nr(l:cp / 4096) % 64), 128 + (float2nr(l:cp / 64) % 64), 128 + (l:cp % 64)]
+            endif
+            for l:byte in l:bytes
+                let l:out .= printf('%%%02X', l:byte)
+            endfor
+        endif
+    endfor
+    return l:out
+endfunction
+
+function! s:decode_uri_bytes(encoded) abort
+    let l:bytes = []
+    let l:i = 0
+    while l:i < strlen(a:encoded)
+        if strpart(a:encoded, l:i, 1) ==# '%'
+            call add(l:bytes, str2nr(strpart(a:encoded, l:i + 1, 2), 16))
+            let l:i += 3
+        else
+            let l:i += 1
+        endif
+    endwhile
+
+    let l:out = ''
+    let l:i = 0
+    while l:i < len(l:bytes)
+        let l:b0 = l:bytes[l:i]
+        if l:b0 < 128
+            let l:cp = l:b0
+            let l:i += 1
+        elseif l:b0 >= 194 && l:b0 < 224 && l:i + 1 < len(l:bytes)
+            let l:cp = (l:b0 - 192) * 64 + (l:bytes[l:i + 1] - 128)
+            let l:i += 2
+        elseif l:b0 >= 224 && l:b0 < 240 && l:i + 2 < len(l:bytes)
+            let l:cp = (l:b0 - 224) * 4096 + (l:bytes[l:i + 1] - 128) * 64 + (l:bytes[l:i + 2] - 128)
+            let l:i += 3
+        elseif l:b0 >= 240 && l:b0 < 245 && l:i + 3 < len(l:bytes)
+            let l:cp = (l:b0 - 240) * 262144 + (l:bytes[l:i + 1] - 128) * 4096 + (l:bytes[l:i + 2] - 128) * 64 + (l:bytes[l:i + 3] - 128)
+            let l:i += 4
+        else
+            let l:cp = l:b0
+            let l:i += 1
+        endif
+        let l:out .= nr2char(l:cp)
+    endwhile
+    return l:out
+endfunction
+
 function! s:get_uri(path) abort
     let l:p = fnamemodify(a:path, ':p')
     if has('win32')
         let l:p = substitute(l:p, '\\', '/', 'g')
         if l:p !~# '^/' | let l:p = '/' . l:p | endif
     endif
-    return 'file://' . l:p
+    return 'file://' . s:encode_uri_path(l:p)
 endfunction
 
 function! s:get_buf_uri(buf) abort
@@ -80,8 +146,8 @@ endfunction
 
 function! s:decode_uri_path(uri) abort
     let l:path = substitute(a:uri, '^file://', '', '')
-    " Hex-decode percent-encoded characters (%20 -> space, etc.)
-    let l:path = substitute(l:path, '%\(\x\x\)', '\=nr2char("0x" . submatch(1))', 'g')
+    " Decode runs of percent-encoded UTF-8 bytes (%20 -> space, etc.).
+    let l:path = substitute(l:path, '\%(%\x\x\)\+', '\=s:decode_uri_bytes(submatch(0))', 'g')
     if has('win32')
         if l:path =~# '^/[a-zA-Z]:'
             let l:path = l:path[1:]
@@ -146,25 +212,41 @@ function! s:supports(ft, method, ...) abort
     return 1
 endfunction
 
-function! s:did_open(ft) abort
-    let l:buf = bufnr('%')
+function! s:did_open(ft, ...) abort
+    let l:buf = a:0 ? a:1 : bufnr('%')
     let l:uri = s:get_buf_uri(l:buf)
-    if empty(l:uri) | return | endif
+    if empty(l:uri) || !has_key(s:servers, a:ft) | return | endif
+    let l:server = s:servers[a:ft]
+    let l:key = get(l:server, 'key', get(s:active_root_keys, a:ft, ''))
+    call setbufvar(l:buf, 'wplus_lsp_server_key', l:key)
     call setbufvar(l:buf, 'wplus_lsp_uri', l:uri)
+    if has_key(get(l:server, 'opened_uris', {}), l:uri) | return | endif
+
+    let l:lines = getbufline(l:buf, 1, '$')
+    if empty(l:lines) | let l:lines = [''] | endif
     call setbufvar(l:buf, 'wplus_lsp_version', 1)
-    call setbufvar(l:buf, 'wplus_lsp_prev_lines', getline(1, '$'))
-    let l:params = {'textDocument': {'uri': l:uri, 'languageId': a:ft, 'version': 1, 'text': join(getline(1, '$'), "\n") . "\n"}}
+    call setbufvar(l:buf, 'wplus_lsp_prev_lines', l:lines)
+    let l:server.opened_uris[l:uri] = 1
+    let l:language = getbufvar(l:buf, '&filetype')
+    let l:params = {'textDocument': {'uri': l:uri, 'languageId': l:language, 'version': 1, 'text': join(l:lines, "\n") . "\n"}}
     call s:send(a:ft, 'textDocument/didOpen', l:params, 1)
-    call wplus#lsp#request_inlay_hints()
-    call wplus#lsp#request_semantic_tokens()
-    call wplus#lsp#request_document_links()
+    if l:buf == bufnr('%')
+        call wplus#lsp#request_inlay_hints()
+        call wplus#lsp#request_semantic_tokens()
+        call wplus#lsp#request_document_links()
+    endif
 endfunction
 
 function! s:did_close(bufnr) abort
     let l:uri = getbufvar(a:bufnr, 'wplus_lsp_uri', '')
     let l:ft  = getbufvar(a:bufnr, '&filetype', '')
-    if !empty(l:uri) && !empty(l:ft) && has_key(s:servers, l:ft)
-        call s:send(l:ft, 'textDocument/didClose', {'textDocument': {'uri': l:uri}}, 1)
+    let l:key = getbufvar(a:bufnr, 'wplus_lsp_server_key', '')
+    if !empty(l:uri) && !empty(l:ft) && has_key(s:root_servers, l:key)
+        call s:send_on_server(l:key, l:ft, 'textDocument/didClose', {'textDocument': {'uri': l:uri}}, 1)
+        if has_key(s:root_servers[l:key].opened_uris, l:uri)
+            call remove(s:root_servers[l:key].opened_uris, l:uri)
+        endif
+        call setbufvar(a:bufnr, 'wplus_lsp_server_key', '')
     endif
 endfunction
 
@@ -255,7 +337,10 @@ function! s:do_did_change(ft, buf) abort
         \ 'text': l:change.text,
         \ }
     let l:params = {'textDocument': {'uri': l:uri, 'version': l:ver}, 'contentChanges': [l:content_change]}
-    call s:send(a:ft, 'textDocument/didChange', l:params, 1)
+    let l:key = getbufvar(a:buf, 'wplus_lsp_server_key', '')
+    if has_key(s:root_servers, l:key)
+        call s:send_on_server(l:key, a:ft, 'textDocument/didChange', l:params, 1)
+    endif
 endfunction
 
 function! wplus#lsp#flush_changes(...) abort
@@ -297,6 +382,23 @@ endfunction
 "   [{'root': '/a', 'cmd': [...]}, ...]   list of dicts; first matching root
 "                                          (or first without a root) wins
 " Returns [] when nothing applies to the current root.
+function! s:server_key(ft, root) abort
+    return a:ft . "\n" . a:root
+endfunction
+
+function! s:activate_server(ft) abort
+    let l:key = s:server_key(a:ft, s:project_root())
+    if has_key(s:root_servers, l:key) && s:job_running(s:root_servers[l:key].job)
+        let s:servers[a:ft] = s:root_servers[l:key]
+        let s:active_root_keys[a:ft] = l:key
+        call setbufvar(bufnr('%'), 'wplus_lsp_server_key', l:key)
+        return 1
+    endif
+    if has_key(s:servers, a:ft) | call remove(s:servers, a:ft) | endif
+    if has_key(s:active_root_keys, a:ft) | call remove(s:active_root_keys, a:ft) | endif
+    return 0
+endfunction
+
 function! s:resolve_server_config(ft, root) abort
     let l:configured = get(g:wplus_lsp_servers, a:ft, [])
     if type(l:configured) == v:t_dict
@@ -325,20 +427,30 @@ endfunction
 
 function! s:start_server(ft) abort
     let l:root = s:project_root()
-    if has_key(s:servers, a:ft) && s:job_running(s:servers[a:ft].job)
-        if get(s:servers[a:ft], 'root', '') ==# l:root
-            call s:did_open(a:ft)
-            return
-        endif
-        " Never reuse a language server from another project root.
-        call wplus#lsp#stop(a:ft)
+    let l:key = s:server_key(a:ft, l:root)
+    if has_key(s:root_servers, l:key) && s:job_running(s:root_servers[l:key].job)
+        let s:servers[a:ft] = s:root_servers[l:key]
+        let s:active_root_keys[a:ft] = l:key
+        call setbufvar(bufnr('%'), 'wplus_lsp_server_key', l:key)
+        call s:did_open(a:ft)
+        return
+    endif
+    if has_key(s:root_servers, l:key)
+        call remove(s:root_servers, l:key)
     endif
     let l:cmd = s:resolve_server_config(a:ft, l:root)
-    if type(l:cmd) != v:t_list || empty(l:cmd) || !executable(l:cmd[0]) | return | endif
-    let l:job = job_start(l:cmd, {'in_mode': 'raw', 'out_mode': 'raw', 'out_cb': {c, m -> s:on_stdout(a:ft, c, m)}, 'err_cb': {c, m -> s:log(a:ft, 'STDERR', m)}})
-    let s:servers[a:ft] = {
+    if type(l:cmd) != v:t_list || empty(l:cmd) || !executable(l:cmd[0])
+        call s:activate_server(a:ft)
+        return
+    endif
+    let l:job = job_start(l:cmd, {'in_mode': 'raw', 'out_mode': 'raw', 'out_cb': {c, m -> s:on_stdout(a:ft, l:key, c, m)}, 'err_cb': {c, m -> s:log(a:ft, 'STDERR', m)}})
+    if type(l:job) != v:t_job | return | endif
+    let s:root_servers[l:key] = {
+        \ 'key': l:key,
+        \ 'ft': a:ft,
         \ 'job': l:job,
         \ 'root': l:root,
+        \ 'opened_uris': {},
         \ 'channel': job_getchannel(l:job),
         \ 'last_id': 0,
         \ 'requests': {},
@@ -346,6 +458,9 @@ function! s:start_server(ft) abort
         \ 'caps': {},
         \ 'initialized': 0,
         \ }
+    let s:servers[a:ft] = s:root_servers[l:key]
+    let s:active_root_keys[a:ft] = l:key
+    call setbufvar(bufnr('%'), 'wplus_lsp_server_key', l:key)
     call s:send(a:ft, 'initialize', {
         \ 'processId': getpid(),
         \ 'rootUri': s:get_uri(l:root),
@@ -369,6 +484,9 @@ function! s:start_server(ft) abort
 endfunction
 
 function! s:send(ft, method, params, ...) abort
+    if s:callback_server_ft !=# a:ft
+        call s:activate_server(a:ft)
+    endif
     if !has_key(s:servers, a:ft) | return 0 | endif
     let l:is_notify = a:0 > 0 ? a:1 : 0
     let l:is_user   = a:0 > 1 ? a:2 : 0
@@ -411,6 +529,36 @@ function! s:send(ft, method, params, ...) abort
     endtry
 endfunction
 
+function! s:send_on_server(key, ft, method, params, ...) abort
+    if !has_key(s:root_servers, a:key) | return 0 | endif
+    let l:had_active = has_key(s:servers, a:ft)
+    let l:old_server = get(s:servers, a:ft, {})
+    let l:old_key = get(s:active_root_keys, a:ft, '')
+    let l:old_callback_key = s:callback_server_key
+    let l:old_callback_ft = s:callback_server_ft
+    let s:servers[a:ft] = s:root_servers[a:key]
+    let s:active_root_keys[a:ft] = a:key
+    let s:callback_server_key = a:key
+    let s:callback_server_ft = a:ft
+    try
+        return call(function('s:send'), [a:ft, a:method, a:params] + a:000)
+    finally
+        let s:root_servers[a:key] = s:servers[a:ft]
+        if l:had_active
+            let s:servers[a:ft] = l:old_server
+        else
+            call remove(s:servers, a:ft)
+        endif
+        if empty(l:old_key)
+            if has_key(s:active_root_keys, a:ft) | call remove(s:active_root_keys, a:ft) | endif
+        else
+            let s:active_root_keys[a:ft] = l:old_key
+        endif
+        let s:callback_server_key = l:old_callback_key
+        let s:callback_server_ft = l:old_callback_ft
+    endtry
+endfunction
+
 function! s:read_location_text(uri, lnum) abort
     let l:path = s:decode_uri_path(a:uri)
     if !filereadable(l:path)
@@ -420,7 +568,37 @@ function! s:read_location_text(uri, lnum) abort
     return len(l:lines) >= a:lnum ? l:lines[a:lnum - 1] : ''
 endfunction
 
-function! s:on_stdout(ft, channel, msg) abort
+function! s:on_stdout(ft, key, channel, msg) abort
+    if !has_key(s:root_servers, a:key) | return | endif
+    let l:had_active = has_key(s:servers, a:ft)
+    let l:old_server = get(s:servers, a:ft, {})
+    let l:old_key = get(s:active_root_keys, a:ft, '')
+    let l:old_callback_key = s:callback_server_key
+    let l:old_callback_ft = s:callback_server_ft
+    let s:servers[a:ft] = s:root_servers[a:key]
+    let s:active_root_keys[a:ft] = a:key
+    let s:callback_server_key = a:key
+    let s:callback_server_ft = a:ft
+    try
+        call s:process_stdout(a:ft, a:msg)
+    finally
+        let s:root_servers[a:key] = s:servers[a:ft]
+        if l:had_active
+            let s:servers[a:ft] = l:old_server
+        else
+            call remove(s:servers, a:ft)
+        endif
+        if empty(l:old_key)
+            if has_key(s:active_root_keys, a:ft) | call remove(s:active_root_keys, a:ft) | endif
+        else
+            let s:active_root_keys[a:ft] = l:old_key
+        endif
+        let s:callback_server_key = l:old_callback_key
+        let s:callback_server_ft = l:old_callback_ft
+    endtry
+endfunction
+
+function! s:process_stdout(ft, msg) abort
     if !has_key(s:servers, a:ft) | return | endif
     let l:s = s:servers[a:ft]
     let l:s.buffer .= a:msg
@@ -484,7 +662,7 @@ function! s:handle_request_result(ft, method, result, ...) abort
         let s:servers[a:ft].caps = get(a:result, 'capabilities', {})
         let s:servers[a:ft].initialized = 1
         call s:send(a:ft, 'initialized', {}, 1)
-        call s:did_open(a:ft)
+        call s:did_open(a:ft, get(l:req, 'bufnr', bufnr('%')))
     elseif a:method ==# 'textDocument/definition'
         if get(l:req, 'tag', '') ==# 'peek'
             call s:peek_definition(a:result)
@@ -1981,21 +2159,27 @@ function! s:execute_code_action(action) abort
 endfunction
 
 function! wplus#lsp#stop(ft) abort
-    if !has_key(s:servers, a:ft) | return | endif
-    let l:server = s:servers[a:ft]
+    let l:key = get(s:active_root_keys, a:ft, s:server_key(a:ft, s:project_root()))
+    if !has_key(s:root_servers, l:key) | return | endif
+    let l:server = s:root_servers[l:key]
     if s:job_running(l:server.job)
-        call s:send(a:ft, 'shutdown', {})
-        call s:send(a:ft, 'exit', {}, 1)
+        call s:send_on_server(l:key, a:ft, 'shutdown', {})
+        call s:send_on_server(l:key, a:ft, 'exit', {}, 1)
         silent! call job_stop(l:server.job)
     endif
-    call remove(s:servers, a:ft)
+    call remove(s:root_servers, l:key)
+    if get(s:active_root_keys, a:ft, '') ==# l:key
+        if has_key(s:active_root_keys, a:ft) | call remove(s:active_root_keys, a:ft) | endif
+        if has_key(s:servers, a:ft) | call remove(s:servers, a:ft) | endif
+    endif
 endfunction
 
 function! wplus#lsp#stop_all() abort
-    for [l:ft, l:server] in items(s:servers)
+    for [l:key, l:server] in items(copy(s:root_servers))
+        let l:ft = get(l:server, 'ft', '')
         if s:job_running(l:server.job)
-            call s:send(l:ft, 'shutdown', {})
-            call s:send(l:ft, 'exit', {}, 1)
+            call s:send_on_server(l:key, l:ft, 'shutdown', {})
+            call s:send_on_server(l:key, l:ft, 'exit', {}, 1)
             let l:i = 0
             while l:i < 10 && s:job_running(l:server.job)
                 sleep 20m
@@ -2007,11 +2191,17 @@ function! wplus#lsp#stop_all() abort
         endif
     endfor
     let s:servers = {}
+    let s:root_servers = {}
+    let s:active_root_keys = {}
+    if s:timeout_timer > 0
+        call timer_stop(s:timeout_timer)
+        let s:timeout_timer = -1
+    endif
 endfunction
 
 function! s:check_request_timeouts(timer) abort
     let l:now = localtime()
-    for [l:ft, l:server] in items(s:servers)
+    for [l:key, l:server] in items(s:root_servers)
         for [l:id, l:req] in items(l:server.requests)
             let l:at = type(l:req) == v:t_dict ? get(l:req, 'at', l:now) : l:now
             if (l:now - l:at) >= g:wplus_lsp_request_timeout
@@ -2081,6 +2271,26 @@ function! wplus#lsp#_test_resolve_server_config(ft, root) abort
     return s:resolve_server_config(a:ft, a:root)
 endfunction
 
+function! wplus#lsp#_test_get_uri(path) abort
+    return s:get_uri(a:path)
+endfunction
+
+function! wplus#lsp#_test_decode_uri_path(uri) abort
+    return s:decode_uri_path(a:uri)
+endfunction
+
+function! wplus#lsp#_test_timeout_timer_id() abort
+    return s:timeout_timer
+endfunction
+
+function! wplus#lsp#_test_current_server_key() abort
+    return getbufvar(bufnr('%'), 'wplus_lsp_server_key', '')
+endfunction
+
+function! wplus#lsp#_test_server_count() abort
+    return len(s:root_servers)
+endfunction
+
 function! wplus#lsp#_test_prepare_rename_valid(result) abort
     return s:prepare_rename_valid(a:result)
 endfunction
@@ -2133,7 +2343,9 @@ endfunction
 function! wplus#lsp#setup() abort
     call s:define_signs()
 
-    let s:timeout_timer = timer_start(5000, function('s:check_request_timeouts'), {'repeat': -1})
+    if s:timeout_timer <= 0 || empty(timer_info(s:timeout_timer))
+        let s:timeout_timer = timer_start(5000, function('s:check_request_timeouts'), {'repeat': -1})
+    endif
 
     command! WlspHover          call wplus#lsp#hover()
     command! WlspCompletion     call wplus#lsp#completion()
@@ -2172,6 +2384,7 @@ function! wplus#lsp#setup() abort
 
     augroup wplus_lsp
         autocmd!
+        autocmd BufEnter * call s:start_server(&filetype)
         autocmd FileType * call s:start_server(&filetype)
         autocmd BufReadPost * call s:did_open(&filetype)
         autocmd InsertEnter * call s:on_insert_enter()

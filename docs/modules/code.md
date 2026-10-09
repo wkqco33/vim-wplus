@@ -40,7 +40,7 @@ let g:wplus_lsp_complete_min_chars = 2 " 식별자 자동완성 최소 길이
 
 **시맨틱 토큰:** 서버가 `semanticTokens`를 지원하면 열기/저장 시 LSP 기반 하이라이트를 자동 적용합니다.
 
-**프로젝트별 서버 설정:** `g:wplus_lsp_servers` 값에 `root`를 지정해 프로젝트 루트별로 다른 서버를 쓸 수 있습니다.
+**프로젝트별 서버 설정:** `g:wplus_lsp_servers` 값에 `root`를 지정해 프로젝트 루트별로 다른 서버를 쓸 수 있습니다. 같은 파일타입의 여러 프로젝트를 동시에 열어도 root별 언어 서버 인스턴스를 유지합니다.
 
 ```vim
 let g:wplus_lsp_servers = {

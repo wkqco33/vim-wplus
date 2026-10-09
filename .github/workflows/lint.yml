@@ -73,3 +73,5 @@ jobs:
         run: brew install vim
       - name: Run tests
         run: ./test/run.sh
+      - name: Test test-runner safeguards
+        run: bash test/test_harness.sh

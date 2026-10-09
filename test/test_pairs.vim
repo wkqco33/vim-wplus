@@ -10,14 +10,15 @@
 " Cursor positions below are mid-line, where normal-mode col() matches the
 " insert-mode column the handler would see.
 
-call wplus#pairs#setup()
-
 function! s:at(text, col) abort
     enew!
     setlocal buftype=nofile noswapfile
     call setline(1, a:text)
     call cursor(1, a:col)
 endfunction
+
+function! Test_pairs_behavior() abort
+call wplus#pairs#setup()
 
 " ── mappings are installed ────────────────────────────────────────────────
 
@@ -101,3 +102,4 @@ call assert_equal("\<BS>\<Del>", wplus#pairs#backspace(),
     \ 'pair-delete still works when no popup menu is visible')
 
 bwipeout!
+endfunction
