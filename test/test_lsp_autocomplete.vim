@@ -83,9 +83,9 @@ endfunction
 
 function! Test_lsp_autocomplete_only_uses_server_trigger_characters() abort
     call wplus#lsp#setup()
-    call wplus#lsp#_test_set_caps('python', {'completionProvider': {'triggerCharacters': ['.']}})
     enew!
     setlocal buftype=nofile bufhidden=wipe noswapfile filetype=python
+    call wplus#lsp#_test_set_caps('python', {'completionProvider': {'triggerCharacters': ['.']}})
     call setline(1, 'a')
     call cursor(1, 2)
     call assert_false(wplus#lsp#_test_auto_completion_trigger_available('python'), 'A one-character identifier should not open a completion list')
