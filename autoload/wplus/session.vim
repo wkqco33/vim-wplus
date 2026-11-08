@@ -56,21 +56,18 @@ endfunction
 
 function! s:close_plugin_windows() abort
     " Close sidebar/plugin windows that embed unrestorable state into sessions
-    " (e.g. tagbar#RestoreSession, NERDTree, etc.)
-    for l:winnr in range(1, winnr('$'))
+    " (e.g. tagbar#RestoreSession, NERDTree, etc.). Iterate in reverse so
+    " closing a window does not shift lower window numbers.
+    for l:winnr in reverse(range(1, winnr('$')))
         let l:bt = getwinvar(l:winnr, '&buftype')
         let l:ft = getwinvar(l:winnr, '&filetype')
         if l:ft =~# '^\(tagbar\|nerdtree\|netrw\)$' || l:bt ==# 'nofile' || l:bt ==# 'terminal'
-            " :windo accepts no range, so `execute l:winnr . 'windo close'` threw
-            " E481 on every VimLeavePre that had a sidebar open -- uncaught, and
-            " right in the middle of session saving.
             try
                 execute l:winnr . 'wincmd w'
                 close
             catch
                 " last window, or already gone -- nothing to close
             endtry
-            break
         endif
     endfor
 endfunction
@@ -80,6 +77,11 @@ function! s:save_session() abort
     if &buftype != '' || empty(bufname('%')) | return | endif
     " Skip if session file is empty (e.g. just started and no file opened)
     if argc() == 0 && line2byte('$') == -1 && bufnr('$') == 1 | return | endif
+
+    let l:listed = len(getbufinfo({'buflisted': 1}))
+    if l:listed > get(g:, 'wplus_session_max_files', 50)
+        return
+    endif
 
     call s:close_plugin_windows()
     let l:file = s:get_session_name()

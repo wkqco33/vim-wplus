@@ -25,7 +25,7 @@ endfunction
 
 function! s:apply_indent() abort
     setlocal foldmethod=indent
-    setlocal foldminlines=1
+    execute 'setlocal foldminlines=' . get(g:, 'wplus_fold_min_lines', 1)
     execute 'setlocal foldlevel=' . g:wplus_fold_level
     if g:wplus_fold_column > 0
         execute 'setlocal foldcolumn=' . g:wplus_fold_column
@@ -55,7 +55,7 @@ function! s:apply_lsp(bufnr) abort
     let b:wplus_fold_ranges = s:lsp_folds[a:bufnr]
     setlocal foldmethod=expr
     setlocal foldexpr=wplus#fold#expr(v:lnum)
-    setlocal foldminlines=1
+    execute 'setlocal foldminlines=' . get(g:, 'wplus_fold_min_lines', 1)
     execute 'setlocal foldlevel=' . g:wplus_fold_level
     if g:wplus_fold_column > 0
         execute 'setlocal foldcolumn=' . g:wplus_fold_column
@@ -138,7 +138,11 @@ function! wplus#fold#setup_buffer() abort
         call s:apply_indent()
     elseif g:wplus_fold_method ==# 'syntax'
         setlocal foldmethod=syntax
+        execute 'setlocal foldminlines=' . get(g:, 'wplus_fold_min_lines', 1)
         execute 'setlocal foldlevel=' . g:wplus_fold_level
+        if g:wplus_fold_column > 0
+            execute 'setlocal foldcolumn=' . g:wplus_fold_column
+        endif
     else
         call s:apply_indent()
     endif

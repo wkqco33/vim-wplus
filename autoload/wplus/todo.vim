@@ -32,9 +32,9 @@ endfunction
 function! s:match_todos() abort
     call s:clear_matches()
     let w:wplus_todo_match_ids = [
-        \ matchadd('WplusTodo',  '\v\b(TODO|XXX)\b'),
-        \ matchadd('WplusFixme', '\v\b(FIXME|BUG|ERROR)\b'),
-        \ matchadd('WplusNote',  '\v\b(NOTE|INFO|HACK)\b'),
+        \ matchadd('WplusTodo',  '\v\C<(TODO|XXX)>'),
+        \ matchadd('WplusFixme', '\v\C<(FIXME|BUG|ERROR)>'),
+        \ matchadd('WplusNote',  '\v\C<(NOTE|INFO|HACK|WARN)>'),
         \ ]
 endfunction
 
@@ -112,13 +112,22 @@ function! s:build_search_cmd(backend_name) abort
 endfunction
 
 function! s:get_todos() abort
-    let l:b = wplus#grep#backend()
-    if empty(l:b)
+    let l:pref = get(g:, 'wplus_todo_grep_backend', '')
+    let l:b_name = ''
+    if !empty(l:pref)
+        let l:b_name = l:pref
+    else
+        let l:b = wplus#grep#backend()
+        if !empty(l:b)
+            let l:b_name = l:b.name
+        endif
+    endif
+    if empty(l:b_name)
         call wplus#util#warn_msg('todo', 'no grep backend found — install ripgrep (rg) for TODO search')
         return []
     endif
 
-    let l:cmd = s:build_search_cmd(l:b.name)
+    let l:cmd = s:build_search_cmd(l:b_name)
     if empty(l:cmd)
         return []
     endif

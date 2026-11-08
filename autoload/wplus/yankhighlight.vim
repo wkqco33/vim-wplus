@@ -1,5 +1,8 @@
 " wplus/yankhighlight.vim — flash highlight on yank (VSCode-style feedback)
 
+if exists('g:autoloaded_wplus_yankhighlight') | finish | endif
+let g:autoloaded_wplus_yankhighlight = 1
+
 let s:timer = -1
 let s:match = -1
 

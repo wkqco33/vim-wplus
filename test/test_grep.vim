@@ -26,3 +26,19 @@ function! Test_grep_buffered_caddexpr() abort
     let &errorformat = l:orig_efm
     call setqflist([], 'r')
 endfunction
+
+function! Test_grep_respects_backend_and_ignore_vcs_options() abort
+    let g:wplus_grep_backend = 'grep'
+    let l:b = wplus#grep#backend()
+    call assert_equal('grep', l:b.name, 'g:wplus_grep_backend should override auto-detection')
+
+    if executable('rg')
+        let g:wplus_grep_backend = 'rg'
+        let g:wplus_grep_ignore_vcs = 0
+        let l:b_rg = wplus#grep#backend()
+        call assert_true(l:b_rg.grepprg =~# '--no-ignore-vcs', 'g:wplus_grep_ignore_vcs=0 should pass --no-ignore-vcs to rg')
+    endif
+
+    let g:wplus_grep_backend = ''
+    let g:wplus_grep_ignore_vcs = 1
+endfunction

@@ -8,6 +8,9 @@
 "   ia  — inner argument (without surrounding comma/space)
 "   aa  — around argument (with trailing comma or leading comma)
 
+if exists('g:autoloaded_wplus_textobj') | finish | endif
+let g:autoloaded_wplus_textobj = 1
+
 function! wplus#textobj#setup() abort
     " Indent text objects
     onoremap <silent> ii :<C-u>call wplus#textobj#indent(0)<CR>
@@ -82,12 +85,18 @@ function! wplus#textobj#argument(around) abort
     endif
 
     " Find argument boundaries within parens
-    let l:inner = l:line[l:open + 1 : l:close - 1]
+    if l:close <= l:open + 1
+        return
+    endif
+    let l:inner = strpart(l:line, l:open + 1, l:close - l:open - 1)
+    if empty(trim(l:inner))
+        return
+    endif
     let l:offset = l:open + 1
 
-    let [l:astart, l:aend] = s:arg_range(l:inner, l:col - l:offset)
+    let [l:astart, l:aend] = s:arg_range(l:inner, max([0, l:col - l:offset]))
 
-    if l:astart < 0
+    if l:astart < 0 || l:astart > l:aend
         return
     endif
 
@@ -95,14 +104,20 @@ function! wplus#textobj#argument(around) abort
     let l:aend   += l:offset
 
     if a:around
-        " Include trailing comma+space or leading comma+space
+        " Include trailing comma+spaces or leading comma+spaces
         if l:line[l:aend + 1] ==# ','
             let l:aend += 1
-            if l:line[l:aend + 1] ==# ' '
+            while l:aend + 1 < l:close && l:line[l:aend + 1] ==# ' '
                 let l:aend += 1
+            endwhile
+        else
+            let l:scan = l:astart - 1
+            while l:scan > l:open && l:line[l:scan] ==# ' '
+                let l:scan -= 1
+            endwhile
+            if l:scan > l:open && l:line[l:scan] ==# ','
+                let l:astart = l:scan
             endif
-        elseif l:line[l:astart - 1] ==# ' ' && l:line[l:astart - 2] ==# ','
-            let l:astart -= 2
         endif
     else
         " Strip surrounding spaces
@@ -112,6 +127,9 @@ function! wplus#textobj#argument(around) abort
         while l:aend >= l:astart && l:line[l:aend] ==# ' '
             let l:aend -= 1
         endwhile
+        if l:astart > l:aend
+            return
+        endif
     endif
 
     call cursor(line('.'), l:astart + 1)

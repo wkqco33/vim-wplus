@@ -4,6 +4,9 @@
 " :Bwipeout — wipeout current buffer, keep window
 " <leader>bd mapping
 
+if exists('g:autoloaded_wplus_bufdelete') | finish | endif
+let g:autoloaded_wplus_bufdelete = 1
+
 function! wplus#bufdelete#setup() abort
     command! -bang Bdelete  call wplus#bufdelete#delete(<bang>0, 0)
     command! -bang Bwipeout call wplus#bufdelete#delete(<bang>0, 1)

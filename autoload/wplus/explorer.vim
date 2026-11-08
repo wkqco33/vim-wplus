@@ -154,8 +154,8 @@ function! s:render(root) abort
     for l:item in s:tree_data
         let l:indent = repeat('  ', l:item.level + 1)
         let l:prefix = l:item.is_dir ? (get(s:expanded, l:item.path, 0) ? '▾ ' : '▸ ') : '  '
-        let l:avail = l:winw - len(l:indent) - len(l:prefix)
-        let l:name = len(l:item.name) > l:avail ? l:item.name[: l:avail - 2] . '…' : l:item.name
+        let l:avail = max([2, l:winw - len(l:indent) - len(l:prefix)])
+        let l:name = len(l:item.name) > l:avail ? strpart(l:item.name, 0, l:avail - 1) . '…' : l:item.name
         call add(l:lines, l:indent . l:prefix . l:name)
     endfor
     if s:truncated

@@ -12,6 +12,7 @@ function! wplus#tabline#render() abort
     for bufnum in bufs
         let name = fnamemodify(bufname(bufnum), ':t')
         if empty(name) | let name = '[No Name]' | endif
+        let name = substitute(name, '%', '%%', 'g')
         let modified = getbufvar(bufnum, '&modified')
         if bufnum == current
             let hl = modified ? 'WplusTabModSel' : 'WplusTabSel'

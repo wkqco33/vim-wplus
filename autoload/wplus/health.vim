@@ -57,6 +57,9 @@ let s:known_options = [
     \ 'wplus_lsp_auto_complete', 'wplus_lsp_complete_delay', 'wplus_lsp_complete_min_chars',
     \ 'wplus_vscode_keymaps', 'wplus_vscode_enabled',
     \ 'wplus_terminal_height', 'wplus_terminal_position',
+    \ 'wplus_colorscheme_auto', 'wplus_colorscheme_auto_detect',
+    \ 'wplus_pairs_map', 'wplus_project_trust_file',
+    \ 'wplus_session_auto_restore', 'wplus_session_auto_save',
     \ ]
 
 function! wplus#health#native_keys() abort

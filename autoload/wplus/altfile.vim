@@ -18,24 +18,75 @@ let s:alt_map = {
     \ }
 
 function! s:find_alternate() abort
-    let ext  = expand('%:e')
-    let base = expand('%:p:r')
-    if !has_key(s:alt_map, ext) | return '' | endif
-    for target_ext in s:alt_map[ext]
-        let candidate = base . '.' . target_ext
-        if filereadable(candidate) | return candidate | endif
+    let l:ext  = expand('%:e')
+    let l:base = expand('%:p:r')
+    let l:dir  = expand('%:p:h')
+    let l:tail = expand('%:t:r')
+
+    " 1. Go: foo.go <-> foo_test.go
+    if l:ext ==# 'go'
+        if l:tail =~# '_test$'
+            return l:dir . '/' . substitute(l:tail, '_test$', '', '') . '.go'
+        endif
+        return l:dir . '/' . l:tail . '_test.go'
+    endif
+
+    " 2. Python: foo.py <-> test_foo.py / foo_test.py
+    if l:ext ==# 'py'
+        if l:tail =~# '^test_'
+            return l:dir . '/' . substitute(l:tail, '^test_', '', '') . '.py'
+        elseif l:tail =~# '_test$'
+            return l:dir . '/' . substitute(l:tail, '_test$', '', '') . '.py'
+        endif
+        for l:cand in [l:dir . '/test_' . l:tail . '.py', l:dir . '/' . l:tail . '_test.py']
+            if filereadable(l:cand) | return l:cand | endif
+        endfor
+        return l:dir . '/test_' . l:tail . '.py'
+    endif
+
+    " 3. Dart: foo.dart <-> foo_test.dart
+    if l:ext ==# 'dart'
+        if l:tail =~# '_test$'
+            let l:src_name = substitute(l:tail, '_test$', '', '') . '.dart'
+            let l:lib_cand = substitute(l:dir, '/test\(/\|$\)', '/lib\1', '') . '/' . l:src_name
+            if filereadable(l:lib_cand) | return l:lib_cand | endif
+            return l:dir . '/' . l:src_name
+        endif
+        let l:tst_cand = substitute(l:dir, '/lib\(/\|$\)', '/test\1', '') . '/' . l:tail . '_test.dart'
+        if filereadable(l:tst_cand) | return l:tst_cand | endif
+        return l:dir . '/' . l:tail . '_test.dart'
+    endif
+
+    " 4. C/C++/ObjC header <-> source
+    if !has_key(s:alt_map, l:ext) | return '' | endif
+    for l:target_ext in s:alt_map[l:ext]
+        let l:candidate = l:base . '.' . l:target_ext
+        if filereadable(l:candidate) | return l:candidate | endif
+        " Also check src/ <-> include/ sibling directories
+        let l:swap_dir = l:dir =~# '/src\(/\|$\)'
+            \ ? substitute(l:dir, '/src\(/\|$\)', '/include\1', '')
+            \ : (l:dir =~# '/include\(/\|$\)' ? substitute(l:dir, '/include\(/\|$\)', '/src\1', '') : '')
+        if !empty(l:swap_dir)
+            let l:alt_cand = l:swap_dir . '/' . l:tail . '.' . l:target_ext
+            if filereadable(l:alt_cand) | return l:alt_cand | endif
+        endif
     endfor
     " Return best guess even if it doesn't exist yet
-    return base . '.' . s:alt_map[ext][0]
+    return l:base . '.' . s:alt_map[l:ext][0]
 endfunction
 
 function! wplus#altfile#jump(cmd) abort
-    let alt = s:find_alternate()
-    if empty(alt)
+    let l:alt = s:find_alternate()
+    if empty(l:alt)
         echohl WarningMsg | echo 'wplus-altfile: no alternate file for ' . expand('%:e') | echohl None
         return
     endif
-    execute a:cmd . ' ' . fnameescape(alt)
+    let l:act = empty(a:cmd) ? 'edit' : a:cmd
+    execute l:act . ' ' . fnameescape(l:alt)
+endfunction
+
+function! wplus#altfile#switch(cmd) abort
+    call wplus#altfile#jump(a:cmd)
 endfunction
 
 function! wplus#altfile#setup() abort

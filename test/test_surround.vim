@@ -67,5 +67,40 @@ let s:before = getline(1)
 call feedkeys('dst', 'x')
 call assert_equal(s:before, getline(1), 'dst does not corrupt the line')
 
+" ── column-1 delimiter regression ([: -1] slice bug) ──────────────────────
+call s:buf('(bar)', 2)
+call feedkeys("ds)", 'x')
+call assert_equal('bar', getline(1), 'ds) at column 1 removes parens without duplicating line')
+
+call s:buf('(bar)', 2)
+call feedkeys('cs)"', 'x')
+call assert_equal('"bar"', getline(1), 'cs)" at column 1 swaps parens for quotes without duplicating line')
+
+call s:buf('hello', 1)
+call feedkeys("veS\"", 'x')
+call assert_equal('"hello"', getline(1), 'visual S" at column 1 surrounds word without duplicating line')
+
+" ── multibyte UTF-8 surrounding ───────────────────────────────────────────
+call s:buf('가나다', 1)
+call feedkeys("veS\"", 'x')
+call assert_equal('"가나다"', getline(1), 'visual S" surrounds multibyte UTF-8 text cleanly')
+
+call s:buf('"가나다"', 4)
+call feedkeys('cs"''', 'x')
+call assert_equal("'가나다'", getline(1), 'cs swaps quotes around multibyte UTF-8 text cleanly')
+
+call s:buf('"가나다"', 4)
+call feedkeys('ds"', 'x')
+call assert_equal('가나다', getline(1), 'ds removes quotes around multibyte UTF-8 text cleanly')
+
+" ── ys{motion}{char} and yss{char} normal-mode operators ──────────────────
+call s:buf('hello world', 1)
+call feedkeys('ysiw"', 'x')
+call assert_equal('"hello" world', getline(1), 'ysiw" surrounds word under cursor')
+
+call s:buf('    hello world', 5)
+call feedkeys('yss)', 'x')
+call assert_equal('    (hello world)', getline(1), 'yss) surrounds entire line preserving indentation')
+
 bwipeout!
 endfunction

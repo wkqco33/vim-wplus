@@ -1,6 +1,9 @@
 " wplus/format.vim — Smart formatter (Alt+Shift+F)
 " Priority: coc/LSP → external tool → ALE → vim indent
 
+if exists('g:autoloaded_wplus_format') | finish | endif
+let g:autoloaded_wplus_format = 1
+
 " ── external formatter map ────────────────────────────────────────────────
 " Values:
 "   cmd      : shell command (reads stdin, writes stdout)
@@ -58,6 +61,8 @@ function! wplus#format#setup() abort
         autocmd!
         autocmd BufWritePre * if get(g:, 'wplus_format_on_save', 0) && &buftype ==# '' && &modifiable | call wplus#format#run() | endif
     augroup END
+
+    command! -bar Wformat call wplus#format#run()
 
     nnoremap <silent> <M-F> :call wplus#format#run()<CR>
     nnoremap <silent> <leader>i :call wplus#format#run()<CR>

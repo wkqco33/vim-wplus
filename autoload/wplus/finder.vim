@@ -81,15 +81,15 @@ function! wplus#finder#filter(winid, key) abort
         call s:cleanup_state()
         return 1
     elseif a:key == "\<C-n>" || a:key == "\<Down>" || a:key == "\<C-j>"
-        let s:state.selected = min([s:state.selected + 1, len(s:state.filtered) - 1])
+        let s:state.selected = max([0, min([s:state.selected + 1, len(s:state.filtered) - 1])])
     elseif a:key == "\<C-p>" || a:key == "\<Up>" || a:key == "\<C-k>"
         let s:state.selected = max([s:state.selected - 1, 0])
     elseif a:key == "\<BS>" || a:key == "\<C-h>"
         if !empty(s:state.query)
-            let s:state.query = s:state.query[:-2]
+            let s:state.query = strcharpart(s:state.query, 0, strchars(s:state.query) - 1)
             call s:filter_items()
         endif
-    elseif a:key =~ '^\p$'
+    elseif strchars(a:key) == 1 && char2nr(a:key) >= 32
         let s:state.query .= a:key
         call s:filter_items()
     endif

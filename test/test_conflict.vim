@@ -91,3 +91,18 @@ function! Test_conflict_targets_cursor_block() abort
 
     bwipeout!
 endfunction
+
+function! Test_conflict_ignores_incomplete_markers() abort
+    enew!
+    setlocal buftype=nofile bufhidden=wipe noswapfile
+    let l:orig = [
+        \ 'normal line',
+        \ '<<<<<<< unclosed marker without separator or end',
+        \ 'important code that must not be deleted',
+        \ ]
+    call setline(1, l:orig)
+    call cursor(2, 1)
+    call wplus#conflict#resolve_ours()
+    call assert_equal(l:orig, getline(1, '$'), 'Unclosed conflict marker must not delete buffer lines')
+    bwipeout!
+endfunction

@@ -43,32 +43,39 @@ endfunction
 
 " ── git blame callback ────────────────────────────────────────────────────
 
+function! s:format_blame_lines(lines) abort
+    if empty(a:lines) | return '' | endif
+    let l:hash    = matchstr(a:lines[0], '^[0-9a-fA-F]\+')[:6]
+    let l:author  = ''
+    let l:summary = ''
+    let l:epoch   = 0
+    for l:l in a:lines
+        if l:l =~# '^author '      | let l:author  = strpart(l:l, 7) | endif
+        if l:l =~# '^summary '     | let l:summary = strpart(l:l, 8) | endif
+        if l:l =~# '^author-time ' | let l:epoch   = str2nr(strpart(l:l, 12)) | endif
+    endfor
+    if empty(l:author) || l:author ==# 'Not Committed Yet' | return '' | endif
+
+    let l:date = strftime(g:wplus_blame_date_format, l:epoch)
+    let l:tpl  = g:wplus_blame_template
+    let l:tpl  = substitute(l:tpl, '<hash>',    escape(l:hash, '\&'), 'g')
+    let l:tpl  = substitute(l:tpl, '<author>',  escape(l:author, '\&'), 'g')
+    let l:tpl  = substitute(l:tpl, '<date>',    escape(l:date, '\&'), 'g')
+    let l:tpl  = substitute(l:tpl, '<summary>', escape(l:summary, '\&'), 'g')
+    return g:wplus_blame_prefix . l:tpl
+endfunction
+
 function! s:on_blame(bufnr, lnum, lines, chan) abort
     if !bufloaded(a:bufnr) | return | endif
-    if empty(a:lines) | return | endif
-
-    " porcelain format: first line is hash + metadata keys follow
-    let author  = ''
-    let summary = ''
-    let epoch   = 0
-    for l in a:lines
-        if l =~# '^author '         | let author  = l[7:] | endif
-        if l =~# '^summary '        | let summary = l[8:] | endif
-        if l =~# '^author-time '    | let epoch   = str2nr(l[12:]) | endif
-    endfor
-    if empty(author) || author ==# 'Not Committed Yet' | return | endif
-
-    let date = strftime(g:wplus_blame_date_format, epoch)
-    let text = g:wplus_blame_prefix
-                \ . substitute(substitute(substitute(g:wplus_blame_template,
-                \   '<author>', author, ''), '<date>', date, ''), '<summary>', summary, '')
+    let l:text = s:format_blame_lines(a:lines)
+    if empty(l:text) | return | endif
 
     call s:clear(a:bufnr, a:lnum)
     try
         call prop_add(a:lnum, 0, {
                     \ 'type':   s:prop_type,
                     \ 'bufnr':  a:bufnr,
-                    \ 'text':   text,
+                    \ 'text':   l:text,
                     \ })
     catch
     endtry
@@ -155,10 +162,13 @@ function! wplus#blame#setup() abort
 endfunction
 
 function! s:on_buf_delete() abort
-    " Clean up any pending timer for this buffer
-    let l:buf = str2nr(expand('<abuf>'))
-    let l:blame_timer = getbufvar(l:buf, 'wplus_blame_timer', -1)
-    if l:blame_timer != -1
-        silent! call timer_stop(l:blame_timer)
+    " Clean up any pending timer
+    if s:timer != -1
+        silent! call timer_stop(s:timer)
+        let s:timer = -1
     endif
+endfunction
+
+function! wplus#blame#_test_format_blame(lines) abort
+    return s:format_blame_lines(a:lines)
 endfunction

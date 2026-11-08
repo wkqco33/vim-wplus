@@ -211,7 +211,7 @@ function! wplus#ai#fix_diagnostic() abort
         \ . "Line with error:\n" . l:cur_line . "\n\n"
         \ . "Context after:\n" . l:suffix . "\n\n"
         \ . "Return ONLY the corrected line of code, without explanations or markdown."
-    call wplus#ai#http#send_request(l:prompt, function('wplus#ai#ui#preview_replace_range', [l:bufnr, l:lnum, l:lnum]))
+    call s:send_ai_request(l:prompt, function('wplus#ai#ui#preview_replace_range', [l:bufnr, l:lnum, l:lnum]))
 endfunction
 
 let s:active_git_jobs = []

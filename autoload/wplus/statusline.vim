@@ -38,7 +38,7 @@ function! s:git_branch() abort
     endif
     " Uses b:wplus_git_branch cached by gitgutter (or direct HEAD read)
     if exists('b:wplus_git_branch') && !empty(b:wplus_git_branch)
-        return ' ' . b:wplus_git_branch
+        return ' ' . substitute(b:wplus_git_branch, '%', '%%', 'g')
     endif
     " Fast fallback: read .git/HEAD
     if !has_key(b:, 'wplus_git_root')
@@ -52,7 +52,7 @@ function! s:git_branch() abort
     if empty(lines) | return '' | endif
     let line = lines[0]
     let branch = line =~# '^ref: ' ? substitute(line, 'ref: refs/heads/', '', '') : line[:6]
-    return ' ' . branch
+    return ' ' . substitute(branch, '%', '%%', 'g')
 endfunction
 
 function! s:diagnostics() abort

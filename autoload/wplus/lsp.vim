@@ -62,7 +62,7 @@ let s:token_type_hl = {
     \ }
 
 function! s:log(ft, type, msg) abort
-    if !g:wplus_lsp_log_enabled | return | endif
+    if !g:wplus_lsp_log_enabled && !get(g:, 'wplus_lsp_debug', 0) | return | endif
     let l:log_file = getcwd() . '/lsp.log'
     let l:line = printf('[%s][%s][%s] %s', strftime('%H:%M:%S'), a:ft, a:type, a:msg)
     call writefile([l:line], l:log_file, 'a')
@@ -1897,7 +1897,7 @@ function! s:parse_snippet(snippet) abort
                 if l:colon == -1
                     call add(l:segs, {'type': 'stop', 'index': str2nr(l:inner), 'placeholder': ''})
                 else
-                    call add(l:segs, {'type': 'stop', 'index': str2nr(l:inner[: l:colon - 1]), 'placeholder': l:inner[l:colon + 1 :]})
+                    call add(l:segs, {'type': 'stop', 'index': str2nr(strpart(l:inner, 0, l:colon)), 'placeholder': strpart(l:inner, l:colon + 1)})
                 endif
                 let l:i = l:close + 1
             else
@@ -2123,8 +2123,10 @@ function! s:apply_text_edits(path, edits) abort
 
         let l:start_line = get(getbufline(l:bufnr, l:sl), 0, '')
         let l:end_line   = l:el == l:sl ? l:start_line : get(getbufline(l:bufnr, l:el), 0, '')
-        let l:prefix = l:sc > 0 ? l:start_line[: l:sc - 1] : ''
-        let l:suffix = l:end_line[l:ec : ]
+        let l:start_byte = max([0, s:lsp_character_to_col(l:start_line, l:sc) - 1])
+        let l:end_byte   = max([0, s:lsp_character_to_col(l:end_line, l:ec) - 1])
+        let l:prefix = strpart(l:start_line, 0, l:start_byte)
+        let l:suffix = strpart(l:end_line, l:end_byte)
 
         let l:replacement = split(l:prefix . l:e.newText . l:suffix, "\n", 1)
 
@@ -2215,8 +2217,25 @@ function! s:check_request_timeouts(timer) abort
     endfor
 endfunction
 
+function! wplus#lsp#toggle_inlay_hints() abort
+    let g:wplus_lsp_inlay_hints = !get(g:, 'wplus_lsp_inlay_hints', 1)
+    if g:wplus_lsp_inlay_hints
+        call wplus#lsp#request_inlay_hints()
+        call wplus#util#info_msg('lsp', 'Inlay hints enabled')
+    else
+        if has('textprop')
+            silent! call prop_remove({'type': 'WplusLspInlay', 'bufnr': bufnr('%'), 'all': v:true})
+        endif
+        call wplus#util#info_msg('lsp', 'Inlay hints disabled')
+    endif
+endfunction
+
 function! wplus#lsp#_test_apply_workspace_edit(edit) abort
     call s:apply_workspace_edit(a:edit)
+endfunction
+
+function! wplus#lsp#_test_apply_text_edits(path, edits) abort
+    call s:apply_text_edits(a:path, a:edits)
 endfunction
 
 function! wplus#lsp#_test_supports(ft, method) abort
@@ -2366,6 +2385,8 @@ function! wplus#lsp#setup() abort
     command! WlspDiagPopup      call wplus#lsp#diag_popup()
     command! WlspSignatureHelp  call wplus#lsp#signature_help()
     command! WlspFormat         call wplus#lsp#format(0)
+    command! WlspInlayHints     call wplus#lsp#toggle_inlay_hints()
+    command! WplusLspInlayHints call wplus#lsp#toggle_inlay_hints()
     command! -nargs=? WlspSymbols call wplus#lsp#workspace_symbols(<q-args> != '' ? <q-args> : input('Symbol: '))
 
     nnoremap <silent> K          :WlspHover<CR>
@@ -2394,7 +2415,7 @@ function! wplus#lsp#setup() abort
         autocmd TextChangedI * call s:trigger_auto_complete(&filetype, bufnr('%'))
         autocmd CompleteDone * call s:on_complete_done()
         autocmd BufWritePost * call s:did_save(&filetype)
-        autocmd BufUnload * call s:did_close(expand('<abuf>'))
+        autocmd BufUnload * call s:did_close(str2nr(expand('<abuf>')))
         autocmd VimLeavePre * call wplus#lsp#stop_all()
     augroup END
 endfunction

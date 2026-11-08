@@ -5,38 +5,58 @@ let g:autoloaded_wplus_grep = 1
 
 let s:search_history = [] " Search history list
 
-function! wplus#grep#backend() abort
-    if executable('rg')
+function! s:backend_spec(name) abort
+    if a:name ==# 'rg' && executable('rg')
+        let l:prg = 'rg --vimgrep --smart-case'
+        if !get(g:, 'wplus_grep_ignore_vcs', 1)
+            let l:prg .= ' --no-ignore-vcs'
+        endif
         return {
             \ 'name': 'rg',
-            \ 'grepprg': 'rg --vimgrep --smart-case',
+            \ 'grepprg': l:prg,
             \ 'format': '%f:%l:%c:%m',
             \ 'supports_ere': 1,
             \ }
-    elseif executable('git') && !empty(wplus#util#find_git_root(getcwd()))
+    elseif a:name ==# 'git' && executable('git') && !empty(wplus#util#find_git_root(getcwd()))
         return {
             \ 'name': 'git',
             \ 'grepprg': 'git grep -n --column',
             \ 'format': '%f:%l:%c:%m',
             \ 'supports_ere': 1,
             \ }
-    elseif executable('grep')
+    elseif a:name ==# 'grep' && executable('grep')
         return {
             \ 'name': 'grep',
             \ 'grepprg': 'grep -RIn $* .',
             \ 'format': '%f:%l:%m',
             \ 'supports_ere': 1,
             \ }
-    elseif has('win32')
+    elseif a:name ==# 'findstr' && has('win32')
         return {
             \ 'name': 'findstr',
             \ 'grepprg': 'findstr /S /N /P $* *',
             \ 'format': '%f:%l:%m',
             \ 'supports_ere': 0,
             \ }
-    else
-        return {}
     endif
+    return {}
+endfunction
+
+function! wplus#grep#backend() abort
+    let l:pref = get(g:, 'wplus_grep_backend', '')
+    if !empty(l:pref)
+        let l:spec = s:backend_spec(l:pref)
+        if !empty(l:spec)
+            return l:spec
+        endif
+    endif
+    for l:candidate in ['rg', 'git', 'grep', 'findstr']
+        let l:spec = s:backend_spec(l:candidate)
+        if !empty(l:spec)
+            return l:spec
+        endif
+    endfor
+    return {}
 endfunction
 
 function! s:configure_grep() abort
@@ -61,8 +81,15 @@ function! s:get_visual_text() abort
         return ''
     endif
 
-    let l:lines[-1] = l:lines[-1][: l:col_end - (&selection ==# 'inclusive' ? 1 : 2)]
-    let l:lines[0] = l:lines[0][l:col_start - 1 :]
+    let l:last_line = l:lines[-1]
+    if &selection ==# 'inclusive'
+        let l:end_char_len = max([1, strlen(matchstr(l:last_line, '.', l:col_end - 1))])
+        let l:end_bytes = l:col_end - 1 + l:end_char_len
+    else
+        let l:end_bytes = max([0, l:col_end - 1])
+    endif
+    let l:lines[-1] = strpart(l:last_line, 0, l:end_bytes)
+    let l:lines[0]  = strpart(l:lines[0], max([0, l:col_start - 1]))
     return trim(substitute(join(l:lines, "\n"), '\_s\+', ' ', 'g'))
 endfunction
 
@@ -123,7 +150,11 @@ function! wplus#grep#search_async(args) abort
 
     let l:cmd = []
     if l:b.name ==# 'rg'
-        let l:cmd = ['rg', '--vimgrep', '--smart-case', '--', a:args]
+        let l:cmd = ['rg', '--vimgrep', '--smart-case']
+        if !get(g:, 'wplus_grep_ignore_vcs', 1)
+            call add(l:cmd, '--no-ignore-vcs')
+        endif
+        call extend(l:cmd, ['--', a:args])
     elseif l:b.name ==# 'git'
         let l:cmd = ['git', 'grep', '-n', '--column', a:args]
     elseif l:b.name ==# 'grep'

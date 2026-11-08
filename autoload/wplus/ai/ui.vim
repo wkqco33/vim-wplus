@@ -118,7 +118,7 @@ function! wplus#ai#ui#preview_commit(content) abort
     call wplus#ai#ui#open_preview('gitcommit', split(l:msg, "\n"), function('s:apply_commit', [l:msg]))
 endfunction
 
-function! wplus#ai#ui#show_review_result(ft, content, title) abort
+function! wplus#ai#ui#show_review_result(ft, title, content) abort
     call wplus#ai#ui#open_result_split('markdown', split(a:content, "\n"), a:title)
 endfunction
 

@@ -87,19 +87,21 @@ function! s:find_conflicts() abort
                 let l:idx += 1
             endwhile
             
-            " Found end
-            let l:end = l:idx + 1
-            call add(b:wplus_conflicts, {
-                \ 'lnum_start': l:start,
-                \ 'lnum_ours': l:ours_start,
-                \ 'lnum_base': l:base_start,
-                \ 'lnum_sep': l:sep_lnum,
-                \ 'lnum_theirs': l:theirs_start,
-                \ 'lnum_end': l:end,
-                \ 'ours_lines': l:ours_lines,
-                \ 'base_lines': l:base_lines,
-                \ 'theirs_lines': l:theirs_lines,
-                \ })
+            " Found end (only record complete conflicts with both ======= and >>>>>>>)
+            if l:sep_lnum > 0 && l:idx < len(l:lines) && l:lines[l:idx] =~# '^>>>>>>>'
+                let l:end = l:idx + 1
+                call add(b:wplus_conflicts, {
+                    \ 'lnum_start': l:start,
+                    \ 'lnum_ours': l:ours_start,
+                    \ 'lnum_base': l:base_start,
+                    \ 'lnum_sep': l:sep_lnum,
+                    \ 'lnum_theirs': l:theirs_start,
+                    \ 'lnum_end': l:end,
+                    \ 'ours_lines': l:ours_lines,
+                    \ 'base_lines': l:base_lines,
+                    \ 'theirs_lines': l:theirs_lines,
+                    \ })
+            endif
             
             let l:idx += 1
         else
@@ -174,7 +176,8 @@ function! s:highlight_conflicts() abort
         call prop_remove({'type': 'WplusConflictMarker', 'all': 1})
     catch
     endtry
-    
+
+    if !get(g:, 'wplus_conflict_auto_highlight', 1) | return | endif
     if empty(s:list()) | return | endif
     
     for l:conf in s:list()

@@ -60,3 +60,14 @@ function! Test_fold_nested_levels() abort
 
     bwipeout!
 endfunction
+
+function! Test_fold_respects_min_lines_option() abort
+    call wplus#fold#setup()
+    let g:wplus_fold_min_lines = 4
+    enew!
+    setlocal buftype=nofile bufhidden=wipe noswapfile filetype=python
+    call wplus#fold#setup_buffer()
+    call assert_equal(4, &l:foldminlines, 'setup_buffer must respect g:wplus_fold_min_lines')
+    let g:wplus_fold_min_lines = 1
+    bwipeout!
+endfunction

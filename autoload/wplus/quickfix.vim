@@ -12,6 +12,9 @@
 " Project-wide search & replace:
 "   <leader>xr  — prompt for pattern & replacement, runs across quickfix files
 
+if exists('g:autoloaded_wplus_quickfix') | finish | endif
+let g:autoloaded_wplus_quickfix = 1
+
 function! wplus#quickfix#setup() abort
     nnoremap <silent> <leader>xq :call wplus#quickfix#toggle_qf()<CR>
     nnoremap <silent> <leader>xl :call wplus#quickfix#toggle_loc()<CR>
