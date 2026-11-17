@@ -1,6 +1,6 @@
 " wplus/multicursor.vim — Multi-cursor: select occurrences and apply edits
 " Mappings:
-"   <C-n>       — add next occurrence of word under cursor
+"   <leader>vn  — add next occurrence of word under cursor
 "   <leader>vx  — skip current occurrence, select next
 "   <leader>va  — select all occurrences in buffer
 "   c           — change all selected occurrences (prompt for replacement)
@@ -78,7 +78,7 @@ function! s:find_next_after(lnum, col) abort
 endfunction
 
 function! s:show_status() abort
-    echo '[wplus] ' . len(s:cursors) . ' cursors  c=change  d=delete  <C-n>=next  <leader>vx=skip  <Esc>=cancel'
+    echo '[wplus] ' . len(s:cursors) . ' cursors  c=change  d=delete  <leader>vn=next  <leader>vx=skip  <Esc>=cancel'
 endfunction
 
 " ── public API ────────────────────────────────────────────────────────────
@@ -240,7 +240,7 @@ function! wplus#multicursor#setup() abort
     " decrement/increment-number commands. Taking those globally is not a
     " trade worth making for a module that is only active on demand, so they
     " live under the <leader>v ("visual multi") prefix instead.
-    nnoremap <silent> <C-n>       :<C-u>call wplus#multicursor#add_next()<CR>
+    nnoremap <silent> <leader>vn  :<C-u>call wplus#multicursor#add_next()<CR>
     nnoremap <silent> <leader>vx  :<C-u>call wplus#multicursor#skip()<CR>
     nnoremap <silent> <leader>va  :<C-u>call wplus#multicursor#select_all()<CR>
 

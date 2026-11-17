@@ -30,20 +30,21 @@
 
 | 키 | 모드 | 모듈 | 동작 |
 | ---- | ------ | ------ | ------ |
-| `gcc` | Normal | commentary | 현재 줄 주석 토글 |
+| `<leader>cc` | Normal/Visual | commentary | 현재 줄 또는 선택 범위 주석 토글 |
 | `gc{motion}` | Normal | commentary | motion 범위 주석 토글 |
 | `gc` | Visual | commentary | 선택 범위 주석 토글 |
 | `ys{motion}{char}` | Normal | surround | 텍스트 감싸기 |
+| `<leader>ys{char}` | Normal | surround | 현재 줄 감싸기 |
 | `cs{old}{new}` | Normal | surround | 감싸기 변경 |
 | `ds{char}` | Normal | surround | 감싸기 제거 |
-| `S{char}` | Visual | surround | 선택 감싸기 |
+| `<leader>vs{char}` | Visual | surround | 선택 감싸기 |
 | `ii` / `ai` | Visual/Op | textobj | 들여쓰기 블록 |
 | `ia` / `aa` | Visual/Op | textobj | 함수 인자 |
-| `<C-n>` | Normal | multicursor | 다음 일치 항목 다중 선택 추가 |
+| `<leader>vn` | Normal | multicursor | 다음 일치 항목 다중 선택 추가 |
 | `<leader>vx` | Normal | multicursor | 현재 일치 항목 건너뛰기 |
 | `<leader>va` | Normal | multicursor | 모든 일치 항목 다중 선택 |
 | `<M-F>` | Normal/Visual | format | 포맷 |
-| `.` | Normal | repeat | 마지막 동작 반복 |
+| `.` | Normal | Vim 기본 | 마지막 동작 반복 (재매핑하지 않음) |
 
 ---
 
@@ -68,17 +69,17 @@
 
 | 키 | 모듈 | 동작 |
 | ---- | ------ | ------ |
-| `gd` | lsp | 정의 이동 |
-| `gy` | lsp | 타입 정의 이동 |
+| `<leader>ld` | lsp | 정의 이동 |
+| `<leader>lt` | lsp | 타입 정의 이동 |
 | `<leader>gi` | lsp | 구현 이동 |
-| `gr` | lsp | 참조 찾기 |
-| `K` | lsp | 심볼 정보 (Hover) |
+| `<leader>lf` | lsp | 참조 찾기 |
+| `<leader>lh` | lsp | 심볼 정보 (Hover) |
 | `<leader>rn` | lsp | 심볼 이름 변경 (미리보기) |
 | `<leader>ca` | lsp | Code Action |
 | `<leader>ci` | lsp | Organize Imports |
 | `<leader>gl` | lsp | Document Link 열기 |
-| `]d` / `[d` | lsp | 다음/이전 진단 |
-| `<leader>d` | lsp | 현재 줄 진단 팝업 |
+| `<leader>ln` / `<leader>lp` | lsp | 다음/이전 진단 |
+| `<leader>le` | lsp | 현재 줄 진단 팝업 |
 | `<leader>o` | outline | 코드 아웃라인 토글 |
 | `:WlspSymbols {query}` | lsp | 워크스페이스 심볼 검색 |
 | `<leader>fg` | grep | 커서 단어로 프로젝트 검색 |
@@ -160,8 +161,8 @@
 | `]Q` / `[Q` | quickfix | 마지막/첫 번째 에러 |
 | `]l` / `[l` | quickfix | Location list 다음/이전 |
 | `<leader>xr` | quickfix | 프로젝트 전체 치환 |
-| `"` | register | 레지스터 미리보기 팝업 |
-| `@` | register | 매크로 레지스터 팝업 |
+| `<leader>rp` | register | 레지스터 미리보기 팝업 |
+| `<leader>rP` | register | 매크로 레지스터 팝업 |
 
 ---
 
@@ -187,7 +188,10 @@ nnoremap <C-k> <C-w>k
 nnoremap <C-l> <C-w>l
 ```
 
-> 플러그인은 네이티브 `<Tab>`을 덮어쓰지 않습니다. AI 제안 수락을 원하면 `imap <Tab> <Plug>WaiSmartTab`처럼 사용자 설정에서 직접 연결하세요.
+> 플러그인은 네이티브 `<Tab>`이나 일반 Vim 기본 키를 덮어쓰지 않습니다. AI 제안 수락을 원하면 `imap <Tab> <Plug>WaiSmartTab`처럼 사용자 설정에서 직접 연결하세요.
+
+LSP의 기존 `K`, `gd`, `gy`, `gr`, `[d`/`]d`, Insert `<C-s>` 키맵은
+`let g:wplus_lsp_native_keymaps = 1`로 opt-in할 수 있습니다. 기본값은 `0`입니다.
 
 ---
 

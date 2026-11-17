@@ -77,13 +77,13 @@ call feedkeys('cs)"', 'x')
 call assert_equal('"bar"', getline(1), 'cs)" at column 1 swaps parens for quotes without duplicating line')
 
 call s:buf('hello', 1)
-call feedkeys("veS\"", 'x')
-call assert_equal('"hello"', getline(1), 'visual S" at column 1 surrounds word without duplicating line')
+call feedkeys("ve\<Space>vs\"", 'x')
+call assert_equal('"hello"', getline(1), '<leader>vs" at column 1 surrounds word without duplicating line')
 
 " ── multibyte UTF-8 surrounding ───────────────────────────────────────────
 call s:buf('가나다', 1)
-call feedkeys("veS\"", 'x')
-call assert_equal('"가나다"', getline(1), 'visual S" surrounds multibyte UTF-8 text cleanly')
+call feedkeys("ve\<Space>vs\"", 'x')
+call assert_equal('"가나다"', getline(1), '<leader>vs" surrounds multibyte UTF-8 text cleanly')
 
 call s:buf('"가나다"', 4)
 call feedkeys('cs"''', 'x')
@@ -93,14 +93,14 @@ call s:buf('"가나다"', 4)
 call feedkeys('ds"', 'x')
 call assert_equal('가나다', getline(1), 'ds removes quotes around multibyte UTF-8 text cleanly')
 
-" ── ys{motion}{char} and yss{char} normal-mode operators ──────────────────
+" ── ys{motion}{char} and namespaced whole-line surround ───────────────────
 call s:buf('hello world', 1)
 call feedkeys('ysiw"', 'x')
 call assert_equal('"hello" world', getline(1), 'ysiw" surrounds word under cursor')
 
 call s:buf('    hello world', 5)
-call feedkeys('yss)', 'x')
-call assert_equal('    (hello world)', getline(1), 'yss) surrounds entire line preserving indentation')
+call feedkeys("\<Space>ys)", 'x')
+call assert_equal('    (hello world)', getline(1), '<leader>ys) surrounds entire line preserving indentation')
 
 bwipeout!
 endfunction

@@ -70,12 +70,12 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 
 | 모듈 | 기능 | 핵심 키 |
 |------|------|---------|
-| `commentary` | 주석 토글 | `gcc`, `gc{motion}` |
-| `surround` | 괄호·따옴표 조작 | `ys`, `cs`, `ds` |
+| `commentary` | 주석 토글 | `<leader>cc`, `gc{motion}` |
+| `surround` | 괄호·따옴표 조작 | `ys`, `<leader>ys`, `<leader>vs`, `cs`, `ds` |
 | `pairs` | 자동 괄호 완성 | 입력 시 자동 |
 | `textobj` | 들여쓰기/인자 텍스트 오브젝트 | `ii`, `ia`, `aa` |
-| `multicursor` | 다중 커서 | `<C-n>` |
-| `register` | 레지스터 미리보기 | `"`, `@` |
+| `multicursor` | 다중 커서 | `<leader>vn` |
+| `register` | 레지스터 미리보기 | `<leader>rp`, `<leader>rP` |
 | `yankhighlight` | 복사 시각 피드백 | 자동 |
 
 ### 🧭 탐색
@@ -113,7 +113,7 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 
 | 모듈 | 기능 | 핵심 키 |
 |------|------|---------|
-| `lsp` | LSP 클라이언트 (정의/참조/rename/완성/스니펫/시맨틱/호출계층) | `gd`, `gr`, `K`, `F2` |
+| `lsp` | LSP 클라이언트 (정의/참조/rename/완성/스니펫/시맨틱/호출계층) | `<leader>ld`, `<leader>lf`, `<leader>lh` |
 | `format` | 스마트 포매터 | `<M-F>` |
 | `outline` | 코드 아웃라인 | `<leader>o` |
 | `fold` | 스마트 폴드 | `<leader>zz` |

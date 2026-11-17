@@ -9,16 +9,16 @@ function! Test_commentary_edge_cases_and_count() abort
     let &l:commentstring = '%s -- comment'
     call setline(1, ['hello', 'world', 'third'])
     call cursor(1, 1)
-    call feedkeys('2gcc', 'x')
+    call feedkeys("2\<Space>cc", 'x')
     call assert_equal(['hello -- comment', 'world -- comment', 'third'], getline(1, '$'),
-        \ '2gcc with %s at index 0 should append right delimiter on 2 lines without duplicating %s')
+        \ '<leader>cc with %s at index 0 should append right delimiter on 2 lines without duplicating %s')
 
     " 2. empty commentstring falls back to '# %s'
     silent %delete _
     let &l:commentstring = ''
     call setline(1, ['alpha'])
     call cursor(1, 1)
-    call feedkeys('gcc', 'x')
+    call feedkeys("\<Space>cc", 'x')
     call assert_equal(['# alpha'], getline(1, '$'), 'empty commentstring should fall back to # comment')
 
     " 3. nomodifiable buffer must not throw E21

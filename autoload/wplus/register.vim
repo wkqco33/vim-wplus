@@ -69,6 +69,6 @@ endfunction
 " ── highlights ────────────────────────────────────────────────────────────
 
 function! wplus#register#setup() abort
-    nnoremap <silent> " :<C-u>call wplus#register#show('"')<CR>
-    nnoremap <silent> @ :<C-u>call wplus#register#show('@')<CR>
+    nnoremap <silent> <leader>rp :<C-u>call wplus#register#show('"')<CR>
+    nnoremap <silent> <leader>rP :<C-u>call wplus#register#show('@')<CR>
 endfunction

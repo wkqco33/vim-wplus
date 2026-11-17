@@ -10,23 +10,27 @@
 
 | 키 | 동작 |
 | ---- | ------ |
-| `gd` | 정의 이동 (Go to Definition) |
-| `gy` | 타입 정의 이동 (Type Definition) |
+| `<leader>ld` | 정의 이동 (Go to Definition) |
+| `<leader>lt` | 타입 정의 이동 (Type Definition) |
 | `<leader>gi` | 구현 이동 (Implementation) |
-| `gr` | 참조 찾기 (References) |
-| `K` | 심볼 정보 (Hover) |
+| `<leader>lf` | 참조 찾기 (References) |
+| `<leader>lh` | 심볼 정보 (Hover) |
 | `<leader>rn` | 심볼 이름 변경 (Rename, 미리보기 포함) |
 | `<leader>ca` | Code Action |
 | `<leader>ci` | Organize Imports |
 | `<leader>gl` | 커서 위치 Document Link 열기 |
-| `]d` / `[d` | 다음/이전 진단 |
-| `<leader>d` | 현재 줄 진단 팝업 |
+| `<leader>ln` / `<leader>lp` | 다음/이전 진단 |
+| `<leader>le` | 현재 줄 진단 팝업 |
 | `:WlspSymbols {query}` | 워크스페이스 심볼 검색 (Quickfix) |
 | `:WlspPeekDefinition` | 정의 소스 팝업 (이동 없이) |
 | `:WlspProblems` | 모든 버퍼 진단을 Quickfix로 |
 | `:WlspCompletion` | 완성 트리거 |
 | `:WlspCallHierarchy` | 호출 계층 (누가 호출) |
 | `:WlspCallHierarchyOutgoing` | 호출 계층 (무엇을 호출) |
+
+Vim 기본 키 동작을 보존하기 위해 LSP 기본 매핑은 `<leader>l` 네임스페이스를 사용합니다.
+기존 `K`, `gd`, `gy`, `gr`, `[d`/`]d`, Insert `<C-s>` 매핑이 필요하면
+`g:wplus_lsp_native_keymaps = 1`로 opt-in할 수 있습니다.
 
 진단은 sign 컬럼에 `E`, `W`, `I`, `H`로 표시되며 상태바에 `E:n W:n` 형식으로도 표시됩니다.
 

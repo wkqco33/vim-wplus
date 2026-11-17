@@ -1,10 +1,10 @@
 " wplus/surround.vim — bracket/quote manipulation (replaces vim-surround)
 " Mappings:
 "   ys{motion}{char}  — surround motion with char
-"   yss{char}         — surround current line
+"   <leader>ys{char}  — surround current line
 "   cs{old}{char}     — change surrounding
 "   ds{char}          — delete surrounding
-"   S{char}  (visual) — surround selection
+"   <leader>vs{char}  — surround Visual selection
 
 if exists('g:autoloaded_wplus_surround') | finish | endif
 let g:autoloaded_wplus_surround = 1
@@ -203,12 +203,11 @@ endfunction
 function! wplus#surround#setup() abort
     " ys{motion}{char}
     nnoremap <silent> ys  :set operatorfunc=wplus#surround#operator<CR>g@
-    " yss{char} — surround line
-    nnoremap <silent> yss :<C-u>call wplus#surround#yss()<CR>
+    " Namespaced whole-line / Visual mappings avoid native/prefix collisions.
+    nnoremap <silent> <leader>ys :<C-u>call wplus#surround#yss()<CR>
     " ds{char}
     nnoremap <silent> ds  :call wplus#surround#ds()<CR>
     " cs{old}{new}
     nnoremap <silent> cs  :call wplus#surround#cs()<CR>
-    " S{char} visual
-    xnoremap <silent> S   :<C-u>call wplus#surround#visual_await()<CR>
+    xnoremap <silent> <leader>vs :<C-u>call wplus#surround#visual_await()<CR>
 endfunction

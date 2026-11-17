@@ -10,7 +10,7 @@
 
 | 키 | 모드 | 동작 |
 |----|------|------|
-| `gcc` | Normal | 현재 줄 주석 토글 |
+| `<leader>cc` | Normal/Visual | 현재 줄 또는 선택 범위 주석 토글 |
 | `gc{motion}` | Normal | motion 범위 주석 토글 (예: `gc3j`, `gcip`) |
 | `gc` | Visual | 선택 범위 주석 토글 |
 
@@ -21,10 +21,13 @@
 | 키 | 동작 | 예시 |
 |----|------|------|
 | `ys{motion}{char}` | 감싸기 | `ysiw"` → `hello` → `"hello"` |
-| `yss{char}` | 현재 줄 감싸기 | `yss(` → `( line )` |
+| `<leader>ys{char}` | 현재 줄 감싸기 | `<leader>ys(` → `( line )` |
 | `cs{old}{new}` | 변경 | `cs"'` → `"hello"` → `'hello'` |
 | `ds{char}` | 제거 | `ds"` → `"hello"` → `hello` |
-| `S{char}` | Visual 선택 감싸기 | `viwS(` → `(hello)` |
+| `<leader>vs{char}` | Visual 선택 감싸기 | Visual 선택 후 `<leader>vs(` → `(hello)` |
+
+`ys{motion}{char}`는 operator 방식으로 그대로 사용할 수 있습니다. 전체 줄과 Visual 감싸기는
+네이티브 키 및 접두 지연을 피하기 위해 `<leader>` 매핑을 사용합니다.
 
 **지원 문자**: `( ) [ ] { } < > " ' \`` 및 HTML 태그 (`t`)
 
@@ -75,7 +78,7 @@ function(arg1, arg2, arg3)
 
 | 키 / 명령 | 모드 | 동작 |
 |-----------|------|------|
-| `<C-n>` / `:WmulticursorAddNext` | Normal | 커서 아래 단어의 다음 일치 항목을 다중 선택에 추가 |
+| `<leader>vn` / `:WmulticursorAddNext` | Normal | 커서 아래 단어의 다음 일치 항목을 다중 선택에 추가 |
 | `<leader>vx` / `:WmulticursorSkip` | Normal | 현재 일치 항목을 건너뛰고 다음 항목 선택 |
 | `<leader>va` / `:WmulticursorSelectAll` | Normal | 현재 버퍼 내 모든 동일 단어 한 번에 다중 선택 |
 | `c` | Normal | 선택된 모든 항목 일괄 치환 (입력 프롬프트) |
@@ -90,8 +93,10 @@ Vim 레지스터 내용을 사용하기 전에 팝업 윈도우로 미리보기�
 
 | 키 | 모드 | 동작 |
 |----|------|------|
-| `"` | Normal | 레지스터 선택용 팝업 표시 (이후 레지스터 키 입력 시 원래 동작 수행) |
-| `@` | Normal | 매크로 실행용 레지스터 팝업 표시 |
+| `<leader>rp` | Normal | 레지스터 선택용 팝업 표시 |
+| `<leader>rP` | Normal | 매크로 실행용 레지스터 팝업 표시 |
+
+기본 키맵은 Vim의 `"` 레지스터 선택과 `@` 매크로 실행을 덮어쓰지 않습니다.
 
 ---
 

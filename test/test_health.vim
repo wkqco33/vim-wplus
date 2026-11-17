@@ -38,6 +38,16 @@ function! Test_health_command_and_output() abort
     call assert_equal(['wplus_unknown_test_option'], l:unknown, 'Unknown option should be detected')
     unlet g:wplus_unknown_test_option
 
+    " Health output must include non-Normal global mapping modes.
+    inoremap <F13> x
+    inoremap <F13><F14> y
+    WplusHealth
+    let l:lines3 = getbufline(l:buf, 1, '$')
+    call assert_match('\[i\] <F13> shadows <F13><F14>', join(l:lines3, "\n"),
+        \ 'Health report must include Insert-mode prefix conflicts')
+    iunmap <F13><F14>
+    iunmap <F13>
+
     " Leave the test runner with a valid window; :close cannot close the last
     " window in Vim's ex mode.
     enew

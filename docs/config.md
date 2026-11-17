@@ -99,6 +99,7 @@ let g:wplus_lsp_diag_delay   = 300        " 진단 갱신 지연 (ms)
 let g:wplus_lsp_auto_complete = 1         " 타이핑 중 자동완성 트리거
 let g:wplus_lsp_complete_delay = 300      " 자동완성 트리거 지연 (ms)
 let g:wplus_lsp_complete_min_chars = 2    " 식별자 자동완성 최소 길이
+let g:wplus_lsp_native_keymaps = 0        " K/gd/gr 등 Vim 기본 키 재매핑 (opt-in)
 
 " ── vscode ────────────────────────────────────────────────────────────────
 " VS Code 단축키 정렬 레이어 (opt-in). 1로 설정하면 F2/F12/Ctrl+Shift+F 등

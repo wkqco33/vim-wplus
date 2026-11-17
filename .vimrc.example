@@ -97,6 +97,7 @@ let g:wplus_lsp_diag_delay = 300        " 진단 갱신 지연(ms)
 let g:wplus_lsp_auto_complete = 1       " 타이핑 중 자동완성 트리거
 let g:wplus_lsp_complete_delay = 300    " 자동완성 트리거 지연(ms)
 let g:wplus_lsp_complete_min_chars = 2  " 식별자 자동완성 최소 길이
+let g:wplus_lsp_native_keymaps = 0      " K/gd/gr 등 Vim 기본 키 재매핑 (opt-in)
 
 " VS Code 단축키 정렬 레이어 (opt-in): F2/F12/Ctrl+Shift+F 등
 let g:wplus_vscode_keymaps = 0
@@ -285,18 +286,18 @@ nnoremap <leader>fR :WgrepRx<CR>             " 정규표현식 검색
 " <leader>h1~4: 슬롯 1~4번 파일로 즉시 점프
 
 " ── 3. LSP 코드 도구 (플러그인 기본 내장) ──
-" gd          : 정의 이동 (:WlspDefinition)
-" gy          : 타입 정의 이동 (:WlspTypeDefinition)
+" <leader>ld  : 정의 이동 (:WlspDefinition)
+" <leader>lt  : 타입 정의 이동 (:WlspTypeDefinition)
 " <leader>gi  : 구현 이동 (:WlspImplementation)
-" gr          : 참조 찾기 (:WlspReferences)
-" K           : 호버 심볼 정보 (:WlspHover)
+" <leader>lf  : 참조 찾기 (:WlspReferences)
+" <leader>lh  : 호버 심볼 정보 (:WlspHover)
 " <leader>rn  : 심볼 이름 변경 (:WlspRename)
 " <leader>ca  : 코드 액션 (:WlspCodeAction)
 " <leader>ci  : Import 정리 (:WlspOrganizeImports)
 " <leader>gl  : Document Link 열기 (:WlspOpenLink)
-" ]d / [d     : 다음/이전 진단 항목
-" <leader>d   : 현재 줄 진단 팝업 (:WlspDiagPopup)
-" Insert <C-s>: 시그니처 힌트 (:WlspSignatureHelp)
+" <leader>ln / lp : 다음/이전 진단 항목
+" <leader>le  : 현재 줄 진단 팝업 (:WlspDiagPopup)
+" <Plug>WplusLspSignatureHelp : 시그니처 힌트 (사용자 매핑용)
 " <leader>o   : 코드 아웃라인 토글 (:WoutlineToggle)
 " <M-F>       : 코드 포매팅 (:Wformat)
 " :WlspSymbols {query}          : 워크스페이스 심볼 검색
@@ -344,6 +345,9 @@ nnoremap <leader>cb :WconflictBoth<CR>       " 둘 다 채택
 " <leader>tt  : 터미널 토글 (:WplusTerminalToggle / :WterminalToggle)
 
 " ── 7. UI / 마크 / 폴드 / Quickfix / 멀티커서 ──
+" <leader>cc  : 현재 줄 주석 토글
+" gc{motion} / Visual gc : 범위 주석 토글
+" <leader>ys : 현재 줄 감싸기, <leader>vs : Visual 선택 감싸기
 " <leader>zz / za / zc / zo : 스마트 폴드 토글/모두열기/모두닫기/주변닫기
 " <leader>ml  : 마크 목록 팝업 (:WmarksList)
 " <leader>md  : 현재 줄 마크 삭제 (:WmarksDelete)
@@ -353,10 +357,10 @@ nnoremap <leader>cb :WconflictBoth<CR>       " 둘 다 채택
 " <leader>xr  : Quickfix 목록 기반 프로젝트 일괄 치환
 " <leader>tq  : TODO 목록 Quickfix (:WtodoQuickfix)
 " <leader>ft  : TODO 목록 Finder (:WtodoFind)
-" <C-n>       : 다음 일치 단어 멀티커서 추가
+" <leader>vn  : 다음 일치 단어 멀티커서 추가
 " <leader>vx  : 현재 멀티커서 건너뛰기
 " <leader>va  : 모든 일치 단어 멀티커서 일괄 선택
-" \" / @      : 레지스터 / 매크로 레지스터 미리보기 팝업
+" <leader>rp / rP : 레지스터 / 매크로 레지스터 미리보기 팝업
 
 " ── 8. 버퍼 관리 및 창 이동 ──
 nnoremap <leader>bd :Bdelete<CR>             " 창 분할을 유지하며 버퍼 닫기

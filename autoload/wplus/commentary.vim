@@ -1,5 +1,5 @@
 " wplus/commentary.vim — comment toggle (replaces vim-commentary)
-" Mappings: gcc (line), gc{motion}, gc (visual)
+" Mappings: <leader>cc (line/visual), gc{motion}
 
 if exists('g:autoloaded_wplus_commentary') | finish | endif
 let g:autoloaded_wplus_commentary = 1
@@ -102,13 +102,12 @@ function! wplus#commentary#toggle_line() abort
 endfunction
 
 function! wplus#commentary#setup() abort
-    " gcc — toggle current line (supports [count]gcc)
-    nnoremap <silent> gcc :<C-u>call wplus#commentary#toggle_line()<CR>
+    " A namespaced whole-line mapping avoids the gc / gcc prefix delay.
+    nnoremap <silent> <leader>cc :<C-u>call wplus#commentary#toggle_line()<CR>
     " gc{motion}
     nnoremap <silent> gc  :set operatorfunc=wplus#commentary#operator<CR>g@
-    " gc / gcc in visual
+    " gc in Visual
     xnoremap <silent> gc  :<C-u>call wplus#commentary#toggle_range(line("'<"), line("'>"))<CR>
-    xnoremap <silent> gcc :<C-u>call wplus#commentary#toggle_range(line("'<"), line("'>"))<CR>
     " Plug mappings for repeat
     nnoremap <silent> <Plug>WplusCommentaryLine :<C-u>call wplus#commentary#toggle_line()<CR>
 endfunction

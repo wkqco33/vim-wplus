@@ -143,9 +143,8 @@ Toggle comments for the current line, motion, or visual selection.
 Comment tokens are read from &commentstring automatically.
 
 Mappings: >
-    gcc            Toggle comment on current line
+    <leader>cc     Toggle current line / visual selection
     gc{motion}     Toggle comment on motion range  (e.g. gc3j, gcip)
-    gc             Toggle comment on visual selection
 <
 
 ==============================================================================
@@ -155,10 +154,10 @@ Add, change, or delete surrounding characters.
 
 Mappings: >
     ys{motion}{c}  Surround motion with c       (ysiw" → "hello")
-    yss{c}         Surround current line
+    <leader>ys{c}  Surround current line
     cs{old}{new}   Change surrounding           (cs"' → 'hello')
     ds{c}          Delete surrounding           (ds" → hello)
-    S{c}           (Visual) Surround selection
+    <leader>vs{c}  (Visual) Surround selection
 <
 Supported: ( ) [ ] { } < > " ' ` and HTML tag (t).
 
@@ -196,7 +195,7 @@ is exactly what vim-repeat already does.
 Without vim-repeat installed, |.| keeps its native behaviour and repeating a
 surround or comment operation is not supported. That is deliberate — an earlier
 version mapped |.| unconditionally and never cleared its stored sequence, so a
-single `gcc` made every later |.| replay the comment toggle.
+single `<leader>cc` made every later |.| replay the comment toggle.
 
 API for plugin authors (no-op unless vim-repeat is present): >
     call wplus#repeat#set("\<Plug>MyAction", v:count)
@@ -208,7 +207,7 @@ API for plugin authors (no-op unless vim-repeat is present): >
 Select multiple occurrences of a word and edit them simultaneously.
 
 Mappings: >
-    <C-n>    Add next match to selection
+    <leader>vn    Add next match to selection
     <leader>vx    Skip current match, add next
     <leader>va    Select all matches in buffer
     c        Replace all selected (prompts for new text)
@@ -222,8 +221,8 @@ Mappings: >
 Preview register contents in a popup before pasting.
 
 Mappings: >
-    "    (Normal) Open register popup, then type register key as usual
-    @    (Normal) Open register popup for macro execution
+    <leader>rp    Open register preview
+    <leader>rP    Open macro register preview
 <
 
 ==============================================================================
@@ -474,14 +473,17 @@ Configuration: >
 Lightweight LSP client using Vim 9 job/channel.
 
 Mappings: >
-    gd              Go to Definition
-    gr              Find References
-    K               Hover (symbol info)
+    <leader>ld      Go to Definition
+    <leader>lt      Go to Type Definition
+    <leader>lf      Find References
+    <leader>lh      Hover (symbol info)
+    <leader>ln/lp   Next / previous diagnostic
+    <leader>le      Diagnostic popup for current line
+    <leader>gi      Go to Implementation
     <leader>rn      Rename symbol
     <leader>ca      Code Action
-    ]e / [e         Next / previous diagnostic
-    <leader>E       Diagnostic popup for current line
 <
+Set g:wplus_lsp_native_keymaps = 1 to opt into the previous native-key mappings.
 Supported servers: gopls (Go), pylsp (Python), typescript-language-server,
   rust-analyzer, clangd (C/C++).
 
@@ -492,6 +494,7 @@ Configuration: >
     let g:wplus_lsp_log_enabled  = 0     " debug log → lsp.log
     let g:wplus_lsp_signcolumn   = 'yes'
     let g:wplus_lsp_cache_ttl    = 300   " definition/reference cache TTL (s)
+    let g:wplus_lsp_native_keymaps = 0   " preserve Vim's built-in keys
 <
 
 ==============================================================================

@@ -2,6 +2,11 @@
 
 ## [Unreleased] - 2026-09-06
 
+### 키맵 비간섭성
+- **Vim 기본 키 보존**: multicursor, register, surround, commentary, LSP 기본 매핑을 leader 키로 이동하고 기존 LSP native 키맵은 `g:wplus_lsp_native_keymaps` opt-in으로 유지.
+- **키맵 Health 검사 확장**: Normal/Insert/Visual 등 전역 매핑의 네이티브 키 탈취와 접두 그림자를 검사하고, commentary/surround 전체 줄 매핑의 접두 충돌 제거.
+- **회귀 테스트 및 문서 갱신**: 모드별 충돌 탐지, 새 기본 매핑, LSP 호환 설정을 테스트하고 키맵 가이드 동기화.
+
 ### 🛡️ 안정성 강화 및 버그 수정 (P0/P1)
 - **`todo` 모듈 정규식 이스케이프 버그 수정**: 큰따옴표 내 `\b`가 ASCII 8(Backspace)로 왜곡되던 문제를 해결하고 리스트 명령어 인자 및 `g:wplus_todo_keywords` 설정 지원.
 - **`run` 모듈 Quickfix 에러 점프 복구**: `valid: 0` 고정 대신 `setqflist(..., {'lines': [line]})`를 적용하여 `&errorformat` 기반의 파일/줄번호 자동 구조화 및 `<CR>` 에러 라인 즉시 점프 지원. 커스텀 테스트 설정을 위한 `g:wplus_test_commands` 추가.
@@ -153,11 +158,13 @@ diffview 는 순수 뷰어가 되고 `wplus#diffview#next_hunk`/`prev_hunk` 는 
 따라오고 Vim 은 그 다음 키 입력에서 모호성을 즉시 해소하므로 실제 지연이 없다.
 (`timeoutlen` 은 입력을 멈출 때만 적용되는데, 오퍼레이터 중간에 멈추는 것은
 의미가 없다.) `health.vim` 의 `s:allowed_prefixes` 에 근거와 함께 명시해 두었다.
+이는 당시 구현의 예외였으며, 이후 전체 줄 동작을 leader 매핑으로 이동해 제거했다.
 
 **네이티브 키 반환.** multicursor 의 skip/select-all 이 Vim 의 숫자
 감소/증가 명령인 `<C-x>`/`<C-a>` 를 전역으로 가져가고 있었다. 필요할 때만
 활성화되는 모듈이 치를 대가가 아니므로 `<leader>vx`/`<leader>va` 로 옮기고
 `:WmulticursorSkip`/`:WmulticursorSelectAll` 명령을 추가했다. `<C-n>` 은 유지.
+이후 기본 완료 키 동작을 보존하기 위해 다음 일치 항목 매핑도 `<leader>vn` 으로 옮겼다.
 
 **`:Wharoon*` → `:Wharpoon*`.** harpoon 명령 3개가 오타 상태였고 문서 3곳이
 그 오타를 충실히 재현하고 있었다.

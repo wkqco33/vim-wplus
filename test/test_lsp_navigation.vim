@@ -1,5 +1,32 @@
 " test/test_lsp_navigation.vim — Test typeDefinition/implementation gating
 
+function! Test_lsp_default_mappings_preserve_native_keys() abort
+    call wplus#lsp#setup()
+    call assert_equal(0, g:wplus_lsp_native_keymaps,
+        \ 'native LSP key overrides must be opt-in')
+
+    for l:key in ['K', 'gd', 'gy', 'gr', ']d', '[d']
+        call assert_equal('', maparg(l:key, 'n'),
+            \ 'default LSP setup must preserve native mapping: ' . l:key)
+    endfor
+    call assert_match('WlspDefinition', maparg(g:mapleader . 'ld', 'n'))
+    call assert_match('WlspHover', maparg(g:mapleader . 'lh', 'n'))
+endfunction
+
+function! Test_lsp_native_keymaps_are_explicit_opt_in() abort
+    let g:wplus_lsp_native_keymaps = 1
+    call wplus#lsp#setup()
+    call assert_match('WlspDefinition', maparg('gd', 'n'))
+    call assert_match('WlspSignatureHelp', maparg('<C-s>', 'i'))
+
+    for l:key in ['K', 'gd', 'gy', 'gr', ']d', '[d']
+        execute 'silent! nunmap' l:key
+    endfor
+    silent! iunmap <C-s>
+    let g:wplus_lsp_native_keymaps = 0
+    call wplus#lsp#setup()
+endfunction
+
 function! Test_lsp_navigation_capability_gating() abort
     call wplus#lsp#setup()
     call wplus#lsp#_test_set_caps('go', {

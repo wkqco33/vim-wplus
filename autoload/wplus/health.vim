@@ -3,14 +3,16 @@
 if exists('g:autoloaded_wplus_health') | finish | endif
 let g:autoloaded_wplus_health = 1
 
-let s:native_keys = ['.', "\<C-a>", "\<C-x>", "\<Tab>"]
+let s:native_key_modes = {
+    \ 'n': ['.', '<C-a>', '<C-x>', '<C-n>', '<C-p>', '<Tab>', '"', '@', 'K', 'S', 'gd', 'gr', ']d', '[d'],
+    \ 'i': ['<C-a>', '<C-n>', '<C-p>', '<C-s>', '<C-x>', '<Tab>'],
+    \ 'x': ['S'],
+    \ }
 
 let s:owners = {
     \ ']h': 'gitgutter#next_hunk',
     \ '[h': 'gitgutter#prev_hunk',
     \ }
-
-let s:allowed_prefixes = ['gc', 'ys', 'ds', 'cs']
 
 let s:known_options = [
     \ 'wplus_theme', 'wplus_theme_enabled', 'wplus_commentary_enabled', 'wplus_pairs_enabled',
@@ -55,6 +57,7 @@ let s:known_options = [
     \ 'wplus_grep_backend', 'wplus_grep_ignore_vcs', 'wplus_grep_max_results',
     \ 'wplus_lsp_debug', 'wplus_lsp_definition_split', 'wplus_lsp_servers',
     \ 'wplus_lsp_auto_complete', 'wplus_lsp_complete_delay', 'wplus_lsp_complete_min_chars',
+    \ 'wplus_lsp_native_keymaps',
     \ 'wplus_vscode_keymaps', 'wplus_vscode_enabled',
     \ 'wplus_terminal_height', 'wplus_terminal_position',
     \ 'wplus_colorscheme_auto', 'wplus_colorscheme_auto_detect',
@@ -63,7 +66,11 @@ let s:known_options = [
     \ ]
 
 function! wplus#health#native_keys() abort
-    return copy(s:native_keys)
+    let l:keys = []
+    for l:mode_keys in values(s:native_key_modes)
+        call extend(l:keys, l:mode_keys)
+    endfor
+    return uniq(sort(l:keys))
 endfunction
 
 function! wplus#health#owners() abort
@@ -118,7 +125,6 @@ function! wplus#health#shadowed_maps(...) abort
 
     for l:a in l:maps
         if empty(l:a.lhs) | continue | endif
-        if index(s:allowed_prefixes, l:a.lhs) >= 0 | continue | endif
         for l:b in l:maps
             if l:a.lhs ==# l:b.lhs | continue | endif
             if len(l:b.lhs) <= len(l:a.lhs) | continue | endif
@@ -145,10 +151,12 @@ endfunction
 
 function! wplus#health#hijacked_native_keys() abort
     let l:bad = []
-    for l:key in s:native_keys
-        if !empty(maparg(l:key, 'n'))
-            call add(l:bad, l:key)
-        endif
+    for [l:mode, l:keys] in items(s:native_key_modes)
+        for l:key in l:keys
+            if !empty(maparg(l:key, l:mode))
+                call add(l:bad, l:mode . ':' . l:key)
+            endif
+        endfor
     endfor
     return l:bad
 endfunction
@@ -250,13 +258,16 @@ function! wplus#health#check() abort
         call add(l:lines, '   [FAIL] Hijacked native keys: ' . join(l:hijacked, ', '))
     endif
 
-    let l:shadowed = wplus#health#shadowed_maps('n')
+    let l:shadowed = []
+    for l:mode in ['n', 'i', 'x', 's', 'o', 'c', 't']
+        call extend(l:shadowed, wplus#health#shadowed_maps(l:mode))
+    endfor
     if empty(l:shadowed)
-        call add(l:lines, '   [OK] No shadowed Normal-mode mappings.')
+        call add(l:lines, '   [OK] No shadowed global mappings.')
     else
         call add(l:lines, printf('   [FAIL] %d shadowed mapping(s):', len(l:shadowed)))
         for l:item in l:shadowed
-            call add(l:lines, printf('     - %s shadows %s', l:item.short, join(l:item.shadows, ', ')))
+            call add(l:lines, printf('     - [%s] %s shadows %s', l:item.mode, l:item.short, join(l:item.shadows, ', ')))
         endfor
     endif
     call add(l:lines, '')

@@ -25,6 +25,7 @@ let g:wplus_lsp_change_delay    = get(g:, 'wplus_lsp_change_delay',    800)
 let g:wplus_lsp_diag_delay      = get(g:, 'wplus_lsp_diag_delay',      300)
 let g:wplus_lsp_request_timeout = get(g:, 'wplus_lsp_request_timeout', 10)
 let g:wplus_lsp_definition_split = get(g:, 'wplus_lsp_definition_split', 0)
+let g:wplus_lsp_native_keymaps = get(g:, 'wplus_lsp_native_keymaps', 0)
 let g:wplus_lsp_auto_complete   = get(g:, 'wplus_lsp_auto_complete',   1)
 let g:wplus_lsp_complete_delay  = get(g:, 'wplus_lsp_complete_delay',  300)
 " Show identifier completion after a short token, while still relying on
@@ -2389,19 +2390,31 @@ function! wplus#lsp#setup() abort
     command! WplusLspInlayHints call wplus#lsp#toggle_inlay_hints()
     command! -nargs=? WlspSymbols call wplus#lsp#workspace_symbols(<q-args> != '' ? <q-args> : input('Symbol: '))
 
-    nnoremap <silent> K          :WlspHover<CR>
-    nnoremap <silent> gd         :WlspDefinition<CR>
-    nnoremap <silent> gy         :WlspTypeDefinition<CR>
+    nnoremap <silent> <leader>lh :WlspHover<CR>
+    nnoremap <silent> <leader>ld :WlspDefinition<CR>
+    nnoremap <silent> <leader>lt :WlspTypeDefinition<CR>
     nnoremap <silent> <leader>gi :WlspImplementation<CR>
-    nnoremap <silent> gr         :WlspReferences<CR>
+    nnoremap <silent> <leader>lf :WlspReferences<CR>
     nnoremap <silent> <leader>rn :WlspRename<CR>
     nnoremap <silent> <leader>ca :WlspCodeAction<CR>
     nnoremap <silent> <leader>ci :WlspOrganizeImports<CR>
     nnoremap <silent> <leader>gl :WlspOpenLink<CR>
-    nnoremap <silent> ]d         :WlspNextDiag<CR>
-    nnoremap <silent> [d         :WlspPrevDiag<CR>
-    nnoremap <silent> <leader>d  :WlspDiagPopup<CR>
-    inoremap <silent> <C-s>      <C-o>:WlspSignatureHelp<CR>
+    nnoremap <silent> <leader>ln :WlspNextDiag<CR>
+    nnoremap <silent> <leader>lp :WlspPrevDiag<CR>
+    nnoremap <silent> <leader>le :WlspDiagPopup<CR>
+    inoremap <silent> <Plug>WplusLspSignatureHelp <C-o>:WlspSignatureHelp<CR>
+
+    " Compatibility layer for users who explicitly prefer the old native-key
+    " overrides. Defaults preserve Vim's built-in Normal/Insert behavior.
+    if g:wplus_lsp_native_keymaps
+        nnoremap <silent> K  :WlspHover<CR>
+        nnoremap <silent> gd :WlspDefinition<CR>
+        nnoremap <silent> gy :WlspTypeDefinition<CR>
+        nnoremap <silent> gr :WlspReferences<CR>
+        nnoremap <silent> ]d :WlspNextDiag<CR>
+        nnoremap <silent> [d :WlspPrevDiag<CR>
+        inoremap <silent> <C-s> <C-o>:WlspSignatureHelp<CR>
+    endif
 
     augroup wplus_lsp
         autocmd!
