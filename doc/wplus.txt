@@ -61,6 +61,10 @@ CONTENTS                                                      *wplus-contents*
   AI ~
   42. AI Assistant ................. |wplus-ai|
 
+  REFERENCE ~
+  43. Health Check ................. |wplus-health|
+  44. Keymap & Feature Reference ... |wplus-keymaps|
+
 ==============================================================================
 1. INTRODUCTION                                                  *wplus-intro*
 
@@ -477,7 +481,8 @@ Mappings: >
     <leader>lt      Go to Type Definition
     <leader>lf      Find References
     <leader>lh      Hover (symbol info)
-    <leader>ln/lp   Next / previous diagnostic
+    <leader>ln      Next diagnostic
+    <leader>lp      Previous diagnostic
     <leader>le      Diagnostic popup for current line
     <leader>gi      Go to Implementation
     <leader>rn      Rename symbol
@@ -717,6 +722,180 @@ external tools, LSP status, AI configuration, keymap conflicts, and options.
 
 Commands: >
     :WplusHealth    Run diagnostics and open report buffer
+<
+
+==============================================================================
+44. KEYMAP & FEATURE REFERENCE                               *wplus-keymaps*
+
+Every keymap, command and module that is actually registered can be browsed
+from inside Vim. The list is rebuilt from maplist() and :command on every
+invocation, so it always matches the running configuration — including
+disabled modules, opted-in keymaps (g:wplus_vscode_keymaps,
+g:wplus_lsp_native_keymaps)
+and your own overrides.
+
+Commands: >
+    :WplusKeys [filter]     Open the reference (keys view)
+    :WplusCommands [filter] Open at the command view
+    :WplusModules [filter]  Open at the module view
+    <leader>?               Same as :WplusKeys
+<
+Popup keys: >
+    <Tab>           Cycle Keys → Commands → Modules
+    <CR>            Put the backing :command on the command line
+                    (module view: open |wplus-<module>|)
+    <C-n> / <C-p>   Next / previous entry (also <C-j>/<C-k>, arrows)
+    q / <Esc>       Close
+    type            Filter by case-insensitive substring
+<
+<CR> never executes a mapping — it only fills the command line so the request
+can be reviewed before it runs. On a Vim without +popupwin the same content is
+written to the __WplusKeys__ buffer instead.
+
+The tables below document the defaults. |wplus-keymaps| is verified by
+ test/test_keys.vim: every registered <leader> mapping must appear here.
+
+KEYMAPS ~
+
+  Navigation
+    <leader>ff      Find files
+    <leader>fb      Find buffers
+    <leader>fr      Find recent files (MRU)
+    <leader>fh      Recent files, global
+    <leader>fH      Recent files, current project
+    <leader>e       Toggle file explorer
+    <leader>ha      Add current file to a harpoon slot
+    <leader>hd      Remove current file from its harpoon slot
+    <leader>hl      Harpoon slot list popup
+    <leader>h1      Jump to harpoon slot 1
+    <leader>h2      Jump to harpoon slot 2
+    <leader>h3      Jump to harpoon slot 3
+    <leader>h4      Jump to harpoon slot 4
+    :A  :AV  :AS    Alternate file (edit / vsplit / split)
+
+  Editing
+    <leader>cc      Toggle comment (current line or selection)
+    gc{motion}      Toggle comment over a motion (Visual: gc)
+    ys{motion}{c}   Surround a motion
+    <leader>ys{c}   Surround current line
+    <leader>vs{c}   Surround visual selection
+    cs{old}{new}    Change surrounding pair
+    ds{c}           Delete surrounding pair
+    ii / ai         Text object: indent block (inner / outer)
+    ia / aa         Text object: function argument (inner / outer)
+    <leader>vn      Multi-cursor: add next match
+    <leader>vx      Multi-cursor: skip current match
+    <leader>va      Multi-cursor: select all matches
+    <leader>i       Format buffer (Visual: format range)
+    <M-F>           Format buffer / selection
+    .               Repeat the last change (Vim native, never remapped)
+
+  Git
+    <leader>hr      Revert hunk at cursor
+    <leader>hp      Preview hunk at cursor
+    <leader>hs      Stage hunk at cursor
+    ]h / [h         Next / previous hunk
+    <leader>bl      Toggle inline blame (:BlamerToggle)
+    <leader>gd      Diff current file (:diffview)
+    <leader>gD      Diff whole repository
+    ]x / [x         Next / previous merge conflict
+
+  Code intelligence (LSP)
+    <leader>ld      Go to definition
+    <leader>lt      Go to type definition
+    <leader>gi      Go to implementation
+    <leader>lf      Find references
+    <leader>lh      Hover symbol info
+    <leader>rn      Rename symbol (preview)
+    <leader>ca      Code action
+    <leader>ci      Organize imports
+    <leader>gl      Open document link
+    <leader>ln      Next diagnostic
+    <leader>lp      Previous diagnostic
+    <leader>le      Diagnostic popup for current line
+    <leader>o       Toggle code outline
+    <leader>fg      Grep project for the word under the cursor (Visual: selection)
+    <leader>fG      Grep project by regex
+
+  Run / build / terminal
+    <leader>rr      Run current file (:Wrun)
+    <leader>rb      Build project (:Wbuild)
+    <leader>rt      Run project tests (:Wtest)
+    <leader>tt      Toggle terminal
+    <Esc><Esc>      Terminal: back to Normal mode
+
+  Buffers, quickfix, UI
+    <leader>bd      Delete buffer, keep the window
+    <leader>bD      Wipe out buffer
+    <leader>xq      Toggle quickfix window
+    <leader>xl      Toggle location list
+    <leader>xr      Replace across the project
+    ]q / [q         Next / previous quickfix entry
+    ]Q / [Q         Last / first quickfix entry
+    ]l / [l         Next / previous location-list entry
+    <leader>rp      Register preview popup
+    <leader>rP      Macro register preview popup
+    <leader>ml      Mark list popup
+    <leader>md      Delete mark on current line
+    <leader>ft      TODO finder
+    <leader>tq      TODO quickfix list
+    <leader>zz      Toggle fold under cursor
+    <leader>za      Open all folds
+    <leader>zc      Close all folds
+    <leader>zo      Close all folds except the current one
+    <leader>sc      Toggle scratch buffer
+    <leader>sv      Open scratch buffer in a vertical split
+    <leader>pe      Edit the project config
+    <leader>pr      Reload the project config
+
+  AI
+    <leader>ac      Cancel in-flight AI requests
+    <leader>?       This reference
+
+COMMANDS ~
+
+  altfile      :A  :AV  :AS
+  ai           :WaiComment  :WaiComplete  :WaiReview  :WaiExplain
+               :WaiRefactor  :WaiFixDiag  :WaiCommitMsg  :WaiCancel
+               :WaiToggleSuggest  :WaiAcceptSuggest  :WaiAcceptWord
+               :WaiDismissSuggest
+  blame        :BlamerToggle
+  bufdelete    :Bdelete  :Bwipeout
+  conflict     :WconflictNext  :WconflictPrev  :WconflictOurs
+               :WconflictTheirs  :WconflictBoth
+  diffview     :WdiffviewFile  :WdiffviewRepo  :WdiffviewStaged
+  explorer     :WexplorerToggle  :WexplorerFind
+  finder       :WfindFiles  :WfindBuffers  :WfindMRU
+  fold         :WfoldToggle  :WfoldOpenAll  :WfoldCloseAll  :WfoldCloseOthers
+  format       :Wformat
+  gitgutter    :WplusGitRevertHunk  :WplusGitStageHunk
+  grep         :Wgrep  :WgrepWord  :WgrepRx
+  harpoon      :WharpoonAdd  :WharpoonRemove  :WharpoonList
+  health       :WplusHealth
+  history      :Whistory  :WhistoryProject
+  keys         :WplusKeys  :WplusCommands  :WplusModules
+  lsp          :WlspHover  :WlspDefinition  :WlspTypeDefinition
+               :WlspImplementation  :WlspReferences  :WlspRename
+               :WlspCodeAction  :WlspOrganizeImports  :WlspOpenLink
+               :WlspCompletion  :WlspSignatureHelp  :WlspProblems
+               :WlspNextDiag  :WlspPrevDiag  :WlspDiagPopup
+               :WlspSymbols  :WlspCallHierarchy  :WlspCallHierarchyOutgoing
+               :WlspPeekDefinition  :WlspFormat  :WlspInlayHints
+               :WplusLspInlayHints
+  marks        :WmarksList  :WmarksDelete  :WmarksRefresh
+  multicursor  :WmulticursorAddNext  :WmulticursorSkip
+               :WmulticursorSelectAll
+  outline      :WoutlineToggle
+  project      :WprojectEdit  :WprojectReload
+  run          :Wrun  :Wbuild  :Wtest
+  scratch      :WscratchToggle  :WscratchVertical
+  session      :WsessionSave  :WsessionLoad  :WsessionDelete
+  terminal     :WterminalToggle  :WplusTerminalToggle
+  todo         :WtodoFind  :WtodoQuickfix
+
+Modules can be turned off per option; the module view reports each one as
+[on] or [off] together with its keymap and command counts: >
+    let g:wplus_keys_enabled = 0    " disable this reference module
 <
 
 ==============================================================================

@@ -2,6 +2,12 @@
 
 ## [Unreleased] - 2026-09-06
 
+### 🔎 키맵 레퍼런스 (`keys` 모듈)
+- **`:WplusKeys` / `<leader>?` 추가**: Vim 안에서 현재 설정에 실제 등록된 키맵·명령·모듈을 훑어보는 통합 팝업. `maplist()`·`:command`·`getscriptinfo()`를 매번 다시 읽어 만들어 비활성 모듈, opt-in 키맵(`g:wplus_vscode_keymaps`, `g:wplus_lsp_native_keymaps`), 사용자 오버라이드까지 그대로 반영한다. `Tab`으로 Keys → Commands → Modules 전환, 타이핑 필터, `<CR>`은 매핑을 실행하지 않고 뒤에 있는 `:명령`을 커맨드라인에 채운다(모듈 화면은 `:help wplus-<module>`). `+popupwin`이 없으면 `__WplusKeys__` 버퍼로 폴백.
+- **`:WplusCommands` / `:WplusModules` 추가**: 명령·모듈 화면을 바로 열고, 명령 화면은 어떤 키가 그 명령을 부르는지 역인덱스를 함께 보여준다.
+- **`:help wplus-keymaps` 신설**: 키맵·명령·모듈 레퍼런스를 단일 정본으로 문서화하고 목차에 연결. `docs/keymaps.md`는 중복 표를 제거하고 확인 방법 안내로 전환(과거 `<leader>ar/ae/af/am`은 기본값이 아니었고 `<leader>i`, `<leader>bl`, `<leader>h2~h4`는 문서에 누락되어 있었다).
+- **문서 드리프트 차단**: `test/test_keys.vim`이 런타임 `<leader>` 매핑 전체가 `doc/wplus.txt`에 존재하는지 검사하므로 키맵 추가 시 문서 누락이 테스트에서 실패한다.
+
 ### 키맵 비간섭성
 - **Vim 기본 키 보존**: multicursor, register, surround, commentary, LSP 기본 매핑을 leader 키로 이동하고 기존 LSP native 키맵은 `g:wplus_lsp_native_keymaps` opt-in으로 유지.
 - **키맵 Health 검사 확장**: Normal/Insert/Visual 등 전역 매핑의 네이티브 키 탈취와 접두 그림자를 검사하고, commentary/surround 전체 줄 매핑의 접두 충돌 제거.

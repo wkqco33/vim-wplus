@@ -18,6 +18,26 @@ let g:wplus_fold_enabled          = 0
 
 ---
 
+## 레퍼런스(`keys`)
+
+```vim
+let g:wplus_keys_enabled = 1    " 0으로 두면 <leader>? 및 :WplusKeys/*Commands/*Modules 미등록
+```
+
+`<leader>?` (또는 `:WplusKeys [filter]`)는 **런타임에 실제 등록된** 키맵·명령·모듈을 보여줍니다.
+
+| 명령 | 화면 |
+|------|------|
+| `:WplusKeys [filter]` | Keys (기본값) |
+| `:WplusCommands [filter]` | Commands |
+| `:WplusModules [filter]` | Modules |
+
+팝업 키: `Tab` 화면 전환 · `Enter` 해당 명령을 커맨드라인에 채움(모듈 화면은 `:help wplus-<module>`) · `C-n`/`C-p` 이동 · `q` 닫기 · 타이핑 필터.
+
+> `<leader>?` 는 매핑을 **실행하지 않습니다.** 부작용이 있는 명령을 목록에서 실수로 촉발하지 않도록 커맨드라인에 채우기만 합니다.
+
+---
+
 ## 편집 모듈
 
 ```vim

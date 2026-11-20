@@ -106,7 +106,14 @@ let g:wplus_load_errors = get(g:, 'wplus_load_errors', [])
 "
 " Not listed here, deliberately:
 "   repeat  - autoloaded shim only, has no setup(). See autoload/wplus/repeat.vim.
-let s:modules = ['theme', 'commentary', 'pairs', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'harpoon', 'marks', 'scratch', 'run', 'project', 'history', 'fold', 'vscode', 'health']
+let s:modules = ['theme', 'commentary', 'pairs', 'altfile', 'indent', 'statusline', 'tabline', 'gitgutter', 'blame', 'illuminate', 'surround', 'format', 'yankhighlight', 'textobj', 'bufdelete', 'quickfix', 'grep', 'root', 'terminal', 'lsp', 'finder', 'explorer', 'session', 'todo', 'conflict', 'ai', 'multicursor', 'register', 'outline', 'diffview', 'harpoon', 'marks', 'scratch', 'run', 'project', 'history', 'fold', 'vscode', 'keys', 'health']
+
+" Exposed so the reference (:WplusKeys → Modules) can list every module, not
+" just the ones that still own a registered mapping. Kept as a function so it
+" does not look like a user-settable g:wplus_* option to :WplusHealth.
+function! wplus#module_names() abort
+    return copy(s:modules)
+endfunction
 
 " Validate user configuration
 call s:validate_config()

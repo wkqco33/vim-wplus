@@ -43,6 +43,8 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 
 **빠른 시작**: `.vimrc.example`을 `~/.vimrc`로 복사하면 기본 키 매핑이 모두 설정됩니다.
 
+**단축키 확인**: Vim 안에서 `<leader>?` (또는 `:WplusKeys`)를 누르면 현재 설정에서 **실제로 등록된** 키맵·명령·모듈을 팝업으로 훑어볼 수 있습니다. `Tab`으로 화면 전환, 타이핑으로 필터, `Enter`로 실행할 명령을 커맨드라인에 채웁니다.
+
 > 설치 상세 · 문제 해결 → **[SETUP.md](SETUP.md)**
 
 ---
@@ -59,7 +61,7 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 | [docs/modules/code.md](docs/modules/code.md) | 코드 도구 모듈 (lsp, run, fold, format …) |
 | [docs/ai.md](docs/ai.md) | AI 어시스턴트 심화 가이드 |
 | [docs/config.md](docs/config.md) | 전체 설정 레퍼런스 |
-| [docs/keymaps.md](docs/keymaps.md) | 기본 단축키 치트시트 |
+| [docs/keymaps.md](docs/keymaps.md) | 단축키 확인 방법 (`:WplusKeys`, `<leader>?`) |
 | [CHANGE_LOG.md](CHANGE_LOG.md) | 변경 이력 |
 
 ---
@@ -126,6 +128,12 @@ source ~/.vim/pack/user/start/vim-wplus/plugin/wplus.vim
 | `marks` | 마크 시각화 | `<leader>ml` |
 | `todo` | TODO 관리 | `<leader>ft` |
 | `health` | 플러그인·환경 진단 보고서 | `:WplusHealth` |
+
+### 🔎 레퍼런스
+
+| 모듈 | 기능 | 핵심 키 |
+|------|------|---------|
+| `keys` | 런타임 키맵·명령·모듈 레퍼런스 (`Tab`으로 화면 전환) | `<leader>?` |
 
 ### 🤖 AI
 

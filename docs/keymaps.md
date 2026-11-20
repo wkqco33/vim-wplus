@@ -1,201 +1,93 @@
-# 기본 단축키 치트시트
+# 단축키 확인 가이드
 
 > [← README](../README.md) · [설정 레퍼런스](config.md) · [AI 가이드](ai.md)
 
-모든 단축키는 `.vimrc.example`에 매핑 예시가 포함되어 있습니다.  
-`<leader>`는 기본적으로 `\`입니다 — 대부분의 사용자는 `,` 또는 `<Space>`로 변경합니다.
+키맵 표는 이 문서에 중복해서 두지 않습니다. 표를 손으로 관리하면 실제 등록된
+키맵과 어긋나기 때문입니다(과거 문서에 있던 `<leader>ar/ae/af/am`은 플러그인
+기본값이 아니라 `.vimrc.example` 예시였고, 반대로 런타임에만 있던
+`<leader>i`, `<leader>bl`, `<leader>h2~h4`는 문서에 없었습니다).
+
+**정본은 두 곳입니다.**
+
+1. Vim 안에서 실행 중인 실제 상태 → `:WplusKeys` (또는 `<leader>?`)
+2. 오프라인 문서 → `:help wplus-keymaps`
 
 ---
 
-## 탐색
-
-| 키 | 모듈 | 동작 |
-| ---- | ------ | ------ |
-| `<leader>ff` | finder | 파일 찾기 |
-| `<leader>fb` | finder | 버퍼 찾기 |
-| `<leader>fr` | finder | 최근 파일 찾기 |
-| `<leader>fh` | history | 전체 최근 파일 |
-| `<leader>fH` | history | 프로젝트 내 최근 파일 |
-| `<leader>e` | explorer | 파일 탐색기 토글 |
-| `<leader>ha` | harpoon | 현재 파일 슬롯에 추가 |
-| `<leader>hd` | harpoon | 현재 파일 슬롯에서 제거 |
-| `<leader>hl` | harpoon | 슬롯 목록 팝업 |
-| `<leader>h1~4` | harpoon | 슬롯 1~4 파일로 이동 |
-| `:A` | altfile | 헤더↔소스 전환 |
-| `:AV` / `:AS` | altfile | 수직/수평 분할로 전환 |
-
----
-
-## 편집
-
-| 키 | 모드 | 모듈 | 동작 |
-| ---- | ------ | ------ | ------ |
-| `<leader>cc` | Normal/Visual | commentary | 현재 줄 또는 선택 범위 주석 토글 |
-| `gc{motion}` | Normal | commentary | motion 범위 주석 토글 |
-| `gc` | Visual | commentary | 선택 범위 주석 토글 |
-| `ys{motion}{char}` | Normal | surround | 텍스트 감싸기 |
-| `<leader>ys{char}` | Normal | surround | 현재 줄 감싸기 |
-| `cs{old}{new}` | Normal | surround | 감싸기 변경 |
-| `ds{char}` | Normal | surround | 감싸기 제거 |
-| `<leader>vs{char}` | Visual | surround | 선택 감싸기 |
-| `ii` / `ai` | Visual/Op | textobj | 들여쓰기 블록 |
-| `ia` / `aa` | Visual/Op | textobj | 함수 인자 |
-| `<leader>vn` | Normal | multicursor | 다음 일치 항목 다중 선택 추가 |
-| `<leader>vx` | Normal | multicursor | 현재 일치 항목 건너뛰기 |
-| `<leader>va` | Normal | multicursor | 모든 일치 항목 다중 선택 |
-| `<M-F>` | Normal/Visual | format | 포맷 |
-| `.` | Normal | Vim 기본 | 마지막 동작 반복 (재매핑하지 않음) |
-
----
-
-## Git
-
-| 키 / 명령 | 모듈 | 동작 |
-| ----------- | ------ | ------ |
-| `<leader>hr` | gitgutter | 커서 위치 hunk 원복 |
-| `<leader>hp` | gitgutter | 커서 위치 hunk 미리보기 |
-| `<leader>hs` | gitgutter | 커서 위치 hunk 스테이징 |
-| `]h` / `[h` | gitgutter | 다음/이전 hunk |
-| `:BlamerToggle` | blame | 인라인 blame 토글 |
-| `<leader>gd` | diffview | 현재 파일 Diff |
-| `<leader>gD` | diffview | 저장소 전체 Diff |
-| `:WconflictNext` / `:WconflictPrev` | conflict | 다음/이전 충돌 |
-| `:WconflictOurs` | conflict | ours 선택 |
-| `:WconflictTheirs` | conflict | theirs 선택 |
-
----
-
-## 코드
-
-| 키 | 모듈 | 동작 |
-| ---- | ------ | ------ |
-| `<leader>ld` | lsp | 정의 이동 |
-| `<leader>lt` | lsp | 타입 정의 이동 |
-| `<leader>gi` | lsp | 구현 이동 |
-| `<leader>lf` | lsp | 참조 찾기 |
-| `<leader>lh` | lsp | 심볼 정보 (Hover) |
-| `<leader>rn` | lsp | 심볼 이름 변경 (미리보기) |
-| `<leader>ca` | lsp | Code Action |
-| `<leader>ci` | lsp | Organize Imports |
-| `<leader>gl` | lsp | Document Link 열기 |
-| `<leader>ln` / `<leader>lp` | lsp | 다음/이전 진단 |
-| `<leader>le` | lsp | 현재 줄 진단 팝업 |
-| `<leader>o` | outline | 코드 아웃라인 토글 |
-| `:WlspSymbols {query}` | lsp | 워크스페이스 심볼 검색 |
-| `<leader>fg` | grep | 커서 단어로 프로젝트 검색 |
-| `<leader>fG` | grep | 정규식으로 프로젝트 검색 |
-| `:Wgrep {pat}` | grep | 패턴 검색 |
-
----
-
-## 실행/빌드
-
-| 키 / 명령 | 모듈 | 동작 |
-| ----------- | ------ | ------ |
-| `<leader>rr` / `:Wrun` | run | 현재 파일 실행 |
-| `<leader>rb` / `:Wbuild` | run | 프로젝트 빌드 |
-| `<leader>rt` / `:Wtest` | run | 프로젝트 테스트 |
-| `<leader>tt` | terminal | 터미널 토글 |
-| `<Esc><Esc>` (terminal) | terminal | Normal 모드로 탈출 |
-
----
-
-## AI
-
-| 키 / 명령 | 모드 | 동작 |
-| ----------- | ------ | ------ |
-| `:'<,'>WaiReview` | Visual | 선택 코드 리뷰 |
-| `:'<,'>WaiExplain` | Visual | 선택 코드 설명 |
-| `:'<,'>WaiRefactor` | Visual | 선택 코드 리팩토링 |
-| `:WaiComment` | Normal | 주석 생성 |
-| `:WaiComplete` | Normal | 코드 완성 |
-| `:WaiFixDiag` | Normal | LSP 진단 수정 |
-| `:WaiCommitMsg` | Normal | 커밋 메시지 생성 |
-| `:WaiToggleSuggest` | Normal | Ghost Text 토글 |
-| `<leader>ac` | Normal | 진행 중인 AI 요청 취소 |
-| `<Tab>` (Insert) | Insert | 기본 매핑 없음 — Vim 기본 동작 보존 |
-| `<Plug>WaiAcceptSuggest` | Insert | Ghost Text 수락 |
-| `<Plug>WaiAcceptWord` | Insert | Ghost Text 다음 단어 수락 |
-| `<Plug>WaiSmartTab` | Insert | 스마트 탭 수락/완성 |
-| `<Plug>WaiDismissSuggest` | Insert | Ghost Text 닫기 |
-
----
-
-## 프로젝트·세션
-
-| 키 / 명령 | 모듈 | 동작 |
-| ----------- | ------ | ------ |
-| `<leader>pe` | project | 프로젝트 설정 편집 |
-| `<leader>pr` | project | 프로젝트 설정 재로드 |
-| `<leader>sc` | scratch | 스크래치 버퍼 토글 |
-| `<leader>sv` | scratch | 스크래치 버퍼 (수직) |
-| `:WsessionSave` | session | 세션 저장 |
-| `:WsessionLoad` | session | 세션 로드 |
-
----
-
-## UI·시각화
-
-| 키 / 명령 | 모듈 | 동작 |
-| ----------- | ------ | ------ |
-| `<leader>zz` | fold | 폴드 토글 |
-| `<leader>za` | fold | 모든 폴드 열기 |
-| `<leader>zc` | fold | 모든 폴드 닫기 |
-| `<leader>zo` | fold | 다른 폴드 닫기 |
-| `<leader>ml` | marks | 마크 목록 팝업 |
-| `<leader>md` | marks | 커서 줄 마크 삭제 |
-| `<leader>ft` | todo | TODO 목록 finder |
-| `<leader>tq` | todo | TODO Quickfix |
-
----
-
-## 버퍼·창
-
-| 키 / 명령 | 모듈 | 동작 |
-| ----------- | ------ | ------ |
-| `<leader>bd` | bufdelete | 버퍼 삭제 (창 유지) |
-| `<leader>bD` | bufdelete | 버퍼 wipeout |
-| `<leader>xq` | quickfix | Quickfix 토글 |
-| `<leader>xl` | quickfix | Location list 토글 |
-| `]q` / `[q` | quickfix | 다음/이전 에러 |
-| `]Q` / `[Q` | quickfix | 마지막/첫 번째 에러 |
-| `]l` / `[l` | quickfix | Location list 다음/이전 |
-| `<leader>xr` | quickfix | 프로젝트 전체 치환 |
-| `<leader>rp` | register | 레지스터 미리보기 팝업 |
-| `<leader>rP` | register | 매크로 레지스터 팝업 |
-
----
-
-## 권장 vimrc 추가 매핑
-
-`<leader>ff`, `<leader>fb`, `<leader>fh`, `<leader>e`, `<leader>rr`, `<leader>rb`,
-`<leader>gd` 등은 **이미 플러그인 기본값**이다. 아래는 기본값이 없는 것만 추린 것이다.
+## 1. 실행 중인 키맵 보기 — `:WplusKeys`
 
 ```vim
-" 리더 키 (기본값은 Vim 기본인 '\')
-let mapleader = ' '
+:WplusKeys              " 전체 키맵
+:WplusKeys lsp          " 필터를 미리 적용해서 열기
+:WplusCommands          " 명령 화면으로 바로 열기
+:WplusModules           " 모듈 화면으로 바로 열기
+```
 
-" AI — ai 모듈은 <Plug> 매핑만 제공하므로 직접 바인딩이 필요하다
+`<leader>?` 를 눌러도 같은 팝업이 열립니다. 목록은 `maplist()`와 `:command`를
+매번 다시 읽어 만들기 때문에, 다음 항목까지 **현재 설정 그대로** 반영됩니다.
+
+- 비활성화한 모듈(`g:wplus_<module>_enabled = 0`)
+- opt-in 키맵(`g:wplus_vscode_keymaps`, `g:wplus_lsp_native_keymaps`)
+- 사용자가 덮어쓴 매핑
+
+### 팝업 조작
+
+| 키 | 동작 |
+| ---- | ------ |
+| `Tab` | Keys → Commands → Modules 화면 전환 |
+| `Enter` | 해당 항목의 명령을 커맨드라인에 채움 (모듈 화면: `:help wplus-<module>`) |
+| `C-n` / `C-p` (`C-j`/`C-k`, 방향키) | 다음 / 이전 항목 |
+| 타이핑 | 대소문자 무시 부분 문자열 필터 |
+| `q` / `Esc` | 닫기 |
+
+`Enter`는 매핑을 **실행하지 않습니다.** `<leader>rr`처럼 부작용이 있는 명령을
+목록에서 실수로 촉발하지 않도록, 뒤에 있는 `:명령`을 커맨드라인에 채우기만
+합니다. 검토 후 직접 Enter를 누르세요.
+
+### 화면별 표시 내용
+
+| 화면 | 한 줄 형식 |
+| ---- | ---------- |
+| Keys | `모드  <leader>ld  :WlspDefinition  [lsp]` |
+| Commands | `:WlspHover  <leader>lh  [lsp]` — 어떤 키가 이 명령을 부르는지(역인덱스) |
+| Modules | `[on] lsp  12 keys  22 cmds  n` — 활성 상태와 키맵/명령 개수 |
+
+`+popupwin`이 없는 Vim에서는 같은 내용이 `__WplusKeys__` 버퍼에 기록됩니다.
+
+---
+
+## 2. 오프라인 문서 — `:help wplus-keymaps`
+
+`:help wplus-keymaps` 또는 `:help wplus-<module>`(예: `:help wplus-lsp`)로
+모듈별 키맵·명령·설정을 볼 수 있습니다. 이 문서는 `test/test_keys.vim`이
+검사합니다 — 런타임에 등록된 `<leader>` 매핑이 문서에 없으면 테스트가
+실패하므로, 문서와 동작이 다시 어긋날 수 없습니다.
+
+---
+
+## 3. 기본값이 없는 매핑
+
+`<leader>ar/ae/af/am`(AI 리뷰·설명·리팩토링·커밋 메시지)처럼 **사용자가 직접
+바인딩해야 하는** 키는 `.vimrc.example`에 예시로 들어 있습니다. 플러그인 기본
+제공 여부는 `:WplusKeys`에서 바로 확인할 수 있습니다.
+
+```vim
+" 직접 바인딩 예시
 vnoremap <leader>ar :WaiReview<CR>
 vnoremap <leader>ae :WaiExplain<CR>
 vnoremap <leader>af :WaiRefactor<CR>
 nnoremap <leader>am :WaiCommitMsg<CR>
-
-" 창 이동
-nnoremap <C-h> <C-w>h
-nnoremap <C-j> <C-w>j
-nnoremap <C-k> <C-w>k
-nnoremap <C-l> <C-w>l
 ```
 
-> 플러그인은 네이티브 `<Tab>`이나 일반 Vim 기본 키를 덮어쓰지 않습니다. AI 제안 수락을 원하면 `imap <Tab> <Plug>WaiSmartTab`처럼 사용자 설정에서 직접 연결하세요.
+> 플러그인은 네이티브 `<Tab>`이나 일반 Vim 기본 키를 덮어쓰지 않습니다. AI 제안
+> 수락을 원하면 `imap <Tab> <Plug>WaiSmartTab`처럼 사용자 설정에서 직접 연결하세요.
 
-LSP의 기존 `K`, `gd`, `gy`, `gr`, `[d`/`]d`, Insert `<C-s>` 키맵은
-`let g:wplus_lsp_native_keymaps = 1`로 opt-in할 수 있습니다. 기본값은 `0`입니다.
+VS Code 단축키 정렬은 `let g:wplus_vscode_keymaps = 1`로 opt-in합니다(기본 `0`).
+켠 상태의 키 목록은 `:WplusKeys`에서 바로 확인하세요.
 
 ---
 
-## VS Code 단축키 정렬 (opt-in)
+## 4. VS Code 단축키 정렬 (opt-in)
 
 `let g:wplus_vscode_keymaps = 1`로 켜면 VS Code 단축키가 그대로 동작합니다.
 기본값은 `0`(꺼짐)이라 기존 사용자에게 영향을 주지 않습니다.
@@ -225,3 +117,19 @@ LSP의 기존 `K`, `gd`, `gy`, `gr`, `[d`/`]d`, Insert `<C-s>` 키맵은
 
 > **터미널 주의**: 일부 터미널은 `Ctrl+Space`와 `Ctrl+Shift+Space`를 구분하지 못합니다.
 > `Ctrl+Space`는 `Ctrl+@`(NUL)에도 함께 매핑되어 있습니다.
+
+---
+
+## 5. 창 이동 매핑 (직접 추가)
+
+플러그인 기본값에 없는 항목입니다.
+
+```vim
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l
+```
+
+LSP의 기존 `K`, `gd`, `gy`, `gr`, `[d`/`]d`, Insert `<C-s>` 키맵은
+`let g:wplus_lsp_native_keymaps = 1`로 opt-in할 수 있습니다. 기본값은 `0`입니다.
