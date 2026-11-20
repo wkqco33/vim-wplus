@@ -1,6 +1,8 @@
 # 변경 이력 (CHANGE LOG)
 
-## [Unreleased] - 2026-09-06
+## [Unreleased]
+
+## [1.3.0] - 2026-11-20
 
 ### 🔎 키맵 레퍼런스 (`keys` 모듈)
 - **`:WplusKeys` / `<leader>?` 추가**: Vim 안에서 현재 설정에 실제 등록된 키맵·명령·모듈을 훑어보는 통합 팝업. `maplist()`·`:command`·`getscriptinfo()`를 매번 다시 읽어 만들어 비활성 모듈, opt-in 키맵(`g:wplus_vscode_keymaps`, `g:wplus_lsp_native_keymaps`), 사용자 오버라이드까지 그대로 반영한다. `Tab`으로 Keys → Commands → Modules 전환, 타이핑 필터, `<CR>`은 매핑을 실행하지 않고 뒤에 있는 `:명령`을 커맨드라인에 채운다(모듈 화면은 `:help wplus-<module>`). `+popupwin`이 없으면 `__WplusKeys__` 버퍼로 폴백.
