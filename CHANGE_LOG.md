@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-20
+
+### 🐛 버그 수정
+- **`sid`가 없는 매핑이 `:WplusKeys` 생성을 중단시키던 문제 수정**: `maplist()`는 스크립트에서 정의되지 않은 매핑에 `'sid'`를 넣지 않고, `getscriptinfo({'sid': 0})`은 모든 Vim 빌드에서 `E475`를 던진다. brew Vim(macOS)에 그런 매핑이 있어 참조 생성 전체가 실패했고, `-es` 모드가 에러 메시지를 감춰 원인 없이 `test_keys`가 실패했다. `s:module_of_sid()`가 `sid <= 0`을 스크립트 조회 없이 처리하도록 수정하고 회귀 테스트를 추가.
+
+### 🧪 테스트 하네스
+- **숨은 Vim 에러를 원인과 함께 보고**: `test/run.sh`가 `source`와 각 `Test_*` 호출을 `try/catch`로 감싸 `v:exception`/`v:throwpoint`를 실패 목록에 남기고, 종료 코드가 0이 아니면 `verbose=1`로 1회 재실행해 `E####`/`Error detected` 라인을 수집한다. 그동안 런타임 에러는 `vim exited 1 before reporting`만 남아 진단이 불가능했다.
+
 ## [1.3.0] - 2026-11-20
 
 ### 🔎 키맵 레퍼런스 (`keys` 모듈)
