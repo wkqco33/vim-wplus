@@ -62,9 +62,23 @@ for file in "${files[@]}"; do
     runner="$out/$name.runner.vim"
     {
         printf 'let v:errors = []\n'
-        printf 'source %s\n' "$(printf '%s' "$file" | sed 's/ /\\ /g')"
+        # Every Test_* call is wrapped: silent-ex mode (-es) swallows error
+        # messages, so an uncaught Vim error would only show up as "vim exited
+        # 1" with no usable cause. Catching it records the exception text in
+        # v:errors, which is the file this runner is judged by.
+        printf 'try\n'
+        printf '  source %s\n' "$(printf '%s' "$file" | sed 's/ /\\ /g')"
+        printf 'catch\n'
+        printf "  call add(v:errors, '%s: ' . v:exception . ' @ ' . v:throwpoint)\n" \
+            "$(printf '%s' "source $name.vim" | sed "s/'/''/g")"
+        printf 'endtry\n'
         for test_fn in "${tests[@]+"${tests[@]}"}"; do
-            printf 'call %s()\n' "$test_fn"
+            printf 'try\n'
+            printf '  call %s()\n' "$test_fn"
+            printf 'catch\n'
+            printf "  call add(v:errors, '%s: ' . v:exception . ' @ ' . v:throwpoint)\n" \
+                "$(printf '%s' "$test_fn()" | sed "s/'/''/g")"
+            printf 'endtry\n'
         done
         printf "call writefile(v:errors, '%s')\n" "$(printf '%s' "$errfile" | sed "s/'/''/g")"
         printf 'qa!\n'
@@ -73,9 +87,23 @@ for file in "${files[@]}"; do
         </dev/null >"$out/$name.stdout" 2>"$out/$name.stderr"
     status=$?
 
+    if [ "$status" -ne 0 ]; then
+        # Errors outside the guarded blocks (or a Vim crash) leave no message
+        # in -es mode. Re-run once with 'verbose' so the real error text is
+        # captured and printed instead of a bare exit code.
+        "$VIM" -Nu "$here/vimrc" -i NONE -n -es --cmd 'set verbose=1' -S "$runner" \
+            </dev/null >"$out/$name.verbose.stdout" 2>"$out/$name.verbose.stderr"
+        grep -E '^(E[0-9]+:|Error detected)' "$out/$name.verbose.stderr" \
+            >"$out/$name.errorlines" || true
+    fi
+
     if [ ! -s "$errfile" ] && [ "$status" -ne 0 ]; then
         echo "FAIL $name (vim exited $status before reporting)"
         sed 's/^/      /' "$out/$name.stderr" | head -20
+        if [ -s "$out/$name.errorlines" ]; then
+            echo "      -- Vim errors --"
+            sed 's/^/      /' "$out/$name.errorlines" | head -20
+        fi
         failed=1
         continue
     fi
