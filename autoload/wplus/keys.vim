@@ -37,6 +37,13 @@ function! s:module_from_path(path) abort
 endfunction
 
 function! s:module_of_sid(sid) abort
+    " maplist() omits 'sid' for mappings that were not defined in a script, so
+    " such an entry arrives here as 0. getscriptinfo({'sid': 0}) raises
+    " E475 ('Invalid value for argument sid') on every Vim build, and a single
+    " entry must not abort the whole reference build.
+    if a:sid <= 0
+        return ''
+    endif
     if has_key(s:sid_cache, a:sid)
         return s:sid_cache[a:sid]
     endif
@@ -309,4 +316,10 @@ function! wplus#keys#setup() abort
     command! -nargs=* -bar WplusCommands call wplus#keys#open('commands', <q-args>)
     command! -nargs=* -bar WplusModules  call wplus#keys#open('modules', <q-args>)
     nnoremap <silent> <leader>? :WplusKeys<CR>
+endfunction
+
+" ── test bridges (not part of the public API) ─────────────────────────────
+
+function! wplus#keys#_test_module_of_sid(sid) abort
+    return s:module_of_sid(a:sid)
 endfunction

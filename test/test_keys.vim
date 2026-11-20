@@ -177,3 +177,17 @@ function! Test_keys_target_never_executes_mappings() abort
 
     call assert_equal({}, wplus#keys#target({}))
 endfunction
+
+function! Test_keys_ignores_mappings_without_script() abort
+    " maplist() omits 'sid' for mappings that were not defined in a script
+    " (brew/macOS Vim ships such a mapping). getscriptinfo({'sid': 0}) raises
+    " E475 on every Vim build, so one such mapping used to abort the whole
+    " reference build with no visible message.
+    call assert_equal('', wplus#keys#_test_module_of_sid(0))
+    call assert_equal('', wplus#keys#_test_module_of_sid(-1))
+
+    " Real script ids still resolve to their module.
+    let s:lsp = getscriptinfo({'name': s:repo . '/autoload/wplus/lsp.vim'})
+    call assert_true(!empty(s:lsp), 'lsp module script should be sourced')
+    call assert_equal('lsp', wplus#keys#_test_module_of_sid(s:lsp[0].sid))
+endfunction
