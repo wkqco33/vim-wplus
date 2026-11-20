@@ -16,5 +16,12 @@ execute 'set runtimepath^=' . fnameescape(s:repo)
 " Keep the leader predictable: several modules and their docs assume Space.
 let g:mapleader = ' '
 
+" Keep the suite out of ~/.vim/sessions. A test run once saved a session whose
+" 'runtimepath' was the test one; the next real start restored it and broke
+" plugin autoload with E117. Tests get a throwaway directory and no autocmds.
+let g:wplus_session_dir = tempname() . '-sessions'
+let g:wplus_session_autoload = 0
+let g:wplus_session_autosave = 0
+
 filetype plugin indent on
 syntax enable

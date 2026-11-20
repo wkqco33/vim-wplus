@@ -144,6 +144,7 @@ let g:wplus_run_use_terminal = 1          " 1=터미널, 0=quickfix
 let g:wplus_session_autoload  = 1
 let g:wplus_session_autosave  = 1
 let g:wplus_session_max_files = 50
+let g:wplus_session_dir       = '~/.vim/sessions'   " 세션 파일 저장 위치
 
 " ── project ──────────────────────────────────────────────────────────────
 let g:wplus_project_config    = '.wplus.vim'

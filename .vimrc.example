@@ -163,6 +163,7 @@ let g:wplus_session_enabled = 1
 let g:wplus_session_autoload = 1
 let g:wplus_session_autosave = 1
 let g:wplus_session_max_files = 50
+let g:wplus_session_dir       = '~/.vim/sessions'   " 세션 파일 저장 위치 (기본값)
 
 let g:wplus_terminal_enabled = 1
 let g:wplus_terminal_height = 15

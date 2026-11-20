@@ -8,6 +8,11 @@
 - **`:help wplus-keymaps` 신설**: 키맵·명령·모듈 레퍼런스를 단일 정본으로 문서화하고 목차에 연결. `docs/keymaps.md`는 중복 표를 제거하고 확인 방법 안내로 전환(과거 `<leader>ar/ae/af/am`은 기본값이 아니었고 `<leader>i`, `<leader>bl`, `<leader>h2~h4`는 문서에 누락되어 있었다).
 - **문서 드리프트 차단**: `test/test_keys.vim`이 런타임 `<leader>` 매핑 전체가 `doc/wplus.txt`에 존재하는지 검사하므로 키맵 추가 시 문서 누락이 테스트에서 실패한다.
 
+### 🧩 세션 복원 안정화
+- **세션 파일이 플러그인 경로를 덮어쓰던 문제 수정**: `:mksession`이 기록한 `set runtimepath=`/`set packpath=`를 복원 시 그대로 적용해 vim-plug 플러그인 경로가 사라지고, 세션 파일 끝의 `doautoall SessionLoadPost`에서 `E117: Unknown function: tagbar#RestoreSession`으로 복원이 중단되던 문제. 복원 시 두 옵션을 제거한 사본을 source하고, 저장 시에도 다시 기록하지 않는다.
+- **테스트 격리**: 테스트 스위트가 `~/.vim/sessions`에 실제 세션을 남기던 문제를 수정(`g:wplus_session_dir`로 임시 디렉터리 지정, autoload/autosave 비활성). 남겨진 세션 파일이 다음 실제 Vim 시작에 복원되며 위 E117을 유발했다.
+- **`g:wplus_session_dir` 옵션 추가** 및 `test/test_session.vim` 신규(복원 시 경로 보존, 오류 보고, 저장 파일 정규화 검증).
+
 ### 키맵 비간섭성
 - **Vim 기본 키 보존**: multicursor, register, surround, commentary, LSP 기본 매핑을 leader 키로 이동하고 기존 LSP native 키맵은 `g:wplus_lsp_native_keymaps` opt-in으로 유지.
 - **키맵 Health 검사 확장**: Normal/Insert/Visual 등 전역 매핑의 네이티브 키 탈취와 접두 그림자를 검사하고, commentary/surround 전체 줄 매핑의 접두 충돌 제거.

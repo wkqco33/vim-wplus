@@ -605,7 +605,15 @@ Configuration: >
     let g:wplus_session_autoload  = 1
     let g:wplus_session_autosave  = 1
     let g:wplus_session_max_files = 50
+    let g:wplus_session_dir       = '~/.vim/sessions'
 <
+:mksession records every option, including 'runtimepath' and 'packpath'.
+Restoring that value would replace the *current* Vim's plugin path with the
+one of whichever Vim saved the session, so plugins that are not loaded yet
+break with "E117: Unknown function" (a session saved by another install shows
+up as tagbar#RestoreSession or NERDTree, for example). This module strips those
+two options before sourcing a session, and never writes them into a new one.
+Stale session files therefore keep working and the plugin path stays intact.
 
 ==============================================================================
 37. PROJECT                                                    *wplus-project*

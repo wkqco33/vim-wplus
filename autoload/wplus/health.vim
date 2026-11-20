@@ -49,6 +49,7 @@ let s:known_options = [
     \ 'wplus_project_verbose', 'wplus_run_commands', 'wplus_build_commands', 'wplus_test_commands', 'wplus_run_use_terminal',
     \ 'wplus_scratch_file', 'wplus_scratch_ft', 'wplus_scratch_position',
     \ 'wplus_session_autoload', 'wplus_session_autosave', 'wplus_session_max_files',
+    \ 'wplus_session_dir',
     \ 'wplus_theme_auto', 'wplus_todo_grep_backend', 'wplus_todo_keywords',
     \ 'wplus_load_errors',
     \ 'wplus_conflict_auto_highlight', 'wplus_explorer_width', 'wplus_explorer_ignore',

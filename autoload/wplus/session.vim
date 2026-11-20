@@ -8,7 +8,13 @@ let g:autoloaded_wplus_session = 1
 let g:wplus_session_autoload = get(g:, 'wplus_session_autoload', get(g:, 'wplus_session_auto_restore', 1))
 let g:wplus_session_autosave = get(g:, 'wplus_session_autosave', get(g:, 'wplus_session_auto_save', 1))
 let g:wplus_session_max_files = get(g:, 'wplus_session_max_files', 50)
-let s:session_dir = expand('~/.vim/sessions')
+let s:session_dir = expand(get(g:, 'wplus_session_dir', '~/.vim/sessions'))
+
+" mksession records every option, including the plugin load path. Restoring
+" that value replaces the current Vim's 'runtimepath'/'packpath' with whatever
+" the saving Vim had, so any autoload function that is still unloaded fails
+" with E117 (e.g. tagbar's SessionLoadPost -> tagbar#RestoreSession).
+let s:load_path_pattern = '^\s*se\%[t]\%[global]\s\+\%(runtimepath\|rtp\|packpath\|pp\)\s*='
 
 " ── public API ────────────────────────────────────────────────────────────
 
@@ -86,19 +92,62 @@ function! s:save_session() abort
     call s:close_plugin_windows()
     let l:file = s:get_session_name()
     execute 'mksession! ' . fnameescape(l:file)
+    " Do not let this file pin the plugin load path for the next start.
+    call s:sanitize_file(l:file)
+endfunction
+
+" Lines that must not travel between Vim instances (plugin load path).
+function! s:strip_load_paths(lines) abort
+    return filter(copy(a:lines), 'v:val !~# s:load_path_pattern')
+endfunction
+
+" Remove the load-path options from a session file in place. Returns the number
+" of stripped lines; keeps the file mode because sessions can hold registers.
+function! s:sanitize_file(path) abort
+    let l:lines = readfile(a:path)
+    let l:kept = s:strip_load_paths(l:lines)
+    let l:stripped = len(l:lines) - len(l:kept)
+    if l:stripped > 0
+        let l:perm = getfperm(a:path)
+        call writefile(l:kept, a:path)
+        if !empty(l:perm) | call setfperm(a:path, l:perm) | endif
+    endif
+    return l:stripped
+endfunction
+
+" Source a:path with the load-path options removed. Sessions written by an
+" older wplus (or by another Vim) are restored from a sanitized copy so the
+" user's file is left untouched. Returns '' or the caught exception text.
+function! s:restore_file(path) abort
+    if !filereadable(a:path)
+        return ''
+    endif
+    let l:lines = readfile(a:path)
+    let l:kept = s:strip_load_paths(l:lines)
+    let l:file = a:path
+    let l:temp = ''
+    if len(l:kept) != len(l:lines)
+        let l:temp = tempname()
+        call writefile(l:kept, l:temp)
+        let l:file = l:temp
+    endif
+    try
+        execute 'source ' . fnameescape(l:file)
+        return ''
+    catch
+        return v:exception
+    finally
+        if !empty(l:temp) | call delete(l:temp) | endif
+    endtry
 endfunction
 
 function! s:load_session() abort
     " Only load if starting Vim with no arguments and empty buffer
     if argc() > 0 || line2byte('$') != -1 || bufnr('$') > 1 | return | endif
 
-    let l:file = s:get_session_name()
-    if filereadable(l:file)
-        try
-            execute 'source ' . fnameescape(l:file)
-        catch
-            call wplus#util#warn_msg('session', 'session load error: ' . v:exception)
-        endtry
+    let l:err = s:restore_file(s:get_session_name())
+    if !empty(l:err)
+        call wplus#util#warn_msg('session', 'session load error: ' . l:err)
     endif
 endfunction
 
@@ -108,4 +157,25 @@ function! s:delete_session() abort
         call delete(l:file)
         echo "Wplus: Session deleted for current project."
     endif
+endfunction
+
+
+" ── test bridges ──────────────────────────────────────────────────────────
+" Thin public wrappers so the restore path can be exercised without a real
+" VimEnter; see test/test_session.vim.
+
+function! wplus#session#_test_strip(lines) abort
+    return s:strip_load_paths(a:lines)
+endfunction
+
+function! wplus#session#_test_restore(path) abort
+    return s:restore_file(a:path)
+endfunction
+
+function! wplus#session#_test_sanitize_file(path) abort
+    return s:sanitize_file(a:path)
+endfunction
+
+function! wplus#session#_test_session_dir() abort
+    return s:session_dir
 endfunction
